@@ -62,8 +62,8 @@ module vardef
   double precision :: curv_threshold
   integer :: max_curv_reverse_top, max_curv_reverse_bot
   ! added lift and drag constraints
-  character(8), dimension(max_op_points) :: moment_constraint_type,			   &
-	                                        lift_constraint_type,			   &
+  character(8), dimension(max_op_points) :: moment_constraint_type,            &
+	                                        lift_constraint_type,                &
 	                                        drag_constraint_type
   double precision, dimension(max_op_points) :: min_moment, min_lift, max_drag
   character(11) :: shape_functions

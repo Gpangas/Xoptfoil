@@ -89,8 +89,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   !added lift_constraint_type, min_lift, drag_constraint_type, max_drag
   !added min_flap_x, max_flap_x
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
-                         min_moment, lift_constraint_type,					   &
-                         min_lift, drag_constraint_type,					   &
+                         min_moment, lift_constraint_type,                     &
+                         min_lift, drag_constraint_type,                       &
                          max_drag, min_te_angle, check_curvature,              &
                          max_curv_reverse_top, max_curv_reverse_bot,           &
                          curv_threshold, symmetrical, min_flap_degrees,        &
