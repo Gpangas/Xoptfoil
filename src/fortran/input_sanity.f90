@@ -25,7 +25,7 @@ module input_sanity
 !
 ! Checks that the seed airfoil passes all constraints, sets scale factors for
 ! objective functions at each operating point, and optionally sets the
-! minimum allowable pitching moment.
+! minimum allowable pitching moment, lift and maximum drag.
 !
 !=============================================================================80
 subroutine check_seed()
@@ -367,9 +367,10 @@ subroutine check_seed()
     end if
   end do
 
-! Set moment constraint or check for violation of specified constraint
+! Set aerodinamic constraint or check for violation of specified constraint
 
   do i = 1, noppoint
+	! moment contraint
     if (trim(moment_constraint_type(i)) == 'use_seed') then
       min_moment(i) = moment(i)
     elseif (trim(moment_constraint_type(i)) == 'specify') then
@@ -380,6 +381,34 @@ subroutine check_seed()
         write(text,*) i
         text = adjustl(text)
         call ask_stop("Seed airfoil violates min_moment constraint for "//&
+                      "operating point "//trim(text)//".")
+      end if
+	end if
+	! lift contraint
+    if (trim(lift_constraint_type(i)) == 'use_seed') then
+      min_lift(i) = lift(i)
+    elseif (trim(lift_constraint_type(i)) == 'specify') then
+      if (lift(i) < min_lift(i)) then
+        write(text,'(F8.4)') lift(i)
+        text = adjustl(text)
+        write(*,*) "Lift: "//trim(text)
+        write(text,*) i
+        text = adjustl(text)
+        call ask_stop("Seed airfoil violates min_lift constraint for "//&
+                      "operating point "//trim(text)//".")
+      end if
+	end if
+	! drag contraint
+    if (trim(drag_constraint_type(i)) == 'use_seed') then
+      max_drag(i) = drag(i)
+    elseif (trim(drag_constraint_type(i)) == 'specify') then
+      if (drag(i) > max_drag(i)) then
+        write(text,'(F8.4)') drag(i)
+        text = adjustl(text)
+        write(*,*) "Drag: "//trim(text)
+        write(text,*) i
+        text = adjustl(text)
+        call ask_stop("Seed airfoil violates max_drag constraint for "//&
                       "operating point "//trim(text)//".")
       end if
     end if

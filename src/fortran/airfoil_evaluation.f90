@@ -124,7 +124,8 @@ function aero_objective_function(designvars, include_penalty)
   logical :: check
   double precision :: increment, curv1, curv2
   integer :: nreversalst, nreversalsb, ndvs
-  double precision :: gapallow, maxthick, ffact
+  double precision :: actual_x_flap
+  double precision :: gapallow, maxthick, ffact, fxfact
   integer :: check_idx, flap_idx, dvcounter
   double precision, parameter :: epsexit = 1.0D-04
   double precision, parameter :: epsupdate = 1.0D-08
@@ -148,10 +149,10 @@ function aero_objective_function(designvars, include_penalty)
 
   dvtbnd1 = 1
   if (trim(shape_functions) == 'naca') then
-    dvtbnd2 = nmodest
+    dvtbnd2 = nmodest                         ! useless line
     dvbbnd2 = nmodest + nmodesb
   else
-    dvtbnd2 = nmodest*3
+    dvtbnd2 = nmodest*3                       ! useless line
     dvbbnd2 = nmodest*3 + nmodesb*3
   end if
   dvbbnd1 = dvtbnd2 + 1
@@ -306,7 +307,7 @@ function aero_objective_function(designvars, include_penalty)
 
 ! Check that number of flap optimize points are correct
 
-  ndvs = size(designvars,1)
+  ndvs = size(designvars,1) - int_x_flap_spec 
   if (nflap_optimize /= (ndvs - dvbbnd2)) then
     write(*,*) "Wrong number of design variables for flap deflections."
     write(*,*) "Please report this bug."
@@ -315,7 +316,7 @@ function aero_objective_function(designvars, include_penalty)
 
 ! Get actual flap angles based on design variables
 ! Also add a penalty for flap deflections outside the specified bounds
-
+  
   ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
   actual_flap_degrees(1:noppoint) = flap_degrees(1:noppoint)
   dvcounter = dvbbnd2 + 1
@@ -329,6 +330,17 @@ function aero_objective_function(designvars, include_penalty)
     dvcounter = dvcounter + 1
   end do
 
+! Get actual flap chord based on design variable
+! Also add a penalty for flap chord outside the specified bounds
+  if (int_x_flap_spec == 1) then
+    fxfact = initial_perturb/(max_flap_x - min_flap_x)
+    actual_x_flap = designvars(dvcounter)/fxfact + min_flap_x
+    penaltyval = penaltyval + max(0.d0,actual_x_flap-max_flap_x)
+    penaltyval = penaltyval + max(0.d0,min_flap_x-actual_x_flap)
+  else
+    actual_x_flap=x_flap
+  end if
+  
 ! Exit if geometry and flap angles don't check out
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -340,7 +352,7 @@ function aero_objective_function(designvars, include_penalty)
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
                  op_mode(1:noppoint), reynolds(1:noppoint), mach(1:noppoint),  &
-                 use_flap, x_flap, y_flap, y_flap_spec,                        &
+                 use_flap, actual_x_flap, y_flap, y_flap_spec,                        &
                  actual_flap_degrees(1:noppoint), xfoil_options, lift, drag,   &
                  moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
 
@@ -406,7 +418,7 @@ function aero_objective_function(designvars, include_penalty)
 
     call run_xfoil(curr_foil, xfoil_geom_options, opp_check(1:ncheckpt),       &
                    opm_check(1:ncheckpt), re_check(1:ncheckpt),                &
-                   ma_check(1:ncheckpt), use_flap, x_flap, y_flap, y_flap_spec,&
+                   ma_check(1:ncheckpt), use_flap, actual_x_flap, y_flap, y_flap_spec,&
                    fd_check(1:ncheckpt), xfoil_options, clcheck, cdcheck,      &
                    cmcheck, rmscheck, alcheck, xtrtcheck, xtrbcheck,           &
                    ncrit_check(1:ncheckpt))
@@ -564,6 +576,22 @@ function aero_objective_function(designvars, include_penalty)
     end if
   end do
 
+! Add penalty for too low lift
+
+  do i = 1, noppoint
+    if (trim(lift_constraint_type(i)) /= 'none') then
+      penaltyval = penaltyval + max(0.d0,min_lift(i)-lift(i))/0.1d0
+    end if
+  end do
+
+! Add penalty for too high drag
+
+  do i = 1, noppoint
+    if (trim(drag_constraint_type(i)) /= 'none') then
+      penaltyval = penaltyval + max(0.d0,drag(i)-max_drag(i))/0.1d0
+    end if
+  end do
+  
 ! Add all penalties to objective function, and make them very large
 
   if (penalize) aero_objective_function =                                      &
@@ -677,7 +705,8 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   double precision, dimension(noppoint) :: alpha, lift, drag, moment, viscrms, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
-  double precision :: ffact, maxt, xmaxt, maxc, xmaxc
+  double precision :: ffact, fxfact, maxt, xmaxt, maxc, xmaxc
+  double precision :: actual_x_flap
   integer :: ndvs, flap_idx, dvcounter
  
   character(100) :: foilfile, polarfile, text
@@ -728,7 +757,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
 ! Check that number of flap optimize points are correct
 
-  ndvs = size(designvars,1)
+  ndvs = size(designvars,1) - int_x_flap_spec
   if (nflap_optimize /= (ndvs - dvbbnd2)) then
     write(*,*) "Wrong number of design variables for flap deflections."
     write(*,*) "Please report this bug."
@@ -745,12 +774,20 @@ function write_airfoil_optimization_progress(designvars, designcounter)
     actual_flap_degrees(flap_idx) = designvars(dvcounter)/ffact
     dvcounter = dvcounter + 1
   end do
+  
+! Get actual flap chord based on design variable
+  if (int_x_flap_spec == 1) then
+    fxfact = initial_perturb/(max_flap_x - min_flap_x)
+    actual_x_flap = designvars(dvcounter)/fxfact + min_flap_x
+  else
+    actual_x_flap=x_flap
+  end if
 
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
                  op_mode(1:noppoint), reynolds(1:noppoint), mach(1:noppoint),  &
-                 use_flap, x_flap, y_flap, y_flap_spec,                        &
+                 use_flap, actual_x_flap, y_flap, y_flap_spec,                        &
                  actual_flap_degrees(1:noppoint), xfoil_options, lift, drag,   &
                  moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
 
@@ -994,7 +1031,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
                                                    moment, xtrt, xtrb
   double precision, dimension(:), allocatable :: fmin, relfmin, rad
   character(150), dimension(:), allocatable :: zoneinfo
-  character(100) :: restfile, foilfile, polarfile, histfile, text
+  character(100) :: restfile, foilfile, polarfile, text
   character(11) :: stepchar
   character(20) :: fminchar, radchar
   character(25) :: relfminchar
@@ -1105,8 +1142,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
 
 ! Open history file
 
-  histfile = trim(output_prefix)//'_optimization_history.dat'
-  open(unit=histunit, file=histfile, status='old',           &
+  open(unit=histunit, file='optimization_history.dat', status='old',           &
        iostat=ioerr)
   if (ioerr /= 0) then
     write_function_restart_cleanup = 3
@@ -1118,7 +1154,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   read(histunit,*)
 
 ! Read optimizer data at each iteration
-
+!write(*,*) step
   do i = 1, step
     read(histunit,*) j, fmin(i), relfmin(i), rad(i)
   end do
@@ -1129,7 +1165,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
 
 ! Re-write history file without the unused iterations
 
-  open(unit=histunit, file=histfile, status='replace')
+  open(unit=histunit, file='optimization_history.dat', status='replace')
   write(histunit,'(A)') "Iteration  Objective function  "//&
                         "% Improvement over seed  Design radius"
   do i = 1, step

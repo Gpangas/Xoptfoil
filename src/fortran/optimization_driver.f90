@@ -121,7 +121,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
   use vardef,             only : shape_functions, nflap_optimize,              &
                                  initial_perturb, min_flap_degrees,            &
-                                 max_flap_degrees, flap_degrees,               &
+                                 max_flap_degrees, flap_degrees, x_flap,       &
+                                 int_x_flap_spec, min_flap_x, max_flap_x,      &
                                  flap_optimize_points, min_bump_width,         &
                                  output_prefix 
   use particle_swarm,     only : pso_options_type, particleswarm
@@ -144,7 +145,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
   integer :: counter, nfuncs, ndv
   double precision, dimension(size(optdesign,1)) :: xmin, xmax, x0
-  double precision :: t1fact, t2fact, ffact
+  double precision :: t1fact, t2fact, ffact, fxfact
   logical :: restart_temp, write_designs
   integer :: stepsg, fevalsg, stepsl, fevalsl, i, oppoint, stat,               &
              iunit, ioerr, designcounter
@@ -178,12 +179,13 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   t1fact = initial_perturb/(1.d0 - 0.001d0)
   t2fact = initial_perturb/(10.d0 - min_bump_width)
   ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
+  fxfact = initial_perturb/(max_flap_x - min_flap_x)
 
 ! Set initial design
 
   if (trim(shape_functions) == 'naca') then     
 
-    nfuncs = ndv - nflap_optimize
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
 
 !   Mode strength = 0 (aka seed airfoil)
 
@@ -191,11 +193,11 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
 !   Seed flap deflection as specified in input file
 
-    do i = nfuncs + 1, ndv
+    do i = nfuncs + 1, ndv - int_x_flap_spec
       oppoint = flap_optimize_points(i-nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
-
+    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
   else
 
     nfuncs = (ndv - nflap_optimize)/3
@@ -208,10 +210,11 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
       x0(counter+2) = 0.5d0*t1fact
       x0(counter+3) = 1.d0*t2fact
     end do
-    do i = 3*nfuncs+1, ndv
+    do i = 3*nfuncs+1, ndv - int_x_flap_spec
       oppoint = flap_optimize_points(i-3*nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
+    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
 
   end if
 
@@ -298,8 +301,12 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
       xmin(1:nfuncs) = -0.5d0*initial_perturb
       xmax(1:nfuncs) = 0.5d0*initial_perturb
-      xmin(nfuncs+1:ndv) = min_flap_degrees*ffact
-      xmax(nfuncs+1:ndv) = max_flap_degrees*ffact
+      xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
+      xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+      if (int_x_flap_spec == 1) then
+        xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
+        xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+      end if
 
     else
 
@@ -314,10 +321,14 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
         xmin(counter+3) = min_bump_width*t2fact
         xmax(counter+3) = 10.d0*t2fact
       end do
-      do i = 3*nfuncs+1, ndv
+      do i = 3*nfuncs+1, ndv - int_x_flap_spec 
         xmin(i) = min_flap_degrees*ffact
         xmax(i) = max_flap_degrees*ffact
       end do
+      if (int_x_flap_spec == 1) then
+        xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
+        xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+      end if
 
     end if
 
@@ -424,7 +435,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   double precision, dimension(noppoint) :: alpha, lift, drag, moment, viscrms, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
-  double precision :: ffact
+  double precision :: ffact, fxfact, actual_x_flap
   integer :: dvtbnd1, dvtbnd2, dvbbnd1, dvbbnd2, nmodest, nmodesb, nptt, nptb, i
   integer :: flap_idx, dvcounter, iunit
   type(airfoil_type) :: final_airfoil
@@ -490,7 +501,10 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
       actual_flap_degrees(flap_idx) = optdesign(dvcounter)/ffact
       dvcounter = dvcounter + 1
     end do
-
+!   Get flap chord based on design variables
+    fxfact = initial_perturb/(max_flap_x - min_flap_x)
+    actual_x_flap = optdesign(dvcounter)/fxfact + min_flap_x
+    
 !   Run xfoil for requested operating points
 
     call run_xfoil(final_airfoil, xfoil_geom_options, op_point(1:noppoint),    &
@@ -511,6 +525,11 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     write(*,'(A)') " ----------------------------------------------------------"
     write(iunit,'(A)')                                                         &
                    " ----------------------------------------------------------"
+    if (int_x_flap_spec == 1) then
+      write(*,'(A13,F9.5)') " Flap chord: ", actual_x_flap
+      write(iunit,'(A13,F9.5)') " Flap chord: ", actual_x_flap
+    end if
+    
     do i = 1, noppoint
       write(text,*) i
       text = adjustl(text)

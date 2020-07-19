@@ -45,6 +45,8 @@ module vardef
                                  flap_degrees, weighting, scale_factor, ncrit_pt
   double precision :: x_flap, y_flap
   character(3) :: y_flap_spec
+  character(8) :: x_flap_spec        ! added x_flap_spec
+  integer :: int_x_flap_spec         ! added int_x_flap_spec
   logical :: use_flap
   character(14), dimension(max_op_points) :: optimization_type
   integer :: nflap_optimize          ! Number of operating points where flap 
@@ -53,13 +55,17 @@ module vardef
   double precision :: xoffset, zoffset, foilscale
 
   type(airfoil_type) :: curr_foil
+  ! added min_flap_x and max_flap_x
   double precision :: min_thickness, max_thickness, min_te_angle,              &
                       growth_allowed, min_flap_degrees, max_flap_degrees,      &
-                      min_camber, max_camber
+                      min_flap_x, max_flap_x, min_camber, max_camber
   double precision :: curv_threshold
   integer :: max_curv_reverse_top, max_curv_reverse_bot
-  character(8), dimension(max_op_points) :: moment_constraint_type
-  double precision, dimension(max_op_points) :: min_moment
+  ! added lift and drag constraints
+  character(8), dimension(max_op_points) :: moment_constraint_type,			   &
+	                                        lift_constraint_type,			   &
+	                                        drag_constraint_type
+  double precision, dimension(max_op_points) :: min_moment, min_lift, max_drag
   character(11) :: shape_functions
   double precision, dimension(:), allocatable :: xmatcht, xmatchb, zmatcht,    &
                                                  zmatchb
@@ -74,7 +80,7 @@ module vardef
   character(80) :: output_prefix
 
   integer :: naddthickconst
-  integer, parameter :: max_addthickconst = 10
+  integer, parameter :: max_addthickconst = 10 ! remove limit?
   double precision, dimension(max_addthickconst) :: addthick_x, addthick_min,  &
                                                     addthick_max
 

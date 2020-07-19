@@ -108,7 +108,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
     if (given_f0_ref) then
       f0 = f0_ref
-    else 
+    else
       f0 = objfunc(x0)
       f0_ref = f0
     end if
@@ -131,7 +131,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
       objvals(j) = objfunc(dv(:,j))
       fevals = fevals + 1
     end do
-  
+
     dv(:,nvars+1) = x0
     objvals(nvars+1) = objfunc(x0)
     fevals = fevals + 1
@@ -174,7 +174,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     open(unit=iunit, file=histfile, status='old',            &
          position='append', iostat=ioerr)
     if (ioerr /= 0) then
-      write(*,*) 
+      write(*,*)
       write(*,*) "Warning: did not find existing optimization_history.dat file."
       write(*,*) "A new one will be written, but old data will be lost."
       write(*,*)
@@ -193,7 +193,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   end if
 
 ! Iterative procedure for optimization
- 
+
   restartcounter = 1
   needshrink = .false.
   converged = .false.
@@ -203,8 +203,10 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   main_loop: do while (.not. converged)
 
     step = step + 1
-    if (step == ds_options%maxit + prevsteps) converged = .true.
-    
+    ! '>=' instead of '==', to make sure it doesn't run after restart when max
+    ! iterations has already been reached
+    if (step >= ds_options%maxit + prevsteps) converged = .true.
+
 !   Sort according to ascending objective function value
 
     call bubble_sort(dv, objvals)
@@ -239,7 +241,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
     if (ds_options%write_designs .and. designcounter == 1) then
       filestat = 'new'
-    else 
+    else
       filestat = 'old'
     end if
 
@@ -271,8 +273,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !   Write restart file if appropriate and update restart counter
 
     if (restartcounter == restart_write_freq) then
-      call simplex_write_restart(step+prevsteps, designcounter, dv, objvals,   &
-                                 f0, fevals)
+      ! 'step' to correct the number on simplex restart
+      call simplex_write_restart(step, designcounter, dv, objvals, f0, fevals)
       restartcounter = 1
     else
       restartcounter = restartcounter + 1
@@ -346,12 +348,12 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
 !       Inside contraction
 
-        else 
+        else
 
           xc = (1.d0 - gam)*xcen + gam*dv(:,nvars+1)
           fc = objfunc(xc)
           fevals = fevals + 1
-          
+
           if (fc < objvals(nvars+1) ) then
             dv(:,nvars+1) = xc
             objvals(nvars+1) = fc
@@ -399,7 +401,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   radius = design_radius(dv)
 
 ! Display warning if max iterations are reached
-  
+
   if (step == ds_options%maxit .and. (radius >= ds_options%tol)) then
     write(*,*) 'Warning: Simplex optimizer forced to exit due to the max number'
     write(*,*) '         of iterations being reached.'
@@ -433,7 +435,7 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals)
 
   character(100) :: restfile
   integer :: iunit
-  
+
 ! Status notification
 
   restfile = 'restart_simplex_'//trim(output_prefix)
@@ -443,7 +445,7 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals)
 
   iunit = 13
   open(unit=iunit, file=restfile, status='replace', form='unformatted')
-  
+
 ! Write restart data
 
   write(iunit) step
@@ -495,7 +497,7 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals)
     write(*,*)
     stop
   end if
-  
+
 ! Read restart data
 
   read(iunit) step

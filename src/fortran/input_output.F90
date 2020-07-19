@@ -72,7 +72,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                       tournament_fraction, crossover_range_factor,             &
                       mutant_probability, chromosome_mutation_rate,            &
                       mutation_range_factor
-  integer :: nbot_actual, nmoment_constraint, nxtr_opt
+  integer :: nbot_actual, nmoment_constraint, nlift_constraint, nxtr_opt
   integer :: i, iunit, ioerr, iostat1, counter, idx
   character(30) :: text
   character(3) :: family
@@ -84,14 +84,19 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             nfunctions_bot, initial_perturb, min_bump_width, restart,          &
             restart_write_freq, write_designs
   namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
-            use_flap, x_flap, y_flap, y_flap_spec, flap_selection,             &
+            use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, flap_selection,             &
             flap_degrees, weighting, optimization_type, ncrit_pt
+  !added lift_constraint_type, min_lift, drag_constraint_type, max_drag
+  !added min_flap_x, max_flap_x
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
-                         min_moment, min_te_angle, check_curvature,            &
+                         min_moment, lift_constraint_type,					   &
+                         min_lift, drag_constraint_type,					   &
+                         max_drag, min_te_angle, check_curvature,              &
                          max_curv_reverse_top, max_curv_reverse_bot,           &
                          curv_threshold, symmetrical, min_flap_degrees,        &
-                         max_flap_degrees, min_camber, max_camber,             &
-                         naddthickconst, addthick_x, addthick_min, addthick_max
+                         max_flap_degrees, min_flap_x, max_flap_x, min_camber, &
+                         max_camber, naddthickconst, addthick_x, addthick_min, &
+                         addthick_max
   namelist /naca_airfoil/ family, maxt, xmaxt, maxc, xmaxc, design_cl, a,      &
                           leidx, reflexed
   namelist /initialization/ feasible_init, feasible_limit,                     &
@@ -150,6 +155,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   noppoint = 1
   use_flap = .false.
   x_flap = 0.75d0
+  x_flap_spec = 'specify' ! specify, optimize 
   y_flap = 0.d0
   y_flap_spec = 'y/c'
   op_mode(:) = 'spec-cl'
@@ -168,6 +174,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   max_camber = 0.1d0
   moment_constraint_type(:) = 'none'
   min_moment(:) = -1.d0
+  lift_constraint_type(:) = 'none'
+  min_lift(:) = 0.d0
+  drag_constraint_type(:) = 'none'
+  max_drag(:) = 1.d0
   min_te_angle = 5.d0
   check_curvature = .false.
   max_curv_reverse_top = 1
@@ -176,6 +186,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   symmetrical = .false.
   min_flap_degrees = -5.d0
   max_flap_degrees = 15.d0
+  min_flap_x = 0.7d0
+  max_flap_x = 0.9d0
   naddthickconst = 0
   addthick_x(:) = 0.01d0
   addthick_min(:) = -1000.d0
@@ -190,6 +202,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   read(iunit, iostat=iostat1, nml=constraints)
   call namelist_check('constraints', iostat1, 'stop')
 
+! Avaliate type of flap chord
+  if (trim(x_flap_spec) == 'optimize') then
+    int_x_flap_spec = 1
+  else
+    int_x_flap_spec = 0
+  end if  
 ! Store operating points where flap setting will be optimized
 
   nflap_optimize = 0
@@ -310,27 +328,26 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     else
       nbot_actual = nfunctions_bot
     end if
-  
+
 !   Set design variables with side constraints
 
     if (trim(shape_functions) == 'naca') then
 
 !     For NACA, we will only constrain the flap deflection
 
-      allocate(constrained_dvs(nflap_optimize))
+      allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
       counter = 0
       do i = nfunctions_top + nbot_actual + 1,                                 &
-             nfunctions_top + nbot_actual + nflap_optimize
+             nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
         counter = counter + 1
         constrained_dvs(counter) = i
       end do
-          
     else
 
 !     For Hicks-Henne, also constrain bump locations and width
 
       allocate(constrained_dvs(2*nfunctions_top + 2*nbot_actual +              &
-                               nflap_optimize))
+                               nflap_optimize + int_x_flap_spec))
       counter = 0
       do i = 1, nfunctions_top + nbot_actual
         counter = counter + 1
@@ -341,11 +358,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
         constrained_dvs(counter) = idx
       end do
       do i = 3*(nfunctions_top + nbot_actual) + 1,                             &
-             3*(nfunctions_top + nbot_actual) + nflap_optimize
+             3*(nfunctions_top + nbot_actual) + nflap_optimize + int_x_flap_spec
         counter = counter + 1
         constrained_dvs(counter) = i
       end do
-
+    
     end if
 
     if (trim(global_search) == 'particle_swarm') then
@@ -429,6 +446,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     end if
 
   end if 
+
 
 ! Set default xfoil aerodynamics and paneling options
 
@@ -544,6 +562,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " noppoint = ", noppoint
   write(*,*) " use_flap = ", use_flap
   write(*,*) " x_flap = ", x_flap
+  write(*,*) " x_flap_spec = "//trim(x_flap_spec)
   write(*,*) " y_flap = ", y_flap
   write(*,*) " y_flap_spec = "//trim(y_flap_spec)
   write(*,*)
@@ -578,6 +597,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     write(*,*) " moment_constraint_type("//trim(text)//") = "//                &
                trim(moment_constraint_type(i))
     write(*,*) " min_moment("//trim(text)//") = ", min_moment(i)
+	write(*,*) " lift_constraint_type("//trim(text)//") = "//                &
+               trim(lift_constraint_type(i))
+    write(*,*) " min_lift("//trim(text)//") = ", min_lift(i)
+	write(*,*) " drag_constraint_type("//trim(text)//") = "//                &
+               trim(drag_constraint_type(i))
+    write(*,*) " max_drag("//trim(text)//") = ", max_drag(i)
   end do
   write(*,*) " min_te_angle = ", min_te_angle
   write(*,*) " check_curvature = ", check_curvature
@@ -587,6 +612,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " symmetrical = ", symmetrical
   write(*,*) " min_flap_degrees = ", min_flap_degrees
   write(*,*) " max_flap_degrees = ", max_flap_degrees
+  write(*,*) " min_flap_x = ", min_flap_x
+  write(*,*) " max_flap_x = ", max_flap_x
   write(*,*) " min_camber = ", min_camber
   write(*,*) " max_camber = ", max_camber
   write(*,*) " naddthickconst = ", naddthickconst
@@ -750,6 +777,13 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   end if
   if ((use_flap) .and. (x_flap <= 0.0)) call my_stop("x_flap must be > 0.")
   if ((use_flap) .and. (x_flap >= 1.0)) call my_stop("x_flap must be < 1.")
+  if ((use_flap) .and. (x_flap_spec /= 'specify')                              &
+    .and. (x_flap_spec /= 'optimize'))                                         &
+    call my_stop("x_flap_spec must be 'specify' or 'optimize'.")
+  if ((trim(x_flap_spec) /= 'specify') .and. (x_flap < min_flap_x))            &
+    call my_stop("x_flap must be >= min_flap_x.")
+  if ((trim(x_flap_spec) /= 'specify') .and. (x_flap > max_flap_x))            &
+        call my_stop("x_flap must be <= max_flap_x.")
   if ((use_flap) .and. (y_flap_spec /= 'y/c') .and. (y_flap_spec /= 'y/t'))    &
     call my_stop("y_flap_spec must be 'y/c' or 'y/t'.")
 
@@ -790,6 +824,16 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       trim(moment_constraint_type(i)) /= 'none')                               &
       call my_stop("moment_constraint_type must be 'use_seed', 'specify', "//  &
                  "or 'none'.")
+    if (trim(lift_constraint_type(i)) /= 'use_seed' .and.                    &
+      trim(lift_constraint_type(i)) /= 'specify' .and.                       &
+      trim(lift_constraint_type(i)) /= 'none')                               &
+      call my_stop("lift_constraint_type must be 'use_seed', 'specify', "//  &
+                 "or 'none'.")
+    if (trim(drag_constraint_type(i)) /= 'use_seed' .and.                    &
+      trim(drag_constraint_type(i)) /= 'specify' .and.                       &
+      trim(drag_constraint_type(i)) /= 'none')                               &
+      call my_stop("drag_constraint_type must be 'use_seed', 'specify', "//  &
+                 "or 'none'.")
   end do
   if (min_te_angle < 0.d0) call my_stop("min_te_angle must be >= 0.")
   if (check_curvature .and. (curv_threshold <= 0.d0))                          &
@@ -806,6 +850,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("min_flap_degrees must be > -90.")
   if (max_flap_degrees >= 90.d0)                                               &
     call my_stop("max_flap_degrees must be < 90.")
+  if (min_flap_x >= max_flap_x)                                    &
+    call my_stop("min_flap_x must be < max_flap_x.")
+  if (min_flap_x <= 0.d0)                                              &
+    call my_stop("min_flap_x must be > 0.")
+  if (max_flap_x >= 1.d0)                                               &
+    call my_stop("max_flap_x must be < 1.")
   if (min_camber >= max_camber)                                                &
     call my_stop("min_camber must be < max_camber.")
   

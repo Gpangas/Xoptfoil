@@ -94,12 +94,15 @@ program main
     nshapedvtop = nparams_top*3
     nshapedvbot = nparams_bot*3
   end if
+  !added the flap chord as design variable
   if (.not. symmetrical) then
-    allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize))
+    allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize+int_x_flap_spec))
   else
-    allocate(optdesign(nshapedvtop+nflap_optimize))
+    allocate(optdesign(nshapedvtop+nflap_optimize+int_x_flap_spec))
   end if
 
+  write(*,*) "Number of Design Variables = ", size(optdesign,1)
+  
 ! Allocate memory for airfoil analysis
 
   call allocate_airfoil_data()
