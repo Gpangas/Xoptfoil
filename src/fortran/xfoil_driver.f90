@@ -49,16 +49,15 @@ module xfoil_driver
 ! Subroutine to smooth an airfoil using Xfoil's PANGEN subroutine
 !
 !=============================================================================80
-subroutine smooth_paneling(foilin, npoint, foilout)
+subroutine smooth_paneling(foilin, geom_options, foilout)
 
   use xfoil_inc
   use vardef, only : airfoil_type
 
   type(airfoil_type), intent(in) :: foilin
-  integer, intent(in) :: npoint
+  type(xfoil_geom_options_type), intent(in) :: geom_options
   type(airfoil_type), intent(out) :: foilout
   
-  type(xfoil_geom_options_type) :: geom_options
   integer :: i
   logical :: needs_cleanup
 
@@ -94,17 +93,6 @@ subroutine smooth_paneling(foilin, npoint, foilout)
   GAMTE_A = 0.d0
   SILENT_MODE = .TRUE.
 
-! Set geometry options for output airfoil
-
-  geom_options%npan = npoint
-  geom_options%cvpar = 1.d0
-  geom_options%cterat = 0.15d0
-  geom_options%ctrrat = 0.2d0
-  geom_options%xsref1 = 1.d0
-  geom_options%xsref2 = 1.d0
-  geom_options%xpref1 = 1.d0
-  geom_options%xpref2 = 1.d0
-
 ! Set xfoil airfoil and paneling options
 
   call xfoil_set_airfoil(foilin)
@@ -116,10 +104,10 @@ subroutine smooth_paneling(foilin, npoint, foilout)
 
 ! Put smoothed airfoil coordinates into derived type
 
-  foilout%npoint = npoint
-  allocate(foilout%x(npoint))
-  allocate(foilout%z(npoint))
-  do i = 1, npoint
+  foilout%npoint = geom_options%npan
+  allocate(foilout%x(geom_options%npan))
+  allocate(foilout%z(geom_options%npan))
+  do i = 1, geom_options%npan
     foilout%x(i) = X(i)
     foilout%z(i) = Y(i)
   end do

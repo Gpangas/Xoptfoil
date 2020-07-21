@@ -35,9 +35,10 @@ module airfoil_operations
 subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
                             xoffset, zoffset, foilscale)
 
-  use vardef,       only : airfoil_type
-  use xfoil_driver, only : smooth_paneling
-  use naca,         only : naca_options_type, naca_456
+  use vardef,             only : airfoil_type
+  use xfoil_driver,       only : smooth_paneling
+  use naca,               only : naca_options_type, naca_456
+  use airfoil_evaluation, only : xfoil_geom_options
 
   character(*), intent(in) :: seed_airfoil, airfoil_file
   type(naca_options_type), intent(in) :: naca_options
@@ -70,7 +71,7 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
 
 ! Use Xfoil to smooth airfoil paneling
 
-  call smooth_paneling(tempfoil, 200, foil)
+  call smooth_paneling(tempfoil, xfoil_geom_options, foil)
 
 ! Calculate leading edge information
 
