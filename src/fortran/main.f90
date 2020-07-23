@@ -26,12 +26,13 @@ program main
   use genetic_algorithm,   only : ga_options_type
   use simplex_search,      only : ds_options_type
   use airfoil_operations,  only : get_seed_airfoil, get_split_points,          &
-                                  split_airfoil
+                                  split_airfoil, RotateAirfoil
   use memory_util,         only : deallocate_airfoil, allocate_airfoil_data,   &
                                   deallocate_airfoil_data
   use input_sanity,        only : check_seed
   use optimization_driver, only : matchfoils_preprocessing, optimize,          &
                                   write_final_design
+  use parametrization_new, only : InitialKBParameterization
 
   implicit none
 
@@ -80,71 +81,75 @@ program main
   allocate(xseedb(pointsb))
   allocate(zseedb(pointsb))
   call split_airfoil(buffer_foil, xseedt, xseedb, zseedt, zseedb, symmetrical)
-
-! Deallocate the buffer airfoil (no longer needed)
-
-  call deallocate_airfoil(buffer_foil)
-
-! Allocate optimal solution
-
-  if (trim(shape_functions) == 'naca') then
-    nshapedvtop = nparams_top
-    nshapedvbot = nparams_bot
-  else
-    nshapedvtop = nparams_top*3
-    nshapedvbot = nparams_bot*3
-  end if
-  !added the flap chord as design variable
-  if (.not. symmetrical) then
-    allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize+int_x_flap_spec))
-  else
-    allocate(optdesign(nshapedvtop+nflap_optimize+int_x_flap_spec))
-  end if
-
-  write(*,*) "Number of Design Variables = ", size(optdesign,1)
   
-! Allocate memory for airfoil analysis
-
-  call allocate_airfoil_data()
-
-! Set up for matching airfoils
-
-  if (match_foils) then
-    call matchfoils_preprocessing(matchfoil_file)
-  else
-    write(*,*) "Optimizing for requested operating points."
-    write(*,*)
-  end if
-
-! Make sure seed airfoil passes constraints, and get scaling factors for
-! operating points
-
-  call check_seed()
-
-! Optimize
+  call RotateAirfoil(xseedt, xseedb, zseedt, zseedb)
   
-  call optimize(search_type, global_search, local_search, constrained_dvs,     &
-                pso_options, ga_options, ds_options, restart,                  &
-                restart_write_freq, optdesign, f0, fmin, steps, fevals)
-
-! Notify of total number of steps and function evals
-
-  write(*,*)
-  write(*,*) 'Optimization complete. Totals: '
-  write(*,*) '  Steps: ', steps, ' Objective function evaluations: ', fevals
-
-! Write final design and summary
-
-  call write_final_design(optdesign, f0, fmin, shape_functions)
-
-! Deallocate memory
-
-  call deallocate_airfoil_data()
-  deallocate(xseedt)
-  deallocate(xseedb)
-  deallocate(zseedt)
-  deallocate(zseedb)
-  deallocate(optdesign)
-  if (allocated(constrained_dvs)) deallocate(constrained_dvs)
+  call InitialKBParameterization()
+!
+!! Deallocate the buffer airfoil (no longer needed)
+!
+!  call deallocate_airfoil(buffer_foil)
+!
+!! Allocate optimal solution
+!
+!  if (trim(shape_functions) == 'naca') then
+!    nshapedvtop = nparams_top
+!    nshapedvbot = nparams_bot
+!  else
+!    nshapedvtop = nparams_top*3
+!    nshapedvbot = nparams_bot*3
+!  end if
+!  !added the flap chord as design variable
+!  if (.not. symmetrical) then
+!    allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize+int_x_flap_spec))
+!  else
+!    allocate(optdesign(nshapedvtop+nflap_optimize+int_x_flap_spec))
+!  end if
+!
+!  write(*,*) "Number of Design Variables = ", size(optdesign,1)
+!  
+!! Allocate memory for airfoil analysis
+!
+!  call allocate_airfoil_data()
+!
+!! Set up for matching airfoils
+!
+!  if (match_foils) then
+!    call matchfoils_preprocessing(matchfoil_file)
+!  else
+!    write(*,*) "Optimizing for requested operating points."
+!    write(*,*)
+!  end if
+!
+!! Make sure seed airfoil passes constraints, and get scaling factors for
+!! operating points
+!
+!  call check_seed()
+!
+!! Optimize
+!  
+!  call optimize(search_type, global_search, local_search, constrained_dvs,     &
+!                pso_options, ga_options, ds_options, restart,                  &
+!                restart_write_freq, optdesign, f0, fmin, steps, fevals)
+!
+!! Notify of total number of steps and function evals
+!
+!  write(*,*)
+!  write(*,*) 'Optimization complete. Totals: '
+!  write(*,*) '  Steps: ', steps, ' Objective function evaluations: ', fevals
+!
+!! Write final design and summary
+!
+!  call write_final_design(optdesign, f0, fmin, shape_functions)
+!
+!! Deallocate memory
+!
+!  call deallocate_airfoil_data()
+!  deallocate(xseedt)
+!  deallocate(xseedb)
+!  deallocate(zseedt)
+!  deallocate(zseedb)
+!  deallocate(optdesign)
+!  if (allocated(constrained_dvs)) deallocate(constrained_dvs)
 
 end program main

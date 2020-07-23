@@ -598,4 +598,68 @@ subroutine my_stop(message, stoptype)
 
 end subroutine my_stop
 
+!=============================================================================80
+!
+! Rotates airfoil to AoA = 0.0
+!
+!=============================================================================80
+subroutine RotateAirfoil(xseedt, xseedb, zseedt, zseedb)
+
+  double precision, dimension(:), intent (inout) :: xseedt, xseedb, zseedt, zseedb
+  integer :: sizet, sizeb, i
+  double precision :: alpha 
+  double precision, dimension(2,2) :: R
+  double precision, dimension(2,1) :: X
+  double precision :: foilscale
+
+  sizet=size(xseedt,1)
+  sizeb=size(xseedb,1)
+  
+  ! calculate AoA
+  alpha = atan((zseedt(sizet)+zseedb(sizeb))/2.0d0)
+
+  ! set up rotation matrix
+  R(1,1)=cos(alpha)
+  R(1,2)=sin(alpha)
+  R(2,1)=-sin(alpha)
+  R(2,2)=cos(alpha)
+  
+  !rotate top
+  do i=1,sizet
+    X(1,1)=xseedt(i)
+    X(2,1)=zseedt(i)
+    
+    X=matmul(R,X)
+    
+    xseedt(i)=X(1,1)
+    zseedt(i)=X(2,1)
+  end do
+  
+  !rotate bot
+  do i=1,sizeb
+    X(1,1)=xseedb(i)
+    X(2,1)=zseedb(i)
+    
+    X=matmul(R,X)
+    
+    xseedb(i)=X(1,1)
+    zseedb(i)=X(2,1)
+  end do
+  
+  !alpha = atan((zseedt(sizet)+zseedb(sizeb))/2.0d0)
+  
+  ! Scale airfoil 
+  foilscale=1.0d0/maxval(xseedt)
+  do i = 1, sizet
+    xseedt(i) = xseedt(i)*foilscale
+    zseedt(i) = zseedt(i)*foilscale
+  end do
+  foilscale=1.0d0/maxval(xseedb)
+  do i = 1, sizeb
+    xseedb(i) = xseedb(i)*foilscale
+    zseedb(i) = zseedb(i)*foilscale
+  end do
+  
+end subroutine RotateAirfoil
+
 end module airfoil_operations

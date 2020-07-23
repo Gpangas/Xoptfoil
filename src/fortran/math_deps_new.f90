@@ -14,7 +14,7 @@ Pure real(8) function factorial(n)
 
 end function factorial
   
-  SUBROUTINE Solve_QR(n,A,B,X)
+SUBROUTINE Solve_QR(n,A,B,X)
 
 implicit none
     integer, intent(in)        ::  n
