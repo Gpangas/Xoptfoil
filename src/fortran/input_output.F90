@@ -46,6 +46,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   use airfoil_evaluation, only : xfoil_options, xfoil_geom_options
   use naca,               only : naca_options_type
   use math_deps,          only : sort_vector
+  use parametrization,    only : parametrization_constrained_dvs
  
   character(*), intent(in) :: input_file
   character(80), intent(out) :: search_type, global_search, local_search,      &
@@ -321,49 +322,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
       'global') then
 
-!   The number of bottom shape functions actually used (0 for symmetrical)
-
-    if (symmetrical) then
-      nbot_actual = 0
-    else
-      nbot_actual = nfunctions_bot
-    end if
-
 !   Set design variables with side constraints
-
-    if (trim(shape_functions) == 'naca') then
-
-!     For NACA, we will only constrain the flap deflection
-
-      allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
-      counter = 0
-      do i = nfunctions_top + nbot_actual + 1,                                 &
-             nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
-        counter = counter + 1
-        constrained_dvs(counter) = i
-      end do
-    else
-
-!     For Hicks-Henne, also constrain bump locations and width
-
-      allocate(constrained_dvs(2*nfunctions_top + 2*nbot_actual +              &
-                               nflap_optimize + int_x_flap_spec))
-      counter = 0
-      do i = 1, nfunctions_top + nbot_actual
-        counter = counter + 1
-        idx = 3*(i-1) + 2      ! DV index of bump location, shape function i
-        constrained_dvs(counter) = idx
-        counter = counter + 1
-        idx = 3*(i-1) + 3      ! Index of bump width, shape function i
-        constrained_dvs(counter) = idx
-      end do
-      do i = 3*(nfunctions_top + nbot_actual) + 1,                             &
-             3*(nfunctions_top + nbot_actual) + nflap_optimize + int_x_flap_spec
-        counter = counter + 1
-        constrained_dvs(counter) = i
-      end do
-    
-    end if
+    call parametrization_constrained_dvs(shape_functions, constrained_dvs,       &
+         nflap_optimize, int_x_flap_spec, nfunctions_top, nfunctions_bot,        &
+         nbot_actual, symmetrical)
 
     if (trim(global_search) == 'particle_swarm') then
 

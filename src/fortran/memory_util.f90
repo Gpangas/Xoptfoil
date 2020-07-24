@@ -68,19 +68,18 @@ subroutine allocate_airfoil_data()
   use xfoil_driver,       only : xfoil_init
   use vardef,             only : nparams_top, nparams_bot, shape_functions,    &
                                  xseedt, xseedb, curr_foil
-  use parametrization,    only : create_shape_functions
+  use parametrization,    only : create_shape_functions, parametrization_dvs
 
   double precision, dimension(:), allocatable :: modest, modesb
+  integer :: ndvs_top, ndvs_bot
 
 ! Allocate shape function setup arrays
-
-  if (trim(shape_functions) == 'naca') then
-    allocate(modest(nparams_top))
-    allocate(modesb(nparams_bot))
-  else
-    allocate(modest(nparams_top*3))
-    allocate(modesb(nparams_bot*3))
-  end if
+  
+  call parametrization_dvs(nparams_top, nparams_bot, shape_functions, ndvs_top, ndvs_bot)
+    
+  allocate(modest(ndvs_top))
+  allocate(modesb(ndvs_bot))
+  
   modest(:) = 0.d0
   modesb(:) = 0.d0
 

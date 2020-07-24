@@ -114,6 +114,257 @@ end subroutine create_shape_functions
 
 !=============================================================================80
 !
+! Calculates number of parametrization design variables from top and botton 
+! input parameters depending on parametrization type
+!
+!=============================================================================80
+subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
+                               ndvs_top, ndvs_bot)
+
+  integer, intent(in) :: nparams_top, nparams_bot
+  character(*), intent(in) :: parametrization_type
+  
+  integer, intent(out) :: ndvs_top, ndvs_bot
+
+  if (trim(parametrization_type) == 'naca') then
+    
+    ndvs_top = nparams_top
+    ndvs_bot = nparams_bot
+    
+  elseif (trim(parametrization_type) == 'hicks-henne') then
+    
+    ndvs_top = nparams_top*3
+    ndvs_bot = nparams_bot*3
+    
+  else
+
+    write(*,*)
+    write(*,*) 'Shape function '//trim(parametrization_type)//' not recognized.'
+    write(*,*)
+    stop
+
+  end if 
+
+end subroutine parametrization_dvs
+
+!=============================================================================80
+!
+! Sets number of constrained design variables based on parametrization
+!
+!=============================================================================80
+subroutine parametrization_constrained_dvs(parametrization_type,               &
+    constrained_dvs, nflap_optimize, int_x_flap_spec, nfunctions_top,          &
+    nfunctions_bot, nbot_actual, symmetrical)
+
+  character(*), intent(in) :: parametrization_type
+  integer, intent(in) :: nflap_optimize
+  integer, intent(in) :: int_x_flap_spec
+  logical, intent(in) :: symmetrical
+  integer, intent(out) :: nfunctions_top, nfunctions_bot
+  integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
+  integer :: i, counter, idx, nbot_actual
+
+
+  !   The number of bottom shape functions actually used (0 for symmetrical)
+
+  if (symmetrical) then
+    nbot_actual = 0
+  else
+    nbot_actual = nfunctions_bot
+  end if
+    
+  !   Set design variables with side constraints
+
+  if (trim(parametrization_type) == 'naca') then
+
+    !     For NACA, we will only constrain the flap deflection
+
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    counter = 0
+    do i = nfunctions_top + nbot_actual + 1,                                   &
+            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
+      counter = counter + 1
+      constrained_dvs(counter) = i
+    end do
+    
+  elseif (trim(parametrization_type) == 'hicks-henne') then
+
+    !     For Hicks-Henne, also constrain bump locations and width
+
+    allocate(constrained_dvs(2*nfunctions_top + 2*nbot_actual +                &
+                              nflap_optimize + int_x_flap_spec))
+    counter = 0
+    do i = 1, nfunctions_top + nbot_actual
+      counter = counter + 1
+      idx = 3*(i-1) + 2      ! DV index of bump location, shape function i
+      constrained_dvs(counter) = idx
+      counter = counter + 1
+      idx = 3*(i-1) + 3      ! Index of bump width, shape function i
+      constrained_dvs(counter) = idx
+    end do
+    
+    do i = 3*(nfunctions_top + nbot_actual) + 1,                               &
+            3*(nfunctions_top + nbot_actual) + nflap_optimize + int_x_flap_spec
+      counter = counter + 1
+      constrained_dvs(counter) = i
+    end do
+    
+  else
+
+    write(*,*)
+    write(*,*) 'Shape function '//trim(parametrization_type)//' not recognized.'
+    write(*,*)
+    stop
+      
+  end if
+
+end subroutine parametrization_constrained_dvs
+
+
+!=============================================================================80
+!
+! Initialize parametrization 
+! Set X0 before optimization
+!
+!=============================================================================80
+subroutine parametrization_init(optdesign, x0)
+
+  use vardef,             only : shape_functions, nflap_optimize,              &
+                                 initial_perturb, min_flap_degrees,            &
+                                 max_flap_degrees, flap_degrees, x_flap,       &
+                                 int_x_flap_spec, min_flap_x, max_flap_x,      &
+                                 flap_optimize_points, min_bump_width
+
+  double precision, dimension(:), intent(inout) :: optdesign
+  double precision, dimension(size(optdesign,1)), intent(out) :: x0
+
+  integer :: i, counter, nfuncs, oppoint, ndv
+  double precision :: t1fact, t2fact, ffact, fxfact
+  
+  ndv = size(optdesign,1)
+  
+  t1fact = initial_perturb/(1.d0 - 0.001d0)
+  t2fact = initial_perturb/(10.d0 - min_bump_width)
+  ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
+  fxfact = initial_perturb/(max_flap_x - min_flap_x)
+  
+  if (trim(shape_functions) == 'naca') then     
+
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+
+  !   Mode strength = 0 (aka seed airfoil)
+
+    x0(1:nfuncs) = 0.d0
+
+  !   Seed flap deflection as specified in input file
+
+    do i = nfuncs + 1, ndv - int_x_flap_spec
+      oppoint = flap_optimize_points(i-nfuncs)
+      x0(i) = flap_degrees(oppoint)*ffact
+    end do
+    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+    
+  elseif (trim(shape_functions) == 'hicks-henne') then
+
+    nfuncs = (ndv - nflap_optimize - int_x_flap_spec)/3
+
+  !   Bump strength = 0 (aka seed airfoil)
+
+    do i = 1, nfuncs
+      counter = 3*(i-1)
+      x0(counter+1) = 0.d0
+      x0(counter+2) = 0.5d0*t1fact
+      x0(counter+3) = 1.d0*t2fact
+    end do
+    do i = 3*nfuncs+1, ndv - int_x_flap_spec
+      oppoint = flap_optimize_points(i-3*nfuncs)
+      x0(i) = flap_degrees(oppoint)*ffact
+    end do
+    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+  
+  else
+
+    write(*,*)
+    write(*,*) 'Shape function '//trim(shape_functions)//' not recognized.'
+    write(*,*)
+    stop
+      
+  end if
+
+end subroutine parametrization_init
+!=============================================================================80
+!
+! Initialize parametrization 
+! Set xmax and xmin before optimization
+!
+!=============================================================================80
+subroutine parametrization_maxmin(optdesign, xmin, xmax)
+
+  use vardef,             only : shape_functions, nflap_optimize,              &
+                                 initial_perturb, min_flap_degrees,            &
+                                 max_flap_degrees, flap_degrees, x_flap,       &
+                                 int_x_flap_spec, min_flap_x, max_flap_x,      &
+                                 flap_optimize_points, min_bump_width
+  
+  double precision, dimension(:), intent(in) :: optdesign
+  double precision, dimension(size(optdesign,1)), intent(out) :: xmin, xmax
+
+  integer :: i, counter, nfuncs, ndv
+  double precision :: t1fact, t2fact, ffact, fxfact
+  
+  ndv = size(optdesign,1)
+  
+  t1fact = initial_perturb/(1.d0 - 0.001d0)
+  t2fact = initial_perturb/(10.d0 - min_bump_width)
+  ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
+  fxfact = initial_perturb/(max_flap_x - min_flap_x)
+    
+  if (trim(shape_functions) == 'naca') then
+
+    nfuncs = ndv - nflap_optimize
+
+    xmin(1:nfuncs) = -0.5d0*initial_perturb
+    xmax(1:nfuncs) = 0.5d0*initial_perturb
+    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    if (int_x_flap_spec == 1) then
+      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+    end if
+
+  elseif (trim(shape_functions) == 'hicks-henne') then
+
+    nfuncs = (ndv - nflap_optimize - nflap_optimize)/3
+
+    do i = 1, nfuncs
+      counter = 3*(i-1)
+      xmin(counter+1) = -initial_perturb/2.d0
+      xmax(counter+1) = initial_perturb/2.d0
+      xmin(counter+2) = 0.0001d0*t1fact
+      xmax(counter+2) = 1.d0*t1fact
+      xmin(counter+3) = min_bump_width*t2fact
+      xmax(counter+3) = 10.d0*t2fact
+    end do
+    do i = 3*nfuncs+1, ndv - int_x_flap_spec 
+      xmin(i) = min_flap_degrees*ffact
+      xmax(i) = max_flap_degrees*ffact
+    end do
+    if (int_x_flap_spec == 1) then
+      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+    end if
+  
+  else
+
+    write(*,*)
+    write(*,*) 'Shape function '//trim(shape_functions)//' not recognized.'
+    write(*,*)
+    stop
+      
+  end if
+end subroutine parametrization_maxmin
+!=============================================================================80
+!
 ! Populates shape function arrays
 ! For Hicks-Hene shape functions, number of elements in modes must be a 
 ! multiple of 3.
@@ -173,20 +424,20 @@ subroutine HH_shape(x, modes, shape_function)
 
   do i = 1, nmodes
 
-!     Extract strength, bump location, and width
+    !     Extract strength, bump location, and width
 
     counter1 = 3*(i-1)
     st = modes(counter1+1)
     t1 = modes(counter1+2)/t1fact
     t2 = modes(counter1+3)/t2fact
 
-!     Check for problems with bump location and width parameters
+    !     Check for problems with bump location and width parameters
 
     if (t1 <= 0.d0) t1 = 0.001d0
     if (t1 >= 1.d0) t1 = 0.999d0
     if (t2 <= 0.d0) t2 = 0.001d0
 
-!     Create shape function
+    !     Create shape function
 
     power1 = log10(0.5d0)/log10(t1)
     do j = 2, npt-1
@@ -195,7 +446,7 @@ subroutine HH_shape(x, modes, shape_function)
     end do
 
   end do
-end subroutine
+end subroutine HH_shape
 !=============================================================================80
 !
 ! Populates shape function arrays for NACA shape functions
@@ -281,12 +532,12 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
 
   if (trim(shapetype) == 'naca') then
     
-    call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
+    call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
                           zt_new, zb_new, symmetrical)
   else
     
-    call HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
-                          zt_new, zb_new, shapetype, symmetrical)
+    call HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,        &
+                          zt_new, zb_new, symmetrical)
   end if
 
 end subroutine create_airfoil
@@ -297,14 +548,13 @@ end subroutine create_airfoil
 ! Using Hicks-Henne bump functions
 !
 !=============================================================================80
-subroutine HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
-                          zt_new, zb_new, shapetype, symmetrical)
+subroutine HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
+                          zt_new, zb_new, symmetrical)
 
   double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
                                                 zb_seed
   double precision, dimension(:), intent(in) :: modest, modesb
   double precision, dimension(:), intent(inout) :: zt_new, zb_new
-  character(*), intent(in) :: shapetype
   logical, intent(in) :: symmetrical
 
   integer :: i, nmodest, nmodesb, npointst, npointsb
@@ -317,7 +567,7 @@ subroutine HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
 
 ! Create shape functions for Hicks-Henne
 
-  call create_shape_functions(xt_seed, xb_seed, modest, modesb, shapetype,   &
+  call create_shape_functions(xt_seed, xb_seed, modest, modesb, 'hicks-henne', &
                                 first_time=.false.)
 
 ! Top surface

@@ -129,7 +129,8 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,W)
 
   dSdw  = 0.0d0
   B     = 0.0d0
-
+  
+! Original (use -B)
 !  do i=0,n
 !	  do j=1,k
 !!		  dSdw(i+1,1)=dSdw(i+1,1)+(fx(X(j))**2)*2*(BinCoef(n,i)**2)*(X(j)**(2*i))*((1-X(j))**(2*(n-i)))
@@ -140,6 +141,7 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,W)
 !	  end do
 !  end do
   
+  ! Simplified
   do i=0,n
 	  do a=0,n
       do j=1,k
@@ -148,6 +150,20 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,W)
 		  end do
 	  end do
   end do
+  
+  !! Simplified with leading edge modification
+  !do i=0,n+1
+	 ! do a=0,n+1
+  !    do j=1,k
+  !      if ((a == 0) .AND. (i \= n+1)) B(i+1)=B(i+1)+fx(X(j))*(Z(j)-X(j)*zcTE)*BinCoef(n,i)*(X(j)**i)*((1-X(j))**(n-i))
+  !      if ((a == 0) .AND. (i == n+1)) B(i+1)=B(i+1)+(Z(j)-X(j)*zcTE)*(X(j)**0.5d0*(1-X(j))**(n-0.5d0))
+		!	  if ((a \= n+1) .AND. (i \= n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+BinCoef(n,i)*BinCoef(n,a)*(X(j)**(i+a))*((1-x(j))**(2*n-i-a))*((fx(X(j)))**2)
+  !      if ((a \= n+1) .AND. (i == n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+BinCoef(n,a)*(X(j)**(a))*((1-x(j))**(n-a))*(X(j)*(1-X(j))**(n+0.5d0))
+  !      if ((a == n+1) .AND. (i \= n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+BinCoef(n,i)*(X(j)**(i))*((1-x(j))**(n-i))*(X(j)*(1-X(j))**(n+0.5d0))
+  !      if ((a == n+1) .AND. (i == n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+(X(j)*(1-X(j))**(2*n-1.d0))
+		!  end do
+	 ! end do
+  !end do
 
   !W_send    = real(W,4)
   !call Solve_QR(n+1,real(dSdw,4),real(B,4),W_send)

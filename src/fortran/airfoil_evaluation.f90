@@ -91,7 +91,7 @@ function aero_objective_function(designvars, include_penalty)
 
   use math_deps,       only : interp_vector, curvature, derv1f1, derv1b1
   use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil
+                              create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil
   use xfoil_inc,       only : AMAX, CAMBR
 
@@ -107,7 +107,7 @@ function aero_objective_function(designvars, include_penalty)
   double precision, dimension(size(xseedb,1)) :: curvb
   double precision, dimension(naddthickconst) :: add_thickvec
   integer :: nmodest, nmodesb, nptt, nptb, i, dvtbnd1, dvtbnd2, dvbbnd1,       &
-             dvbbnd2, ncheckpt, nptint
+             dvbbnd2, ncheckpt, nptint, ndvs_top, ndvs_bot
   double precision :: penaltyval
   double precision :: tegap, growth1, growth2, maxgrowth, len1, len2
   double precision :: panang1, panang2, maxpanang, heightfactor
@@ -146,16 +146,13 @@ function aero_objective_function(designvars, include_penalty)
   end if
 
 ! Set modes for top and bottom surfaces
-
+  
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  
   dvtbnd1 = 1
-  if (trim(shape_functions) == 'naca') then
-    dvtbnd2 = nmodest                         ! useless line
-    dvbbnd2 = nmodest + nmodesb
-  else
-    dvtbnd2 = nmodest*3                       ! useless line
-    dvbbnd2 = nmodest*3 + nmodesb*3
-  end if
+  dvtbnd2 = ndvs_top
   dvbbnd1 = dvtbnd2 + 1
+  dvbbnd2 = ndvs_top + ndvs_bot
 
 ! Overwrite lower DVs for symmetrical airfoils (they are not used)
 
@@ -620,7 +617,7 @@ end function aero_objective_function
 function matchfoil_objective_function(designvars)
 
   use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil
+                              create_airfoil, parametrization_dvs
   use math_deps,       only : norm_2
 
   double precision, dimension(:), intent(in) :: designvars
@@ -628,7 +625,7 @@ function matchfoil_objective_function(designvars)
 
   double precision, dimension(size(xseedt,1)) :: zt_new
   double precision, dimension(size(xseedb,1)) :: zb_new
-  integer :: nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd
+  integer :: nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd, ndvs_top, ndvs_bot
 
   nmodest = size(top_shape_function,1)
   nmodesb = size(bot_shape_function,1)
@@ -637,13 +634,10 @@ function matchfoil_objective_function(designvars)
 
 ! Set modes for top and bottom surfaces
 
-  if (trim(shape_functions) == 'naca') then
-    dvtbnd = nmodest
-    dvbbnd = nmodest + nmodesb
-  else
-    dvtbnd = nmodest*3
-    dvbbnd = nmodest*3 + nmodesb*3
-  end if
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  
+  dvtbnd = ndvs_top
+  dvbbnd = ndvs_top + ndvs_bot
 
 ! Create top and bottom surfaces by perturbation of seed airfoil
 
@@ -691,7 +685,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
   use math_deps,       only : interp_vector 
   use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil
+                              create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil, xfoil_geometry_info
 
   double precision, dimension(:), intent(in) :: designvars
@@ -701,7 +695,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   double precision, dimension(size(xseedt,1)) :: zt_new
   double precision, dimension(size(xseedb,1)) :: zb_new
   integer :: nmodest, nmodesb, nptt, nptb, i, dvtbnd1, dvtbnd2, dvbbnd1,       &
-             dvbbnd2 
+             dvbbnd2, ndvs_top, ndvs_bot
   double precision, dimension(noppoint) :: alpha, lift, drag, moment, viscrms, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
@@ -720,15 +714,11 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
 ! Set modes for top and bottom surfaces
 
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
   dvtbnd1 = 1
-  if (trim(shape_functions) == 'naca') then
-    dvtbnd2 = nmodest
-    dvbbnd2 = nmodest + nmodesb
-  else
-    dvtbnd2 = nmodest*3
-    dvbbnd2 = nmodest*3 + nmodesb*3
-  end if
+  dvtbnd2 = ndvs_top
   dvbbnd1 = dvtbnd2 + 1
+  dvbbnd2 = ndvs_top + ndvs_bot
 
 ! Overwrite lower DVs for symmetrical airfoils (they are not used)
 
@@ -909,7 +899,7 @@ end function write_airfoil_optimization_progress
 function write_matchfoil_optimization_progress(designvars, designcounter)
 
   use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil
+                              create_airfoil, parametrization_dvs
 
   double precision, dimension(:), intent(in) :: designvars
   integer, intent(in) :: designcounter
@@ -917,7 +907,7 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
 
   double precision, dimension(size(xseedt,1)) :: zt_new
   double precision, dimension(size(xseedb,1)) :: zb_new
-  integer :: i, nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd
+  integer :: i, nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd, ndvs_top, ndvs_bot
 
   character(100) :: foilfile, text
   integer :: foilunit
@@ -929,13 +919,10 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
 
 ! Set modes for top and bottom surfaces
 
-  if (trim(shape_functions) == 'naca') then
-    dvtbnd = nmodest
-    dvbbnd = nmodest + nmodesb
-  else
-    dvtbnd = nmodest*3
-    dvbbnd = nmodest*3 + nmodesb*3
-  end if
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  
+  dvtbnd = ndvs_top
+  dvbbnd = ndvs_top + ndvs_bot
 
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.

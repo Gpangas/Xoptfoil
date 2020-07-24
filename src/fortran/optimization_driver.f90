@@ -119,19 +119,15 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
                     pso_options, ga_options, ds_options, restart,              &
                     restart_write_freq, optdesign, f0_ref, fmin, steps, fevals)
 
-  use vardef,             only : shape_functions, nflap_optimize,              &
-                                 initial_perturb, min_flap_degrees,            &
-                                 max_flap_degrees, flap_degrees, x_flap,       &
-                                 int_x_flap_spec, min_flap_x, max_flap_x,      &
-                                 flap_optimize_points, min_bump_width,         &
-                                 output_prefix 
+  use vardef,             only : output_prefix 
   use particle_swarm,     only : pso_options_type, particleswarm
   use genetic_algorithm,  only : ga_options_type, geneticalgorithm
   use simplex_search,     only : ds_options_type, simplexsearch
   use airfoil_evaluation, only : objective_function,                           &
                                  objective_function_nopenalty, write_function, &
                                  write_function_restart_cleanup
-
+  use parametrization,    only : parametrization_init, parametrization_maxmin
+  
   character(*), intent(in) :: search_type, global_search, local_search
   type(pso_options_type), intent(in) :: pso_options
   type(ga_options_type), intent(in) :: ga_options
@@ -143,12 +139,9 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   integer, intent(out) :: steps, fevals
   logical, intent(in) :: restart
 
-  integer :: counter, nfuncs, ndv
   double precision, dimension(size(optdesign,1)) :: xmin, xmax, x0
-  double precision :: t1fact, t2fact, ffact, fxfact
   logical :: restart_temp, write_designs
-  integer :: stepsg, fevalsg, stepsl, fevalsl, i, oppoint, stat,               &
-             iunit, ioerr, designcounter
+  integer :: stepsg, fevalsg, stepsl, fevalsl, stat, iunit, ioerr, designcounter
   character(100) :: restart_status_file
   character(19) :: restart_status
   character(14) :: stop_reason
@@ -172,51 +165,9 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   fevalsl = 0
   designcounter = 0
 
-  ndv = size(optdesign,1)
-
-! Scale all variables to have a range of initial_perturb
-
-  t1fact = initial_perturb/(1.d0 - 0.001d0)
-  t2fact = initial_perturb/(10.d0 - min_bump_width)
-  ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
-  fxfact = initial_perturb/(max_flap_x - min_flap_x)
-
 ! Set initial design
 
-  if (trim(shape_functions) == 'naca') then     
-
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
-
-!   Mode strength = 0 (aka seed airfoil)
-
-    x0(1:nfuncs) = 0.d0
-
-!   Seed flap deflection as specified in input file
-
-    do i = nfuncs + 1, ndv - int_x_flap_spec
-      oppoint = flap_optimize_points(i-nfuncs)
-      x0(i) = flap_degrees(oppoint)*ffact
-    end do
-    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-  else
-
-    nfuncs = (ndv - nflap_optimize)/3
-
-!   Bump strength = 0 (aka seed airfoil)
-
-    do i = 1, nfuncs
-      counter = 3*(i-1)
-      x0(counter+1) = 0.d0
-      x0(counter+2) = 0.5d0*t1fact
-      x0(counter+3) = 1.d0*t2fact
-    end do
-    do i = 3*nfuncs+1, ndv - int_x_flap_spec
-      oppoint = flap_optimize_points(i-3*nfuncs)
-      x0(i) = flap_degrees(oppoint)*ffact
-    end do
-    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-
-  end if
+  call parametrization_init(optdesign, x0)
 
 ! Compute f0_ref, ignoring penalties for violated constraints
 
@@ -224,7 +175,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
 ! Set default restart status (global or local optimization) from user input
 
-  if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==    &
+  if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
       'global') then
     restart_status = 'global_optimization'
   else
@@ -242,7 +193,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 !   Read or issue warning if file is not found
 
     if (ioerr /= 0) then
-      write(*,*) 'Warning: could not find restart status file '//&
+      write(*,*) 'Warning: could not find restart status file '//              &
                  trim(restart_status_file)//'.'
       write(*,*) 'Restarting with '//trim(restart_status)//'.'
     else
@@ -294,43 +245,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   if (trim(restart_status) == 'global_optimization') then
 
 !   Set up mins and maxes
-    
-    if (trim(shape_functions) == 'naca') then
-
-      nfuncs = ndv - nflap_optimize
-
-      xmin(1:nfuncs) = -0.5d0*initial_perturb
-      xmax(1:nfuncs) = 0.5d0*initial_perturb
-      xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
-      xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
-      if (int_x_flap_spec == 1) then
-        xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
-        xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
-      end if
-
-    else
-
-      nfuncs = (ndv - nflap_optimize)/3
-
-      do i = 1, nfuncs
-        counter = 3*(i-1)
-        xmin(counter+1) = -initial_perturb/2.d0
-        xmax(counter+1) = initial_perturb/2.d0
-        xmin(counter+2) = 0.0001d0*t1fact
-        xmax(counter+2) = 1.d0*t1fact
-        xmin(counter+3) = min_bump_width*t2fact
-        xmax(counter+3) = 10.d0*t2fact
-      end do
-      do i = 3*nfuncs+1, ndv - int_x_flap_spec 
-        xmin(i) = min_flap_degrees*ffact
-        xmax(i) = max_flap_degrees*ffact
-      end do
-      if (int_x_flap_spec == 1) then
-        xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
-        xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
-      end if
-
-    end if
+    call parametrization_maxmin(optdesign, xmin, xmax)
 
 !   Write restart status to file
 
@@ -422,7 +337,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   use memory_util,        only : allocate_airfoil, deallocate_airfoil
   use airfoil_operations, only : airfoil_write
   use parametrization,    only : top_shape_function, bot_shape_function,       &
-                                 create_airfoil
+                                 create_airfoil, parametrization_dvs
   use airfoil_evaluation, only : xfoil_geom_options, xfoil_options
   use xfoil_driver,       only : run_xfoil
 
@@ -437,7 +352,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: ffact, fxfact, actual_x_flap
   integer :: dvtbnd1, dvtbnd2, dvbbnd1, dvbbnd2, nmodest, nmodesb, nptt, nptb, i
-  integer :: flap_idx, dvcounter, iunit
+  integer :: flap_idx, dvcounter, iunit, ndvs_top, ndvs_bot
   type(airfoil_type) :: final_airfoil
   character(80) :: output_file, aero_file
   character(30) :: text
@@ -450,16 +365,12 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
 
 ! Set modes for top and bottom surfaces
 
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  
   dvtbnd1 = 1
-  if (trim(shapetype) == 'naca') then
-    dvtbnd2 = nmodest
-    dvbbnd2 = nmodest + nmodesb
-  else
-    dvtbnd2 = nmodest*3
-    dvbbnd2 = nmodest*3 + nmodesb*3
-  end if
+  dvtbnd2 = ndvs_top
   dvbbnd1 = dvtbnd2 + 1
-
+  dvbbnd2 = ndvs_top + ndvs_bot
 ! Overwrite lower DVs for symmetrical airfoils (they are not used)
 
   if (symmetrical) then
