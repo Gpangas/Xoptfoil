@@ -90,8 +90,7 @@ subroutine allocate_airfoil_data()
 ! For NACA, this will create the shape functions.  For Hicks-Henne,
 ! it will just allocate them.
 
-  call create_shape_functions(xseedt, xseedb, modest, modesb,                  &
-                              shape_functions, first_time=.true.)
+  call create_shape_functions(xseedt, xseedb, modest, modesb, shape_functions)
 
 ! Allocate memory for working airfoil on each thread
 
@@ -118,13 +117,13 @@ end subroutine allocate_airfoil_data
 !=============================================================================80
 subroutine deallocate_airfoil_data()
 
-  use parametrization,    only : deallocate_shape_functions
+  use parametrization,    only : deallocate_parametrization
   use vardef,             only : curr_foil
   use xfoil_driver,       only : xfoil_cleanup
 
 !$omp parallel default(shared)
 
-  call deallocate_shape_functions()
+  call deallocate_parametrization()
   call deallocate_airfoil(curr_foil)
   call xfoil_cleanup()
 

@@ -73,8 +73,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                       tournament_fraction, crossover_range_factor,             &
                       mutant_probability, chromosome_mutation_rate,            &
                       mutation_range_factor
-  integer :: nbot_actual, nmoment_constraint, nlift_constraint, nxtr_opt
-  integer :: i, iunit, ioerr, iostat1, counter, idx
+  integer :: nbot_actual, nmoment_constraint, nxtr_opt
+  integer :: i, iunit, ioerr, iostat1
   character(30) :: text
   character(3) :: family
   character(10) :: pso_convergence_profile, parents_selection_method
@@ -559,10 +559,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     write(*,*) " moment_constraint_type("//trim(text)//") = "//                &
                trim(moment_constraint_type(i))
     write(*,*) " min_moment("//trim(text)//") = ", min_moment(i)
-	write(*,*) " lift_constraint_type("//trim(text)//") = "//                &
+  write(*,*) " lift_constraint_type("//trim(text)//") = "//                &
                trim(lift_constraint_type(i))
     write(*,*) " min_lift("//trim(text)//") = ", min_lift(i)
-	write(*,*) " drag_constraint_type("//trim(text)//") = "//                &
+  write(*,*) " drag_constraint_type("//trim(text)//") = "//                &
                trim(drag_constraint_type(i))
     write(*,*) " max_drag("//trim(text)//") = ", max_drag(i)
   end do
@@ -718,8 +718,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       trim(seed_airfoil) /= 'naca')                                            &
     call my_stop("seed_airfoil must be 'from_file' or 'naca'.")
   if (trim(shape_functions) /= 'hicks-henne' .and.                             &
-      trim(shape_functions) /= 'naca')                                         &
-    call my_stop("shape_functions must be 'hicks-henne' or 'naca'.")
+      trim(shape_functions) /= 'naca' .and.                                    &
+      trim(shape_functions) /= 'kulfan-bussoletti')                            &
+    call my_stop("shape_functions must be 'hicks-henne' or 'naca' or           &
+                 &'kulfan-bussoletti'.")
   if (nfunctions_top < 0)                                                      &
     call my_stop("nfunctions_top must be >= 0.")
   if (nfunctions_bot < 0)                                                      &

@@ -18,45 +18,53 @@
 module parametrization
 
 ! Contains subroutines to create an airfoil shape from design variables
-
+  use parametrization_deform
+  use parametrization_constr
   implicit none
 
-! Shape functions for creating airfoil shapes (top and bottom)
-
-  double precision, dimension(:,:), pointer :: top_shape_function
-  double precision, dimension(:,:), pointer :: bot_shape_function
-
-!$omp threadprivate(top_shape_function)
-!$omp threadprivate(bot_shape_function)
-
   contains
+  
+subroutine allocate_parametrization(nmodest, nmodesb, npointst, npointsb, shapetype) 
+  use parametrization_deform, only : allocate_shape_functions
 
-!=============================================================================80
-!
-! Allocates memory for shape functions
-!
-!=============================================================================80
-subroutine allocate_shape_functions(nmodest, nmodesb, npointst, npointsb)
-
+  character(*), intent(in) :: shapetype
   integer, intent(in) :: nmodest, nmodesb, npointst, npointsb
+  if ((trim(shapetype) == 'naca') .OR. (trim(shapetype) == 'hicks-henne')) then
+    call allocate_shape_functions(nmodest, nmodesb, npointst, npointsb)
+        
+  elseif (trim(shapetype) == 'kulfan-bussoletti') then
 
-  allocate(top_shape_function(nmodest,npointst))
-  allocate(bot_shape_function(nmodesb,npointsb))
+  else
 
-end subroutine allocate_shape_functions
+    write(*,*)
+    write(*,*) 'Shape function '//trim(shapetype)//' not recognized.'
+    write(*,*)
+    stop
 
-!=============================================================================80
-!
-! Deallocates memory for shape functions
-!
-!=============================================================================80
-subroutine deallocate_shape_functions
+  end if
+  
+end subroutine allocate_parametrization
 
-  deallocate(top_shape_function)
-  deallocate(bot_shape_function)
+subroutine deallocate_parametrization() 
+  use parametrization_deform, only : allocate_shape_functions
+  use vardef, only : shape_functions
+  
+  if ((trim(shape_functions) == 'naca') .OR. (trim(shape_functions) == 'hicks-henne')) then
+    call deallocate_shape_functions()
+        
+  elseif (trim(shape_functions) == 'kulfan-bussoletti') then
 
-end subroutine deallocate_shape_functions
+  else
 
+    write(*,*)
+    write(*,*) 'Shape function '//trim(shape_functions)//' not recognized.'
+    write(*,*)
+    stop
+
+  end if
+  
+end subroutine deallocate_parametrization
+  
 !=============================================================================80
 !
 ! Creates shape functions for top and bottom surfaces
@@ -65,12 +73,10 @@ end subroutine deallocate_shape_functions
 ! multiple of 3.
 !
 !=============================================================================80
-subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype,   &
-                                  first_time)
+subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
 
   double precision, dimension(:), intent(in) :: xtop, xbot, modestop, modesbot
   character(*), intent(in) :: shapetype
-  logical, intent(in) :: first_time
 
   integer :: nmodestop, nmodesbot, ntop, nbot
 
@@ -80,37 +86,79 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype,   &
   if (trim(shapetype) == 'naca') then
     nmodestop = size(modestop,1)
     nmodesbot = size(modesbot,1)
-  else
+    
+  elseif (trim(shapetype) == 'hicks-henne') then
     nmodestop = size(modestop,1)/3
     nmodesbot = size(modesbot,1)/3
-  end if
+    
+  elseif (trim(shapetype) == 'kulfan-bussoletti') then
+    ! Number of modes is order of polynomial +1
+    nmodestop = size(modestop,1)
+    nmodesbot = size(modesbot,1)
+  else
 
-  if (first_time) then
-
-!   Allocate shape functions
-
-    call allocate_shape_functions(nmodestop, nmodesbot, ntop, nbot)
-
-!   Initialize shape functions
-
-    top_shape_function(:,:) = 0.d0
-    bot_shape_function(:,:) = 0.d0
-
-  end if
-
-  if ((.not. first_time) .or. (trim(shapetype) == 'naca')) then
-
-!   Create shape functions for top
-
-    call create_shape(xtop, modestop, shapetype, top_shape_function)
-
-!   Create shape functions for bottom
-
-    call create_shape(xbot, modesbot, shapetype, bot_shape_function)
+    write(*,*)
+    write(*,*) 'Shape function '//trim(shapetype)//' not recognized.'
+    write(*,*)
+    stop
 
   end if
+
+  !   Allocate shape functions
+
+  call allocate_shape_functions(nmodestop, nmodesbot, ntop, nbot)
 
 end subroutine create_shape_functions
+
+
+!=============================================================================80
+!
+! Creates an airfoil surface by perturbing an input "seed" airfoil
+!
+!=============================================================================80
+subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
+                          zt_new, zb_new, shapetype, symmetrical)
+  use vardef, only : tcTE
+
+  double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
+                                                zb_seed
+  double precision, dimension(:), intent(in) :: modest, modesb
+  double precision, dimension(:), intent(inout) :: zt_new, zb_new
+  character(*), intent(in) :: shapetype
+  logical, intent(in) :: symmetrical
+  integer :: i
+
+  if (trim(shapetype) == 'naca') then
+    
+    call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
+                          zt_new, zb_new, symmetrical)
+    
+  elseif (trim(shapetype) == 'hicks-henne') then
+    
+    call HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,        &
+                          zt_new, zb_new, symmetrical)
+    
+  elseif (trim(shapetype) == 'kulfan-bussoletti') then
+    call KBP_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,       &
+                          zt_new, zb_new, symmetrical, tcTE)
+  else
+
+    write(*,*)
+    write(*,*) 'Shape function '//trim(shapetype)//' not recognized.'
+    write(*,*)
+    stop
+  end if
+
+  !write(*,*) 'modest'
+  !do i = 1,size(modest,1)
+  !  write(*,*) modest(i)
+  !end do
+  !write(*,*) 'modesb'
+  !do i = 1,size(modesb,1)
+  !  write(*,*) modesb(i)
+  !end do
+end subroutine create_airfoil
+
 
 !=============================================================================80
 !
@@ -132,10 +180,14 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
     ndvs_bot = nparams_bot
     
   elseif (trim(parametrization_type) == 'hicks-henne') then
-    
+
     ndvs_top = nparams_top*3
     ndvs_bot = nparams_bot*3
     
+  elseif (trim(parametrization_type) == 'kulfan-bussoletti') then
+    
+    ndvs_top = nparams_top
+    ndvs_bot = nparams_bot
   else
 
     write(*,*)
@@ -209,6 +261,16 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
       constrained_dvs(counter) = i
     end do
     
+  elseif (trim(parametrization_type) == 'kulfan-bussoletti') then
+    !     For kulfan-bussoletti, we will only constrain the flap deflection
+
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    counter = 0
+    do i = nfunctions_top + nbot_actual + 1,                                   &
+            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
+      counter = counter + 1
+      constrained_dvs(counter) = i
+    end do
   else
 
     write(*,*)
@@ -233,7 +295,9 @@ subroutine parametrization_init(optdesign, x0)
                                  initial_perturb, min_flap_degrees,            &
                                  max_flap_degrees, flap_degrees, x_flap,       &
                                  int_x_flap_spec, min_flap_x, max_flap_x,      &
-                                 flap_optimize_points, min_bump_width
+                                 flap_optimize_points, min_bump_width,         &
+                                 xseedt, xseedb, zseedt, zseedb, nshapedvtop,  &
+                                 nshapedvbot, modest_seed, modesb_seed
 
   double precision, dimension(:), intent(inout) :: optdesign
   double precision, dimension(size(optdesign,1)), intent(out) :: x0
@@ -282,8 +346,21 @@ subroutine parametrization_init(optdesign, x0)
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
   
-  else
+  elseif (trim(shape_functions) == 'kulfan-bussoletti') then
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
 
+    x0(1:nshapedvtop) = modest_seed
+    x0(nshapedvtop+1:nfuncs) = modesb_seed
+
+    !   Seed flap deflection as specified in input file
+
+    do i = nfuncs + 1, ndv - int_x_flap_spec
+      oppoint = flap_optimize_points(i-nfuncs)
+      x0(i) = flap_degrees(oppoint)*ffact
+    end do
+    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+  else
+    
     write(*,*)
     write(*,*) 'Shape function '//trim(shape_functions)//' not recognized.'
     write(*,*)
@@ -291,7 +368,11 @@ subroutine parametrization_init(optdesign, x0)
       
   end if
 
+  write(*,*) 'X0'
+  write(*,*) X0
 end subroutine parametrization_init
+
+
 !=============================================================================80
 !
 ! Initialize parametrization 
@@ -302,9 +383,9 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
 
   use vardef,             only : shape_functions, nflap_optimize,              &
                                  initial_perturb, min_flap_degrees,            &
-                                 max_flap_degrees, flap_degrees, x_flap,       &
+                                 max_flap_degrees, nshapedvtop, nshapedvbot,   &
                                  int_x_flap_spec, min_flap_x, max_flap_x,      &
-                                 flap_optimize_points, min_bump_width
+                                 min_bump_width, modest_seed, modesb_seed
   
   double precision, dimension(:), intent(in) :: optdesign
   double precision, dimension(size(optdesign,1)), intent(out) :: xmin, xmax
@@ -313,6 +394,8 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
   double precision :: t1fact, t2fact, ffact, fxfact
   
   ndv = size(optdesign,1)
+  write(*,*) 'ndv'
+  write(*,*) ndv
   
   t1fact = initial_perturb/(1.d0 - 0.001d0)
   t2fact = initial_perturb/(10.d0 - min_bump_width)
@@ -321,7 +404,7 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
     
   if (trim(shape_functions) == 'naca') then
 
-    nfuncs = ndv - nflap_optimize
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
 
     xmin(1:nfuncs) = -0.5d0*initial_perturb
     xmax(1:nfuncs) = 0.5d0*initial_perturb
@@ -334,7 +417,7 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
 
   elseif (trim(shape_functions) == 'hicks-henne') then
 
-    nfuncs = (ndv - nflap_optimize - nflap_optimize)/3
+    nfuncs = (ndv - nflap_optimize - int_x_flap_spec)/3
 
     do i = 1, nfuncs
       counter = 3*(i-1)
@@ -354,6 +437,20 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
       xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
     end if
   
+  elseif (trim(shape_functions) == 'kulfan-bussoletti') then
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    
+    xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
+    xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
+    xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
+    xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+    
+    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    if (int_x_flap_spec == 1) then
+      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+    end if
   else
 
     write(*,*)
@@ -362,288 +459,78 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
     stop
       
   end if
+  
+  write(*,*) 'xmin'
+  write(*,*) xmin
+  write(*,*) 'xmax'
+  write(*,*) xmax
 end subroutine parametrization_maxmin
+
 !=============================================================================80
 !
-! Populates shape function arrays
-! For Hicks-Hene shape functions, number of elements in modes must be a 
-! multiple of 3.
+! Generate seed airfoil compatible with parametrization type
 !
 !=============================================================================80
-subroutine create_shape(x, modes, shapetype, shape_function)
+subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
+  modest_seed, modesb_seed, symmetrical, tcTE, shape_functions)
 
-  double precision, dimension(:), intent(in) :: x, modes
-  character(*), intent(in) :: shapetype
-  double precision, dimension(:,:), intent(inout) :: shape_function
-
-  shape_switch: if (trim(shapetype) == 'naca') then
+  logical, intent(in) :: symmetrical
+  character(*), intent(in) :: shape_functions
+  double precision, dimension(:), intent(in) :: xseedt, xseedb
+  double precision, dimension(:), intent(inout) :: zseedt, zseedb
+  double precision, dimension(:), intent(inout) :: modest_seed
+  double precision, dimension(:), intent(inout) :: modesb_seed
+  double precision, intent(inout) :: tcTE
+  
+  double precision, dimension(size(xseedt,1)) :: zseedt_new
+  double precision, dimension(size(xseedb,1)) :: zseedb_new
+  double precision :: sum
+  integer :: i
+      
+  if (trim(shape_functions) == 'naca') then
     
-    call NACA_shape(x, modes, shape_function)
+    zseedt_new=zseedt
+    zseedb_new=zseedb
     
-  elseif (trim(shapetype) == 'hicks-henne') then
+  elseif (trim(shape_functions) == 'hicks-henne') then
     
-    call HH_shape(x, modes, shape_function)
+    zseedt_new=zseedt
+    zseedb_new=zseedb
     
+  elseif (trim(shape_functions) == 'kulfan-bussoletti') then
+    call KBP_init(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed)
+    call KBP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed,            &
+                      modesb_seed, zseedt_new, zseedb_new, symmetrical, tcTE)
+      sum=0.d0
+      do i = 1, size(zseedt,1)
+        sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
+      end do
+      sum=sum**0.5
+      Write(*,*) ' RMSE of upper surface'
+      Write(*,*) sum
+      sum=0.d0
+      do i = 1, size(zseedb,1)
+        sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
+      end do
+      sum=sum**0.5
+      Write(*,*) ' RMSE of lower surface'
+      Write(*,*) sum
   else
 
     write(*,*)
-    write(*,*) 'Shape function '//trim(shapetype)//' not recognized.'
+    write(*,*) 'Shape function '//trim(shape_functions)//' not recognized.'
     write(*,*)
     stop
-
-  end if shape_switch
-
-end subroutine create_shape
-
-!=============================================================================80
-!
-! Populates shape function arrays for Hicks-Hene shape functions,
-! number of elements in modes must be a multiple of 3.
-!
-!=============================================================================80
-subroutine HH_shape(x, modes, shape_function)
-
-  use vardef, only : initial_perturb, min_bump_width
-
-  double precision, dimension(:), intent(in) :: x, modes
-  double precision, dimension(:,:), intent(inout) :: shape_function
-
-  integer :: npt, nmodes, i, j, counter1
-  double precision :: power1, st, t1, t2, t1fact, t2fact, pi
-  double precision :: chord, xle, xs
-
-  npt = size(x,1)
-  chord = x(npt) - x(1)
-  xle = x(1)
-
-  
-  nmodes = size(modes,1)/3
-  t1fact = initial_perturb/(1.d0 - 0.001d0)
-  t2fact = initial_perturb/(10.d0 - min_bump_width)
-  pi = acos(-1.d0)
-
-  do i = 1, nmodes
-
-    !     Extract strength, bump location, and width
-
-    counter1 = 3*(i-1)
-    st = modes(counter1+1)
-    t1 = modes(counter1+2)/t1fact
-    t2 = modes(counter1+3)/t2fact
-
-    !     Check for problems with bump location and width parameters
-
-    if (t1 <= 0.d0) t1 = 0.001d0
-    if (t1 >= 1.d0) t1 = 0.999d0
-    if (t2 <= 0.d0) t2 = 0.001d0
-
-    !     Create shape function
-
-    power1 = log10(0.5d0)/log10(t1)
-    do j = 2, npt-1
-      xs = (x(j)-xle)/chord
-      shape_function(i,j) = st*sin(pi*xs**power1)**t2
-    end do
-
-  end do
-end subroutine HH_shape
-!=============================================================================80
-!
-! Populates shape function arrays for NACA shape functions
-!
-!=============================================================================80
-subroutine NACA_shape(x, modes, shape_function)
-
-  double precision, dimension(:), intent(in) :: x, modes
-  double precision, dimension(:,:), intent(inout) :: shape_function
-
-  integer :: npt, nmodes, i, j, counter1, counter2
-  double precision :: power1, power2, dvscale
-  double precision :: chord, xle, xs
-
-  npt = size(x,1)
-  chord = x(npt) - x(1)
-  xle = x(1)
-
-  nmodes = size(modes,1)
-
-!   Create naca shape functions
-
-  do j = 1, npt
-    xs = (x(j)-xle)/chord
-    shape_function(1,j) = sqrt(xs) - xs
-  end do
-
-  counter1 = 1
-  counter2 = 1
-
-  do i = 2, nmodes
-
-!     Whole-powered shapes
-
-    if (counter2 == 1) then
-
-      power1 = dble(counter1)
-      do j = 1, npt
-        xs = (x(j)-xle)/chord
-        shape_function(i,j) = xs**(power1)*(1.d0 - xs)
-      end do
-      counter2 = 2
-
-!     Fractional-powered shapes
-
-    else
-
-      power1 = 1.d0/dble(counter1 + 2)
-      power2 = 1.d0/dble(counter1 + 1)
-      do j = 1, npt
-        xs = (x(j)-xle)/chord
-        shape_function(i,j) = xs**power1 - xs**power2
-      end do
-      counter2 = 1
-      counter1 = counter1 + 1
-       
-    end if
-
-  end do
-
-!   Normalize shape functions
-
-  do i = 1, nmodes
-    dvscale = 1.d0/abs(maxval(shape_function(i,:)))
-    shape_function(i,:) = shape_function(i,:)*dvscale
-  end do
-
-end subroutine NACA_shape
-!=============================================================================80
-!
-! Creates an airfoil surface by perturbing an input "seed" airfoil
-!
-!=============================================================================80
-subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
-                          zt_new, zb_new, shapetype, symmetrical)
-
-  double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
-                                                zb_seed
-  double precision, dimension(:), intent(in) :: modest, modesb
-  double precision, dimension(:), intent(inout) :: zt_new, zb_new
-  character(*), intent(in) :: shapetype
-  logical, intent(in) :: symmetrical
-
-  if (trim(shapetype) == 'naca') then
-    
-    call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
-                          zt_new, zb_new, symmetrical)
-  else
-    
-    call HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,        &
-                          zt_new, zb_new, symmetrical)
   end if
-
-end subroutine create_airfoil
-
-!=============================================================================80
-!
-! Creates an airfoil surface by perturbing an input "seed" airfoil
-! Using Hicks-Henne bump functions
-!
-!=============================================================================80
-subroutine HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
-                          zt_new, zb_new, symmetrical)
-
-  double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
-                                                zb_seed
-  double precision, dimension(:), intent(in) :: modest, modesb
-  double precision, dimension(:), intent(inout) :: zt_new, zb_new
-  logical, intent(in) :: symmetrical
-
-  integer :: i, nmodest, nmodesb, npointst, npointsb
-  
-  nmodest = size(modest,1)/3
-  nmodesb = size(modesb,1)/3
-  
-  npointst = size(zt_seed,1)
-  npointsb = size(zb_seed,1)
-
-! Create shape functions for Hicks-Henne
-
-  call create_shape_functions(xt_seed, xb_seed, modest, modesb, 'hicks-henne', &
-                                first_time=.false.)
-
-! Top surface
-
-  zt_new = zt_seed
-  do i = 1, nmodest
-    zt_new = zt_new + top_shape_function(i,1:npointst)
+  zseedt=zseedt_new
+  zseedb=zseedb_new
+  write(*,*) 'modest_seed'
+  do i=1,size(modest_seed,1)
+    write(*,*) modest_seed(i)
   end do
-
-! Bottom surface
-
-  if (.not. symmetrical) then
-    zb_new = zb_seed
-    do i = 1, nmodesb
-      zb_new = zb_new + bot_shape_function(i,1:npointsb)
-    end do
-
-! For symmetrical airfoils, just mirror the top surface
-
-  else
-    do i = 1, npointsb
-      zb_new(i) = -zt_new(i)
-    end do
-  end if
-
-end subroutine HH_airfoil
-
-!=============================================================================80
-!
-! Creates an airfoil surface by perturbing an input "seed" airfoil
-! Using NACA bump functions
-!
-!=============================================================================80
-  subroutine NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
-                          zt_new, zb_new, symmetrical)
-
-  double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
-                                                zb_seed
-  double precision, dimension(:), intent(in) :: modest, modesb
-  double precision, dimension(:), intent(inout) :: zt_new, zb_new
-  logical, intent(in) :: symmetrical
-
-  integer :: i, nmodest, nmodesb, npointst, npointsb
-  double precision :: strength
-
-  nmodest = size(modest,1)
-  nmodesb = size(modesb,1)
-
-  npointst = size(zt_seed,1)
-  npointsb = size(zb_seed,1)
-
-! Top surface
-
-  zt_new = zt_seed
-  do i = 1, nmodest
-    strength = modest(i)
-    zt_new = zt_new + strength*top_shape_function(i,1:npointst)
+  write(*,*) 'modesb_seed'
+  do i=1,size(modesb_seed,1)
+    write(*,*) modesb_seed(i)
   end do
-
-! Bottom surface
-
-  if (.not. symmetrical) then
-    zb_new = zb_seed
-    do i = 1, nmodesb
-      strength = modesb(i)
-      zb_new = zb_new + strength*bot_shape_function(i,1:npointsb)
-    end do
-
-! For symmetrical airfoils, just mirror the top surface
-
-  else
-    do i = 1, npointsb
-      zb_new(i) = -zt_new(i)
-    end do
-  end if
-  
-  end subroutine NACA_airfoil
-  
+end subroutine parametrization_new_seed
 end module parametrization

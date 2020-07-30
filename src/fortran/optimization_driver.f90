@@ -336,8 +336,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   use vardef
   use memory_util,        only : allocate_airfoil, deallocate_airfoil
   use airfoil_operations, only : airfoil_write
-  use parametrization,    only : top_shape_function, bot_shape_function,       &
-                                 create_airfoil, parametrization_dvs
+  use parametrization,    only : create_airfoil, parametrization_dvs
   use airfoil_evaluation, only : xfoil_geom_options, xfoil_options
   use xfoil_driver,       only : run_xfoil
 
@@ -358,8 +357,8 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   character(30) :: text
   character(12) :: flapnote
 
-  nmodest = size(top_shape_function,1)
-  nmodesb = size(bot_shape_function,1)
+  nmodest = nshapedvtop
+  nmodesb = nshapedvbot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 

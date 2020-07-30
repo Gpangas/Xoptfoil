@@ -63,18 +63,21 @@ module vardef
   integer :: max_curv_reverse_top, max_curv_reverse_bot
   ! added lift and drag constraints
   character(8), dimension(max_op_points) :: moment_constraint_type,            &
-	                                        lift_constraint_type,                &
-	                                        drag_constraint_type
+                                          lift_constraint_type,                &
+                                          drag_constraint_type
   double precision, dimension(max_op_points) :: min_moment, min_lift, max_drag
-  character(11) :: shape_functions
+  character(17) :: shape_functions
   double precision, dimension(:), allocatable :: xmatcht, xmatchb, zmatcht,    &
                                                  zmatchb
   logical :: match_foils
   logical :: check_curvature
   logical :: symmetrical
 
-  integer :: nparams_top, nparams_bot
-  double precision :: initial_perturb
+  integer :: nparams_top, nparams_bot, nshapedvtop, nshapedvbot
+  double precision, dimension(:), allocatable :: modest_seed
+  double precision, dimension(:), allocatable :: modesb_seed
+  
+  double precision :: initial_perturb, tcTE
   double precision :: min_bump_width
 
   character(80) :: output_prefix

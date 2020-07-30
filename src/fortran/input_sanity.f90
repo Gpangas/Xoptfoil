@@ -383,7 +383,7 @@ subroutine check_seed()
         call ask_stop("Seed airfoil violates min_moment constraint for "//&
                       "operating point "//trim(text)//".")
       end if
-	end if
+  end if
 	! lift contraint
     if (trim(lift_constraint_type(i)) == 'use_seed') then
       min_lift(i) = lift(i)
@@ -397,7 +397,7 @@ subroutine check_seed()
         call ask_stop("Seed airfoil violates min_lift constraint for "//&
                       "operating point "//trim(text)//".")
       end if
-	end if
+  end if
 	! drag contraint
     if (trim(drag_constraint_type(i)) == 'use_seed') then
       max_drag(i) = drag(i)

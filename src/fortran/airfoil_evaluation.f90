@@ -88,10 +88,9 @@ end function objective_function_nopenalty
 !
 !=============================================================================80
 function aero_objective_function(designvars, include_penalty)
-
+  use vardef,          only : nshapedvtop, nshapedvbot
   use math_deps,       only : interp_vector, curvature, derv1f1, derv1b1
-  use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil, parametrization_dvs
+  use parametrization, only : create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil
   use xfoil_inc,       only : AMAX, CAMBR
 
@@ -133,11 +132,14 @@ function aero_objective_function(designvars, include_penalty)
   logical :: penalize
 
   pi = acos(-1.d0)
-  nmodest = size(top_shape_function,1)
-  nmodesb = size(bot_shape_function,1)
+  nmodest = nshapedvtop
+  nmodesb = nshapedvbot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 
+  !write(*,*) 'designvars'
+  !write(*,*) designvars
+    
 ! Enable / disable penalty function
 
   penalize = .true.
@@ -146,13 +148,14 @@ function aero_objective_function(designvars, include_penalty)
   end if
 
 ! Set modes for top and bottom surfaces
-  
+
   call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
   
   dvtbnd1 = 1
   dvtbnd2 = ndvs_top
   dvbbnd1 = dvtbnd2 + 1
   dvbbnd2 = ndvs_top + ndvs_bot
+
 
 ! Overwrite lower DVs for symmetrical airfoils (they are not used)
 
@@ -306,8 +309,11 @@ function aero_objective_function(designvars, include_penalty)
 
   ndvs = size(designvars,1) - int_x_flap_spec 
   if (nflap_optimize /= (ndvs - dvbbnd2)) then
+    write(*,*) nflap_optimize
+    write(*,*) ndvs
+    write(*,*) dvbbnd2
     write(*,*) "Wrong number of design variables for flap deflections."
-    write(*,*) "Please report this bug."
+    write(*,*) "Please report this bug.1"
     stop
   end if
 
@@ -615,9 +621,8 @@ end function aero_objective_function
 !
 !=============================================================================80
 function matchfoil_objective_function(designvars)
-
-  use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil, parametrization_dvs
+  use vardef,          only : nshapedvtop, nshapedvbot
+  use parametrization, only : create_airfoil, parametrization_dvs
   use math_deps,       only : norm_2
 
   double precision, dimension(:), intent(in) :: designvars
@@ -627,8 +632,8 @@ function matchfoil_objective_function(designvars)
   double precision, dimension(size(xseedb,1)) :: zb_new
   integer :: nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd, ndvs_top, ndvs_bot
 
-  nmodest = size(top_shape_function,1)
-  nmodesb = size(bot_shape_function,1)
+  nmodest = nshapedvtop
+  nmodesb = nshapedvbot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 
@@ -682,10 +687,9 @@ end function write_function
 !
 !=============================================================================80
 function write_airfoil_optimization_progress(designvars, designcounter)
-
+  use vardef,          only : nshapedvtop, nshapedvbot
   use math_deps,       only : interp_vector 
-  use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil, parametrization_dvs
+  use parametrization, only : create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil, xfoil_geometry_info
 
   double precision, dimension(:), intent(in) :: designvars
@@ -707,8 +711,8 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   character(8) :: maxtchar, xmaxtchar, maxcchar, xmaxcchar
   integer :: foilunit, polarunit
 
-  nmodest = size(top_shape_function,1)
-  nmodesb = size(bot_shape_function,1)
+  nmodest = nshapedvtop
+  nmodesb = nshapedvbot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 
@@ -750,7 +754,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   ndvs = size(designvars,1) - int_x_flap_spec
   if (nflap_optimize /= (ndvs - dvbbnd2)) then
     write(*,*) "Wrong number of design variables for flap deflections."
-    write(*,*) "Please report this bug."
+    write(*,*) "Please report this bug.2"
     stop
   end if
 
@@ -897,9 +901,8 @@ end function write_airfoil_optimization_progress
 !
 !=============================================================================80
 function write_matchfoil_optimization_progress(designvars, designcounter)
-
-  use parametrization, only : top_shape_function, bot_shape_function,          &
-                              create_airfoil, parametrization_dvs
+  use vardef,          only : nshapedvtop, nshapedvbot
+  use parametrization, only : create_airfoil, parametrization_dvs
 
   double precision, dimension(:), intent(in) :: designvars
   integer, intent(in) :: designcounter
@@ -912,8 +915,8 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
   character(100) :: foilfile, text
   integer :: foilunit
 
-  nmodest = size(top_shape_function,1)
-  nmodesb = size(bot_shape_function,1)
+  nmodest = nshapedvtop
+  nmodesb = nshapedvbot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 

@@ -149,14 +149,14 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
     objval(1) = objfunc(x0)
 !$omp do
     do i = 2, pop
-      dv(:,i) = maxval(xmax - xmin)*dv(:,i) + xmin
+      dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
       objval(i) = objfunc(dv(:,i))
     end do
 !$omp end do
   else
 !$omp do
     do i = 1, pop
-      dv(:,i) = maxval(xmax - xmin)*dv(:,i) + xmin
+      dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
       objval(i) = objfunc(dv(:,i))
     end do
 !$omp end do
@@ -189,7 +189,7 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
       do while ((initcount <= attempts) .and.                                  &
                (objval(i) >= feasible_limit))
         call random_number(randvec1)
-        dv(:,i) = maxval(xmax - xmin)*randvec1 + xmin
+        dv(:,i) = (xmax - xmin)*randvec1 + xmin
         objval(i) = objfunc(dv(:,i))
         if (objval(i) < minstore) then
           minstore = objval(i)

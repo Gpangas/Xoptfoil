@@ -32,8 +32,7 @@ program main
   use input_sanity,        only : check_seed
   use optimization_driver, only : matchfoils_preprocessing, optimize,          &
                                   write_final_design
-  use parametrization_new, only : InitialKBParameterization
-  use parametrization,     only : parametrization_dvs
+  use parametrization,     only : parametrization_dvs, parametrization_new_seed
 
   implicit none
 
@@ -45,7 +44,7 @@ program main
   type(pso_options_type) :: pso_options
   type(ga_options_type) :: ga_options
   type(ds_options_type) :: ds_options
-  integer :: pointst, pointsb, steps, fevals, nshapedvtop, nshapedvbot,        &
+  integer :: pointst, pointsb, steps, fevals,        &
              restart_write_freq 
   double precision, dimension(:), allocatable :: optdesign
   integer, dimension(:), allocatable :: constrained_dvs
@@ -68,7 +67,7 @@ program main
                    seed_airfoil, airfoil_file, nparams_top, nparams_bot,       &
                    restart, restart_write_freq, constrained_dvs, naca_options, &
                    pso_options, ga_options, ds_options, matchfoil_file)
-
+  
   ! Load seed airfoil into memory, including transformations and smoothing
 
   call get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, buffer_foil, &
@@ -83,9 +82,8 @@ program main
   allocate(zseedb(pointsb))
   call split_airfoil(buffer_foil, xseedt, xseedb, zseedt, zseedb, symmetrical)
   
-  !call RotateAirfoil(xseedt, xseedb, zseedt, zseedb)
-  
-  !call InitialKBParameterization()
+  !Rotate Airfoil to put TE at (1,0) 
+  call RotateAirfoil(xseedt, xseedb, zseedt, zseedb)
 
   ! Deallocate the buffer airfoil (no longer needed)
 
@@ -116,12 +114,18 @@ program main
     write(*,*) "Optimizing for requested operating points."
     write(*,*)
   end if
-
+  
+  allocate(modest_seed(nshapedvtop),modesb_seed(nshapedvbot))
+  
+  modest_seed=0.0d0
+  modesb_seed=0.0d0
+  tcTE=0.0d0
+  call parametrization_new_seed(xseedt, xseedb, zseedt, zseedb, modest_seed,   &
+      modesb_seed, symmetrical, tcTE, shape_functions)
   ! Make sure seed airfoil passes constraints, and get scaling factors for
   ! operating points
-
+  
   call check_seed()
-
   ! Optimize
   
   call optimize(search_type, global_search, local_search, constrained_dvs,     &
