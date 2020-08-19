@@ -32,7 +32,7 @@ subroutine allocate_parametrization(nmodest, nmodesb, npointst, npointsb, shapet
   if ((trim(shapetype) == 'naca') .OR. (trim(shapetype) == 'hicks-henne')) then
     call allocate_shape_functions(nmodest, nmodesb, npointst, npointsb)
         
-  elseif (trim(shapetype) == 'kulfan-bussoletti') then
+  elseif (trim(shapetype) == 'kulfan-bussoletti' .OR. trim(shapetype) == 'b-spline') then
 
   else
 
@@ -52,7 +52,7 @@ subroutine deallocate_parametrization()
   if ((trim(shape_functions) == 'naca') .OR. (trim(shape_functions) == 'hicks-henne')) then
     call deallocate_shape_functions()
         
-  elseif (trim(shape_functions) == 'kulfan-bussoletti') then
+  elseif (trim(shape_functions) == 'kulfan-bussoletti' .OR. trim(shape_functions) == 'b-spline') then
 
   else
 
@@ -95,6 +95,11 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
     ! Number of modes is order of polynomial +1
     nmodestop = size(modestop,1)
     nmodesbot = size(modesbot,1)
+    
+  elseif (trim(shapetype) == 'b_spline') then
+    ! 
+    nmodestop = size(modestop,1)
+    nmodesbot = size(modesbot,1)
   else
 
     write(*,*)
@@ -118,7 +123,7 @@ end subroutine create_shape_functions
 !=============================================================================80
 subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
                           zt_new, zb_new, shapetype, symmetrical)
-  use vardef, only : tcTE
+  use vardef, only : tcTE,b_spline_degree,b_spline_xtype,b_spline_distribution
 
   double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
                                                 zb_seed
@@ -141,6 +146,11 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   elseif (trim(shapetype) == 'kulfan-bussoletti') then
     call KBP_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,       &
                           zt_new, zb_new, symmetrical, tcTE)
+    
+  elseif (trim(shapetype) == 'b_spline') then
+    !call BSP_airfoil(ut_seed, xt_seed, zt_seed, ub_seed, xb_seed, zb_seed,     &
+    !xmodest, zmodest, xmodesb, zmodesb, xt_new, xb_new, zt_new, zb_new,        &
+    !symmetrical, b_spline_degree)
   else
 
     write(*,*)
@@ -188,6 +198,11 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
     
     ndvs_top = nparams_top
     ndvs_bot = nparams_bot
+  
+  elseif (trim(parametrization_type) == 'b_spline') then
+    
+    ndvs_top = nparams_top-2
+    ndvs_bot = nparams_bot-2
   else
 
     write(*,*)
@@ -267,10 +282,22 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
     counter = 0
     do i = nfunctions_top + nbot_actual + 1,                                   &
-            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
+    nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
       counter = counter + 1
       constrained_dvs(counter) = i
     end do
+
+  elseif (trim(parametrization_type) == 'b_spline') then
+    !     For b_spline, we will only constrain the flap deflection
+
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    counter = 0
+    do i = nfunctions_top + nbot_actual + 1,                                   &
+      nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
+      counter = counter + 1
+      constrained_dvs(counter) = i
+    end do
+            
   else
 
     write(*,*)
@@ -279,8 +306,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
     stop
       
   end if
-
 end subroutine parametrization_constrained_dvs
+
 
 
 !=============================================================================80
@@ -359,6 +386,21 @@ subroutine parametrization_init(optdesign, x0)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+  
+  elseif (trim(shape_functions) == 'b-spline') then
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+
+    x0(1:nshapedvtop) = modest_seed
+    x0(nshapedvtop+1:nfuncs) = modesb_seed
+
+    !   Seed flap deflection as specified in input file
+
+    do i = nfuncs + 1, ndv - int_x_flap_spec
+      oppoint = flap_optimize_points(i-nfuncs)
+      x0(i) = flap_degrees(oppoint)*ffact
+    end do
+    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+  
   else
     
     write(*,*)
@@ -451,6 +493,22 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
       xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
       xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
     end if
+  
+  elseif (trim(shape_functions) == 'b-spline') then
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    
+    xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
+    xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
+    xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
+    xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+    
+    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    if (int_x_flap_spec == 1) then
+      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+    end if  
+  
   else
 
     write(*,*)
@@ -501,20 +559,40 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     call KBP_init(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed)
     call KBP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed,            &
                       modesb_seed, zseedt_new, zseedb_new, symmetrical, tcTE)
-      sum=0.d0
-      do i = 1, size(zseedt,1)
-        sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
-      end do
-      sum=sum**0.5
-      Write(*,*) ' RMSE of upper surface'
-      Write(*,*) sum
-      sum=0.d0
-      do i = 1, size(zseedb,1)
-        sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
-      end do
-      sum=sum**0.5
-      Write(*,*) ' RMSE of lower surface'
-      Write(*,*) sum
+    sum=0.d0
+    do i = 1, size(zseedt,1)
+      sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
+    end do
+    sum=sum**0.5
+    Write(*,*) ' RMSE of upper surface'
+    Write(*,*) sum
+    sum=0.d0
+    do i = 1, size(zseedb,1)
+      sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
+    end do
+    sum=sum**0.5
+    Write(*,*) ' RMSE of lower surface'
+    Write(*,*) sum
+  
+  elseif (trim(shape_functions) == 'b-spline') then
+    !call KBP_init(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed)
+    !call KBP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed,            &
+    !                  modesb_seed, zseedt_new, zseedb_new, symmetrical, tcTE)
+    !sum=0.d0
+    !do i = 1, size(zseedt,1)
+    !  sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
+    !end do
+    !sum=sum**0.5
+    !Write(*,*) ' RMSE of upper surface'
+    !Write(*,*) sum
+    !sum=0.d0
+    !do i = 1, size(zseedb,1)
+    !  sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
+    !end do
+    !sum=sum**0.5
+    !Write(*,*) ' RMSE of lower surface'
+    !Write(*,*) sum
+  
   else
 
     write(*,*)

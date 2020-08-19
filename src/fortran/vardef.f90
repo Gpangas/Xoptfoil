@@ -79,6 +79,7 @@ module vardef
   
   double precision :: initial_perturb, tcTE
   double precision :: min_bump_width
+  integer :: b_spline_degree, b_spline_xtype, b_spline_distribution
 
   character(80) :: output_prefix
 

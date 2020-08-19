@@ -33,8 +33,8 @@ module input_output
 !
 !=============================================================================80
 subroutine read_inputs(input_file, search_type, global_search, local_search,   &
-                       seed_airfoil, airfoil_file, nfunctions_top,             &
-                       nfunctions_bot, restart, restart_write_freq,            &
+                       seed_airfoil, airfoil_file, nparameters_top,             &
+                       nparameters_bot, restart, restart_write_freq,            &
                        constrained_dvs, naca_options, pso_options, ga_options, &
                        ds_options, matchfoil_file)
 
@@ -51,7 +51,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   character(*), intent(in) :: input_file
   character(80), intent(out) :: search_type, global_search, local_search,      &
                                 seed_airfoil, airfoil_file, matchfoil_file
-  integer, intent(out) :: nfunctions_top, nfunctions_bot
+  integer, intent(out) :: nparameters_top, nparameters_bot
   integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
   integer, dimension(max_addthickconst) :: sort_idxs
   double precision, dimension(max_addthickconst) :: temp_thickmin, temp_thickmax
@@ -81,11 +81,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   character :: choice
 
   namelist /optimization_options/ search_type, global_search, local_search,    &
-            seed_airfoil, airfoil_file, shape_functions, nfunctions_top,       &
-            nfunctions_bot, initial_perturb, min_bump_width, restart,          &
+            seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
+            nparameters_bot, initial_perturb, min_bump_width, b_spline_degree, &
+            b_spline_xtype, b_spline_distribution, restart,                     &
             restart_write_freq, write_designs
   namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
-            use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, flap_selection,             &
+            use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, flap_selection,&
             flap_degrees, weighting, optimization_type, ncrit_pt
   !added lift_constraint_type, min_lift, drag_constraint_type, max_drag
   !added min_flap_x, max_flap_x
@@ -131,8 +132,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   seed_airfoil = 'naca'
   shape_functions = 'hicks-henne'
   min_bump_width = 0.1d0
-  nfunctions_top = 4
-  nfunctions_bot = 4
+  b_spline_degree = 3      
+  b_spline_xtype = 1       
+  b_spline_distribution = 3
+  nparameters_top = 4
+  nparameters_bot = 4
   initial_perturb = 0.025d0
   restart = .false.
   restart_write_freq = 20
@@ -324,7 +328,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
 !   Set design variables with side constraints
     call parametrization_constrained_dvs(shape_functions, constrained_dvs,       &
-         nflap_optimize, int_x_flap_spec, nfunctions_top, nfunctions_bot,        &
+         nflap_optimize, int_x_flap_spec, nparameters_top, nparameters_bot,        &
          nbot_actual, symmetrical)
 
     if (trim(global_search) == 'particle_swarm') then
@@ -509,8 +513,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " airfoil_file = '"//trim(airfoil_file)//"'"
   write(*,*) " shape_functions = '"//trim(shape_functions)//"'"
   write(*,*) " min_bump_width = ", min_bump_width
-  write(*,*) " nfunctions_top = ", nfunctions_top
-  write(*,*) " nfunctions_bot = ", nfunctions_bot
+  write(*,*) " b_spline_degree = ", b_spline_degree
+  write(*,*) " b_spline_xtype = ", b_spline_xtype
+  write(*,*) " b_spline_distribution = ", b_spline_distribution
+  write(*,*) " nparameters_top = ", nparameters_top
+  write(*,*) " nparameters_bot = ", nparameters_bot
   write(*,*) " initial_perturb = ", initial_perturb
   write(*,*) " restart = ", restart
   write(*,*) " restart_write_freq = ", restart_write_freq
@@ -719,17 +726,25 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("seed_airfoil must be 'from_file' or 'naca'.")
   if (trim(shape_functions) /= 'hicks-henne' .and.                             &
       trim(shape_functions) /= 'naca' .and.                                    &
-      trim(shape_functions) /= 'kulfan-bussoletti')                            &
+      trim(shape_functions) /= 'kulfan-bussoletti' .and.                       &
+      trim(shape_functions) /= 'b-spline')                            &
     call my_stop("shape_functions must be 'hicks-henne' or 'naca' or           &
-                 &'kulfan-bussoletti'.")
-  if (nfunctions_top < 0)                                                      &
-    call my_stop("nfunctions_top must be >= 0.")
-  if (nfunctions_bot < 0)                                                      &
-    call my_stop("nfunctions_bot must be >= 0.")
+                 &'kulfan-bussoletti' or 'b-spline'.")
+  if (nparameters_top < 0)                                                     &
+    call my_stop("nparameters_top must be >= 0.")
+  if (nparameters_bot < 0)                                                     &
+    call my_stop("nparameters_bot must be >= 0.")
   if (initial_perturb <= 0.d0)                                                 &
     call my_stop("initial_perturb must be > 0.")
   if (min_bump_width <= 0.d0)                                                  &
     call my_stop("min_bump_width must be > 0.")
+  if (b_spline_degree < 2)                                                     &
+    call my_stop("b_spline_degree must be >= 2")
+  if (b_spline_xtype /= 1 .and. b_spline_xtype /= 2)                           &
+    call my_stop("b_spline_xtype must be 1 or 2")
+  if (b_spline_distribution /= 1 .and. b_spline_distribution /= 2 .and.          &
+      b_spline_distribution /= 3)                                               &
+    call my_stop("b_spline_distribution must be 1 or 2 or 3")
 
 ! Operating points
 

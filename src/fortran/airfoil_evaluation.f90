@@ -826,7 +826,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
                trim(polarfile)//" ..."
     open(unit=polarunit, file=polarfile, status='replace')
     write(polarunit,'(A)') 'title="Airfoil polars"'
-    write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb"'
+    write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb" "flap deflexion" "flap hinge position"'
     write(polarunit,'(A)') 'zone t="Seed airfoil polar"'
 
   else
@@ -866,8 +866,9 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 ! Write polars to file
 
   do i = 1, noppoint
-    write(polarunit,'(6ES14.6)') alpha(i), lift(i), drag(i), moment(i),        &
-                                 xtrt(i), xtrb(i)
+    write(polarunit,'(8ES14.6)') alpha(i), lift(i), drag(i), moment(i),        &
+                                 xtrt(i), xtrb(i), actual_flap_degrees(i),     &
+                                 actual_x_flap
   end do
 
 ! Close output files
