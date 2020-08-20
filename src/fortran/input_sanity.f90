@@ -480,6 +480,9 @@ subroutine check_seed()
     scale_factor(i) = 1.d0/checkval
   end do
 
+  write(*,*) 'Airfoil passed all constraints'
+  write(*,*)
+  
 end subroutine check_seed
 
 !=============================================================================80

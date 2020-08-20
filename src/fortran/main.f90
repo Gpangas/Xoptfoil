@@ -101,6 +101,11 @@ program main
   end if
 
   write(*,*) "Number of Design Variables = ", size(optdesign,1)
+  write(*,*) "  for top shape            = ", nshapedvtop
+  write(*,*) "  for bot shape            = ", nshapedvbot
+  write(*,*) "  for flap deflexion       = ", nflap_optimize
+  write(*,*) "  for flap hinge position  = ", int_x_flap_spec
+  write(*,*)
   
   ! Allocate memory for airfoil analysis
 

@@ -26,14 +26,18 @@ module parametrization
   
 subroutine allocate_parametrization(nmodest, nmodesb, npointst, npointsb, shapetype) 
   use parametrization_deform, only : allocate_shape_functions
+  use parametrization_constr, only : allocate_b_matrix
 
   character(*), intent(in) :: shapetype
   integer, intent(in) :: nmodest, nmodesb, npointst, npointsb
   if ((trim(shapetype) == 'naca') .OR. (trim(shapetype) == 'hicks-henne')) then
     call allocate_shape_functions(nmodest, nmodesb, npointst, npointsb)
         
-  elseif (trim(shapetype) == 'kulfan-bussoletti' .OR. trim(shapetype) == 'b-spline') then
-
+  elseif (trim(shapetype) == 'kulfan-bussoletti') then
+  
+  elseif (trim(shapetype) == 'b_spline') then
+    call allocate_b_matrix(nmodest, nmodesb, npointst, npointsb)
+    
   else
 
     write(*,*)
@@ -42,18 +46,22 @@ subroutine allocate_parametrization(nmodest, nmodesb, npointst, npointsb, shapet
     stop
 
   end if
-  
+  write(*,*) 'check'
 end subroutine allocate_parametrization
 
 subroutine deallocate_parametrization() 
-  use parametrization_deform, only : allocate_shape_functions
+  use parametrization_deform, only : deallocate_shape_functions
+  use parametrization_constr, only : deallocate_b_matrix
   use vardef, only : shape_functions
   
   if ((trim(shape_functions) == 'naca') .OR. (trim(shape_functions) == 'hicks-henne')) then
     call deallocate_shape_functions()
         
-  elseif (trim(shape_functions) == 'kulfan-bussoletti' .OR. trim(shape_functions) == 'b-spline') then
-
+  elseif (trim(shape_functions) == 'kulfan-bussoletti') then
+  
+  elseif (trim(shape_functions) == 'b_spline') then
+    call deallocate_b_matrix()
+    
   else
 
     write(*,*)
@@ -111,7 +119,7 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
 
   !   Allocate shape functions
 
-  call allocate_shape_functions(nmodestop, nmodesbot, ntop, nbot)
+  call allocate_parametrization(nmodestop, nmodesbot, ntop, nbot, shapetype)
 
 end subroutine create_shape_functions
 
@@ -123,7 +131,8 @@ end subroutine create_shape_functions
 !=============================================================================80
 subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
                           zt_new, zb_new, shapetype, symmetrical)
-  use vardef, only : tcTE,b_spline_degree,b_spline_xtype,b_spline_distribution
+  use vardef, only : tcTE,b_spline_degree,b_spline_xtype,b_spline_distribution,&
+    upointst, upointsb, xcontrolt, xcontrolb
 
   double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
                                                 zb_seed
@@ -132,6 +141,8 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   character(*), intent(in) :: shapetype
   logical, intent(in) :: symmetrical
   integer :: i
+  double precision, dimension(size(xt_seed,1)) :: xt_new
+  double precision, dimension(size(xb_seed,1)) :: xb_new
 
   if (trim(shapetype) == 'naca') then
     
@@ -148,9 +159,11 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
                           zt_new, zb_new, symmetrical, tcTE)
     
   elseif (trim(shapetype) == 'b_spline') then
-    !call BSP_airfoil(ut_seed, xt_seed, zt_seed, ub_seed, xb_seed, zb_seed,     &
-    !xmodest, zmodest, xmodesb, zmodesb, xt_new, xb_new, zt_new, zb_new,        &
-    !symmetrical, b_spline_degree)
+    !write(*,*) size(xcontrolt,1), size(xcontrolb,1), size(modest,1), size(modesb,1)
+    call BSP_airfoil(upointst, xt_seed, zt_seed, upointsb, xb_seed, zb_seed,   &
+      xcontrolt, xcontrolb, modest, modesb, xt_new, xb_new, zt_new, zb_new,    &
+      symmetrical)
+  
   else
 
     write(*,*)
@@ -178,7 +191,8 @@ end subroutine create_airfoil
 !=============================================================================80
 subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
                                ndvs_top, ndvs_bot)
-
+  use vardef, only : b_spline_xtype
+  
   integer, intent(in) :: nparams_top, nparams_bot
   character(*), intent(in) :: parametrization_type
   
@@ -201,8 +215,14 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
   
   elseif (trim(parametrization_type) == 'b_spline') then
     
-    ndvs_top = nparams_top-2
-    ndvs_bot = nparams_bot-2
+    if (b_spline_xtype .EQ. 1) then
+      ndvs_top = nparams_top-2
+      ndvs_bot = nparams_bot-2
+    else
+      ndvs_top = (nparams_top-2)*2
+      ndvs_bot = (nparams_bot-2)*2
+    end if
+    
   else
 
     write(*,*)
@@ -387,7 +407,7 @@ subroutine parametrization_init(optdesign, x0)
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
   
-  elseif (trim(shape_functions) == 'b-spline') then
+  elseif (trim(shape_functions) == 'b_spline') then
     nfuncs = ndv - nflap_optimize - int_x_flap_spec
 
     x0(1:nshapedvtop) = modest_seed
@@ -494,7 +514,7 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
       xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
     end if
   
-  elseif (trim(shape_functions) == 'b-spline') then
+  elseif (trim(shape_functions) == 'b_spline') then
     nfuncs = ndv - nflap_optimize - int_x_flap_spec
     
     xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
@@ -531,7 +551,9 @@ end subroutine parametrization_maxmin
 !=============================================================================80
 subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   modest_seed, modesb_seed, symmetrical, tcTE, shape_functions)
-
+  
+  use vardef, only: upointst, upointsb, xcontrolt, xcontrolb
+  
   logical, intent(in) :: symmetrical
   character(*), intent(in) :: shape_functions
   double precision, dimension(:), intent(in) :: xseedt, xseedb
@@ -540,8 +562,8 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   double precision, dimension(:), intent(inout) :: modesb_seed
   double precision, intent(inout) :: tcTE
   
-  double precision, dimension(size(xseedt,1)) :: zseedt_new
-  double precision, dimension(size(xseedb,1)) :: zseedb_new
+  double precision, dimension(size(xseedt,1)) :: xseedt_new, zseedt_new
+  double precision, dimension(size(xseedb,1)) :: xseedb_new, zseedb_new
   double precision :: sum
   integer :: i
       
@@ -574,24 +596,48 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     Write(*,*) ' RMSE of lower surface'
     Write(*,*) sum
   
-  elseif (trim(shape_functions) == 'b-spline') then
-    !call KBP_init(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed)
-    !call KBP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed,            &
-    !                  modesb_seed, zseedt_new, zseedb_new, symmetrical, tcTE)
-    !sum=0.d0
-    !do i = 1, size(zseedt,1)
-    !  sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
-    !end do
-    !sum=sum**0.5
-    !Write(*,*) ' RMSE of upper surface'
-    !Write(*,*) sum
-    !sum=0.d0
-    !do i = 1, size(zseedb,1)
-    !  sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
-    !end do
-    !sum=sum**0.5
-    !Write(*,*) ' RMSE of lower surface'
-    !Write(*,*) sum
+  elseif (trim(shape_functions) == 'b_spline') then
+    call BSP_init(xseedt, xseedb, zseedt, zseedb, modest_seed, modesb_seed)
+    
+    call BSP_airfoil(upointst, xseedt, zseedt, upointsb, xseedb, zseedb,       &
+      xcontrolt, xcontrolb, modest_seed, modesb_seed, xseedt_new, xseedb_new,  &
+      zseedt_new, zseedb_new, symmetrical)
+    Write(*,*) ' x control top'
+    do i = 1, size(xcontrolt,1)
+      write(*,*) xcontrolt(i)
+    end do
+    
+    sum=0.d0
+    do i = 1, size(xseedt,1)
+      sum=sum+(xseedt(i)-xseedt_new(i))**2./real(size(xseedt,1),8)
+    end do
+    sum=sum**0.5
+    Write(*,*) ' RMSE of x upper surface'
+    Write(*,*) sum
+    
+    sum=0.d0
+    do i = 1, size(zseedt,1)
+      sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
+    end do
+    sum=sum**0.5
+    Write(*,*) ' RMSE of z upper surface'
+    Write(*,*) sum
+    
+    sum=0.d0
+    do i = 1, size(xseedb,1)
+      sum=sum+(xseedb(i)-xseedb_new(i))**2./real(size(xseedb,1),8)
+    end do
+    sum=sum**0.5
+    Write(*,*) ' RMSE of x lower surface'
+    Write(*,*) sum
+    
+    sum=0.d0
+    do i = 1, size(zseedb,1)
+      sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
+    end do
+    sum=sum**0.5
+    Write(*,*) ' RMSE of z lower surface'
+    Write(*,*) sum
   
   else
 

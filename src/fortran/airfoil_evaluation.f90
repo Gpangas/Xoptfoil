@@ -88,7 +88,7 @@ end function objective_function_nopenalty
 !
 !=============================================================================80
 function aero_objective_function(designvars, include_penalty)
-  use vardef,          only : nshapedvtop, nshapedvbot
+  use vardef,          only : nparams_top, nparams_bot!nshapedvtop, nshapedvbot
   use math_deps,       only : interp_vector, curvature, derv1f1, derv1b1
   use parametrization, only : create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil
@@ -132,8 +132,8 @@ function aero_objective_function(designvars, include_penalty)
   logical :: penalize
 
   pi = acos(-1.d0)
-  nmodest = nshapedvtop
-  nmodesb = nshapedvbot
+  nmodest = nparams_top
+  nmodesb = nparams_bot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 
@@ -165,7 +165,8 @@ function aero_objective_function(designvars, include_penalty)
   end if
 
 ! Create top and bottom surfaces by perturbation of seed airfoil
-
+  !write(*,*) 'a',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
+  
   call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
                       designvars(dvtbnd1:dvtbnd2), designvars(dvbbnd1:dvbbnd2),&
                       zt_new, zb_new, shape_functions, symmetrical)
@@ -621,7 +622,7 @@ end function aero_objective_function
 !
 !=============================================================================80
 function matchfoil_objective_function(designvars)
-  use vardef,          only : nshapedvtop, nshapedvbot
+  use vardef,          only : nparams_top, nparams_bot
   use parametrization, only : create_airfoil, parametrization_dvs
   use math_deps,       only : norm_2
 
@@ -632,8 +633,8 @@ function matchfoil_objective_function(designvars)
   double precision, dimension(size(xseedb,1)) :: zb_new
   integer :: nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd, ndvs_top, ndvs_bot
 
-  nmodest = nshapedvtop
-  nmodesb = nshapedvbot
+  nmodest = nparams_top
+  nmodesb = nparams_bot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 
@@ -687,7 +688,7 @@ end function write_function
 !
 !=============================================================================80
 function write_airfoil_optimization_progress(designvars, designcounter)
-  use vardef,          only : nshapedvtop, nshapedvbot
+  use vardef,          only : nparams_top, nparams_bot
   use math_deps,       only : interp_vector 
   use parametrization, only : create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil, xfoil_geometry_info
@@ -711,8 +712,8 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   character(8) :: maxtchar, xmaxtchar, maxcchar, xmaxcchar
   integer :: foilunit, polarunit
 
-  nmodest = nshapedvtop
-  nmodesb = nshapedvbot
+  nmodest = nparams_top
+  nmodesb = nparams_bot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 
@@ -733,7 +734,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
-
+  !write(*,*) 'b',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
   call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
                       designvars(dvtbnd1:dvtbnd2), designvars(dvbbnd1:dvbbnd2),&
                       zt_new, zb_new, shape_functions, symmetrical)
@@ -902,7 +903,7 @@ end function write_airfoil_optimization_progress
 !
 !=============================================================================80
 function write_matchfoil_optimization_progress(designvars, designcounter)
-  use vardef,          only : nshapedvtop, nshapedvbot
+  use vardef,          only : nparams_top, nparams_bot
   use parametrization, only : create_airfoil, parametrization_dvs
 
   double precision, dimension(:), intent(in) :: designvars
@@ -916,8 +917,8 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
   character(100) :: foilfile, text
   integer :: foilunit
 
-  nmodest = nshapedvtop
-  nmodesb = nshapedvbot
+  nmodest = nparams_top
+  nmodesb = nparams_bot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
 

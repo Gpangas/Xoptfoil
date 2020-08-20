@@ -379,7 +379,8 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
 
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
-
+  !write(*,*) 'c',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
+  
   call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
                       optdesign(dvtbnd1:dvtbnd2), optdesign(dvbbnd1:dvbbnd2),  &
                       zt_new, zb_new, shapetype, symmetrical)

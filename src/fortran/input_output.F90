@@ -727,9 +727,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   if (trim(shape_functions) /= 'hicks-henne' .and.                             &
       trim(shape_functions) /= 'naca' .and.                                    &
       trim(shape_functions) /= 'kulfan-bussoletti' .and.                       &
-      trim(shape_functions) /= 'b-spline')                            &
+      trim(shape_functions) /= 'b_spline')                            &
     call my_stop("shape_functions must be 'hicks-henne' or 'naca' or           &
-                 &'kulfan-bussoletti' or 'b-spline'.")
+                 &'kulfan-bussoletti' or 'b_spline'.")
   if (nparameters_top < 0)                                                     &
     call my_stop("nparameters_top must be >= 0.")
   if (nparameters_bot < 0)                                                     &

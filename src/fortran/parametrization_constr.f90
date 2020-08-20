@@ -3,7 +3,13 @@ module parametrization_constr
 ! Contains subroutines to create an airfoil shape from design variables
 
   implicit none
+! Shape functions for creating airfoil shapes (top and bottom)
 
+  double precision, dimension(:,:), pointer :: top_b_matrix
+  double precision, dimension(:,:), pointer :: bot_b_matrix
+
+!$omp threadprivate(top_b_matrix)
+!$omp threadprivate(bot_b_matrix)
   contains
 
 !/////////////////////////////////////////////////////////////////////////////80
@@ -213,34 +219,45 @@ end subroutine KBParameterization_fitting
 !/////////////////////////////////////////////////////////////////////////////80
 
 ! ----------------------------------------------------------------------------
-! Subroutine that implements the B-Spline Parameterization, weights to coordinates.
+! Subroutine that implements the b_spline Parameterization, weights to coordinates.
 subroutine BSP_airfoil(ut_seed, xt_seed, zt_seed, ub_seed, xb_seed, zb_seed,   &
-xmodest, zmodest, xmodesb, zmodesb, xt_new, xb_new, zt_new, zb_new,            &
-symmetrical, spline_degree)
+xmodest, xmodesb, zmodest, zmodesb, xt_new, xb_new, zt_new, zb_new,            &
+symmetrical)
+  
+  use vardef, only : b_spline_xtype, b_spline_degree
 
   implicit none
 
-  integer, intent (in) :: spline_degree
-  real*8, dimension(:), intent (in) :: xmodest, zmodest
-  real*8, dimension(:), intent (in) :: xmodesb, zmodesb
+  real*8, dimension(:), intent (in) :: xmodest, xmodesb, zmodest, zmodesb
   logical, intent(in) :: symmetrical
   real*8, dimension(:), intent (in) ::ut_seed, xt_seed, zt_seed
   real*8, dimension(:), intent (in) ::ub_seed, xb_seed, zb_seed
   real*8, dimension(size(xt_seed,1)), intent (out) :: xt_new, zt_new
   real*8, dimension(size(xb_seed,1)), intent (out) :: xb_new, zb_new
+  
   integer :: i, nPointst, nPointsb, nmodest, nmodesb
-
+  real*8, dimension(size(xmodest,1)) :: zmodest_use
+  real*8, dimension(size(xmodesb,1)) :: zmodesb_use
+  
   nmodest=size(xmodest,1)
-  nmodesb=size(xmodest,1)
+  nmodesb=size(xmodesb,1)
   nPointst=size(xt_seed,1)
   nPointsb=size(xb_seed,1)
+
+  zmodest_use(1)=zt_seed(1)
+  zmodest_use(nmodest)=zt_seed(nPointst)
+  zmodest_use(2:nmodest-1)=zmodest
+  
+  zmodesb_use(1)=zb_seed(1)
+  zmodesb_use(nmodesb)=zb_seed(nPointsb)
+  zmodesb_use(2:nmodesb-1)=zmodesb
   
   ! Calculates the X, Z coordinates of the airfoil
-  call BSpline_C2A(spline_degree,nmodest,xmodest,zmodest,nPointst,ut_seed,xt_new,zt_new)
-
+  !call BSpline_C2A(b_spline_degree,nmodest,xmodest,zmodest_use,nPointst,ut_seed,xt_new,zt_new)
+  call BSpline_C2A_b_matrix(nmodest,xmodest,zmodest_use,nPointst,top_b_matrix,xt_new,zt_new)
   if (.not. symmetrical) then
-    call BSpline_C2A(spline_degree,nmodesb,xmodesb,zmodesb,nPointsb,ub_seed,xb_new,zb_new)
-  
+    !call BSpline_C2A(b_spline_degree,nmodesb,xmodesb,zmodesb_use,nPointsb,ub_seed,xb_new,zb_new)
+    call BSpline_C2A_b_matrix(nmodesb,xmodesb,zmodesb_use,nPointsb,bot_b_matrix,xb_new,zb_new)
   else
     ! For symmetrical airfoils, just mirror the top surface
     xb_new = xt_new
@@ -250,8 +267,8 @@ symmetrical, spline_degree)
 end subroutine  BSP_airfoil
 
 !***************************************************************
-! Given n control points of a b-spline and parametric point vector u, it
-! obtains the x, y coordinates of points distributed along the b-spline.
+! Given n control points of a b_spline and parametric point vector u, it
+! obtains the x, y coordinates of points distributed along the b_spline.
 !***************************************************************
 subroutine BSpline_C2A(n,n_cp,xin,yin,n_p,uspline,xspline,yspline)
   
@@ -300,7 +317,7 @@ subroutine BSpline_C2A(n,n_cp,xin,yin,n_p,uspline,xspline,yspline)
   y(:)        = yin
 
 
-  ! Compute the b-spline.
+  ! Compute the b_spline.
   spline(:,1)=0.d0
   spline(:,2)=0.d0
   spline(1,1)=x(1)
@@ -327,6 +344,47 @@ subroutine BSpline_C2A(n,n_cp,xin,yin,n_p,uspline,xspline,yspline)
   yspline(:)    = spline(:,2)
   
 end subroutine BSpline_C2A
+
+!***************************************************************
+! Given n control points of a b_spline and the b matrix, it
+! obtains the x, y coordinates of points distributed along the b_spline.
+!***************************************************************
+subroutine BSpline_C2A_b_matrix(n_cp,xin,yin,n_p,BMATRIX,xspline,yspline)
+  
+  ! Modules.
+
+  ! Variable declaration.
+  implicit none
+
+  ! Parameters.
+
+  ! Input variables.
+  integer, intent(in) ::                 n_cp          ! no. of control points
+  integer, intent(in) ::                 n_p          ! no. of desired spline points
+  real*8, dimension(n_cp), intent(in) :: xin        ! x-coordinate of control points
+  real*8, dimension(n_cp), intent(in) :: yin        ! y-coordinate of control points
+  real*8, dimension(n_p,n_cp), intent(in)  :: BMATRIX    ! b_matrix
+
+  ! Output variables.
+  real*8, dimension(n_p), intent(out)  :: xspline    ! x coordinate of spline
+  real*8, dimension(n_p), intent(out)  :: yspline    ! y coordinate of spline
+
+  ! Local variables.
+  integer ::i,j,k        ! counters
+  real*8, dimension(n_cp) :: x! x-coordinate of control points
+  real*8, dimension(n_cp) :: y! y-coordinate of control points
+  
+  ! Determine control points vector
+  x(:)        = xin
+  y(:)        = yin
+
+
+  ! Compute the b_spline.
+  
+  xspline   = matmul(BMATRIX,x)
+  yspline   = matmul(BMATRIX,y)
+  
+end subroutine BSpline_C2A_b_matrix
 
 !******************************************************************
 ! Routine that implements De Boor's algorithm, present in:
@@ -374,31 +432,53 @@ end subroutine d_BSpline
 
   ! ----------------------------------------------------------------------------
 ! Subroutine that implements the Kulfan-Bussoletti Parameterization, coordinates to weights.
-subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, xmodest, zmodest, xmodesb, &
-zmodesb)
-!  (ut_seed, xt_seed, zt_seed, ub_seed, xb_seed, zb_seed,   &
-!xmodest, zmodest, xmodesb, zmodesb, xt_new, xb_new, zt_new, zb_new,            &
-!symmetrical, spline_degree)
+subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
+
   use vardef, only : nparams_top, nparams_bot,b_spline_degree, b_spline_xtype, &
-                    b_spline_distribution
+                    b_spline_distribution, upointst, upointsb, xcontrolt,      &
+                    xcontrolb
   
   implicit none
   
+  real*8, dimension(:), intent (in) :: xseedt, xseedb, zseedt, zseedb
+  real*8, dimension(nparams_top-2), intent (out) :: modest
+  real*8, dimension(nparams_bot-2), intent (out) :: modesb
   
-  if (b_spline_xtype .EQ. 1) then
-    BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,nspline,xspline,zspline,uspline,n_cp,xmodest,zmodest)
-  else
-    BSpline_A2C_freex(b_spline_degree,b_spline_distribution,nspline,xspline,zspline,uspline,n_cp,x,z)
-  end if
+  real*8, dimension(nparams_top):: modest_full
+  real*8, dimension(nparams_bot):: modesb_full
+  integer:: npointst, npointsb
+  
+  npointst=size(xseedt,1)
+  npointsb=size(xseedb,1)
+  
+  allocate(upointst(npointst), upointsb(npointsb))
+  allocate(xcontrolt(nparams_top), xcontrolb(nparams_bot))
+  
+  call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,      &
+    xseedt,zseedt,upointst,nparams_top,xcontrolt,modest_full,top_b_matrix)
+  
+  modest=modest_full(2:nparams_top-1)
+  
+  !if (b_spline_xtype .EQ. 1) then
+  !  BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,nspline,xspline,zspline,uspline,n_cp,xmodest,zmodest)
+  !else
+  !  BSpline_A2C_freex(b_spline_degree,b_spline_distribution,nspline,xspline,zspline,uspline,n_cp,x,z)
+  !end if
+  call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,      &
+    xseedb,zseedb,upointsb,nparams_bot,xcontrolb,modesb_full,bot_b_matrix)
+  
+  modesb=modesb_full(2:nparams_bot-1)
+  
 
 end subroutine BSP_init
 
 ! -------------------------------------------------------------------
-! Subroutine to determine control points from its  airfoil b-spline points.
+! Subroutine to determine control points from its  airfoil b_spline points.
 ! X position is known and fixed
 ! U is computed from X and xspline, newton method
 ! Z is computed from U and zspline, min squares
-subroutine BSpline_A2C_fixedx(n,option,nspline,xspline,zspline,uspline,n_cp,x,z)
+subroutine BSpline_A2C_fixedx(n,option,nspline,xspline,zspline,uspline,n_cp,x, &
+z,BMATRIX)
   
   ! Variables declaration.
   implicit none
@@ -417,7 +497,7 @@ subroutine BSpline_A2C_fixedx(n,option,nspline,xspline,zspline,uspline,n_cp,x,z)
   real*8, intent(out) :: uspline(nspline) !parametric value
   real*8, intent(out) :: x(n_cp)! x-coordinate of control points
   real*8, intent(out) :: z(n_cp)! z-coordinate of control points
-
+  real*8, intent(out):: BMATRIX(nspline,n_cp)
   ! Local variables
   integer :: i
   real*8:: v
@@ -438,12 +518,12 @@ subroutine BSpline_A2C_fixedx(n,option,nspline,xspline,zspline,uspline,n_cp,x,z)
     write(*,*) uspline(i),v, xspline(i),v-xspline(i)
   end do
 
-  call GET_P_MINSQUARES(nspline,uspline,zspline,n,n_cp,z)
+  call GET_P_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BMATRIX)
   
 end subroutine BSpline_A2C_fixedx  
 
 ! -------------------------------------------------------------------
-! Subroutine to determine control points from its  airfoil b-spline points.
+! Subroutine to determine control points from its  airfoil b_spline points.
 ! U position is known and fixed
 ! X is computed from U and xspline, min squares
 ! Z is computed from U and zspline, min squares
@@ -467,14 +547,16 @@ subroutine BSpline_A2C_freex(n,option,nspline,xspline,zspline,uspline,n_cp,x,z)
   real*8, intent(out) :: x(n_cp)! x-coordinate of control points
   real*8, intent(out) :: z(n_cp)! z-coordinate of control points
   
+  !Local variables.
+  real*8:: BSPLINE_FULL(nspline,n_cp)
   ! Set U position
   call SetDistribution(option,nspline,uspline)
 
   ! Get X, computed from U and xspline, min squares
-  call GET_P_MINSQUARES(nspline,uspline,xspline,n,n_cp,x)
+  call GET_P_MINSQUARES(nspline,uspline,xspline,n,n_cp,x,BSPLINE_FULL)
 
   ! Get Z, computed from U and zspline, min squares
-  call GET_P_MINSQUARES(nspline,uspline,zspline,n,n_cp,z)
+  call GET_P_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BSPLINE_FULL)
   
   end subroutine BSpline_A2C_freex  
 
@@ -534,7 +616,10 @@ end subroutine GET_U_NEWTON
 
 !--------------------------------------------------------------------
 ! Get p control points from u parametric vector and p airfoil coordinates
-subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol)
+subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL)
+
+  use math_deps, only : SOLVE_SVD  
+  
   ! Variables declaration.
   implicit none
 
@@ -547,11 +632,12 @@ subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol)
 
   ! Output variables.
   real*8, intent(out) :: pcontrol(n_cp)! p-coordinate of control points
+  real*8, intent(out):: BSPLINE_FULL(nspline,n_cp)
 
   ! Local variables
   integer:: i,j
-  real*8:: BSPLINE_FULL(nspline,n_cp), P_FULL(nspline)
-  real*8:: BSPLINE(nspline-2,n_cp-2), BSPLINE_T(n_cp-2,nspline-2)
+  real*8:: P_FULL(nspline)!, BSPLINE_FULL(nspline,n_cp)
+  real*8:: BSPLINE_T(n_cp-2,nspline-2), BSPLINE(nspline-2,n_cp-2)
   real*8:: B_DUMMY(n+1)
   real*8:: p(nspline-2)
   real*8:: A(n_cp-2,n_cp-2), B(n_cp-2)
@@ -626,8 +712,8 @@ subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol)
 end subroutine GET_P_MINSQUARES
 
 !***************************************************************
-! Given n control points of a b-spline and the parametric point u, it
-! obtains the x coordinate of a single point distributed along the b-spline.
+! Given n control points of a b_spline and the parametric point u, it
+! obtains the x coordinate of a single point distributed along the b_spline.
 !***************************************************************
 subroutine B_Spline_Single(n,n_cp,xin,uspline,xspline)
   
@@ -672,7 +758,7 @@ subroutine B_Spline_Single(n,n_cp,xin,uspline,xspline)
   ! Determine control points vector
   x(:)        = xin
 
-  ! Compute the b-spline
+  ! Compute the b_spline
   spline=0.d0
   mainloop: do i=n+1,n_cp
     !write(*,*) t(i), uspline, t(i+1)
@@ -691,8 +777,8 @@ subroutine B_Spline_Single(n,n_cp,xin,uspline,xspline)
   end subroutine B_Spline_Single
   
 !***************************************************************
-! Given n control points of a b-spline and the parametric point u, it obtains
-! the x coordinate of a single point distributed along the b-spline derivative.
+! Given n control points of a b_spline and the parametric point u, it obtains
+! the x coordinate of a single point distributed along the b_spline derivative.
 !***************************************************************
 subroutine B_Spline_Single_d(n,n_cp,xin,uspline,xspline)
   
@@ -737,7 +823,7 @@ subroutine B_Spline_Single_d(n,n_cp,xin,uspline,xspline)
   ! Determine control points vector
   x(:)        = xin
 
-  ! Compute the b-spline.
+  ! Compute the b_spline.
   spline=0.d0
   mainloop: do i=n,n_cp-1
     !for u in t(i)<u<t(i+1)
@@ -823,5 +909,35 @@ subroutine SetDistribution(option,n,x)
   return
 
 end subroutine SetDistribution
+
+!=============================================================================80
+!
+! Allocates memory for b_matrix
+!
+!=============================================================================80
+subroutine allocate_b_matrix(nmodest, nmodesb, npointst, npointsb)
+
+  integer, intent(in) :: nmodest, nmodesb, npointst, npointsb
+
+  allocate(top_b_matrix(npointst,nmodest+2))
+  allocate(bot_b_matrix(npointsb,nmodesb+2))
+
+  !   Initialize shape functions
+
+  top_b_matrix(:,:) = 0.d0
+  bot_b_matrix(:,:) = 0.d0
+end subroutine allocate_b_matrix
+
+!=============================================================================80
+!
+! Deallocates memory for b_matrix
+!
+!=============================================================================80
+subroutine deallocate_b_matrix
+
+  deallocate(top_b_matrix)
+  deallocate(bot_b_matrix)
+
+end subroutine deallocate_b_matrix
 end module parametrization_constr
   
