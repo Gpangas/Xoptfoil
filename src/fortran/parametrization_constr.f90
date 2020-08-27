@@ -592,7 +592,8 @@ subroutine GET_U_NEWTON(n,n_cp,x,nspline,xspline,u)
       !Newton's method to get u
       u(i)=xspline(i)
       x_new=2.0D0 !just to fail condition
-      do while((abs(xspline(i)-x_new)/abs(xspline(i))) .GT. 1.0e-10)
+      ! limited to 1000 iterations, if convergence is impossible
+      do while( ((abs(xspline(i)-x_new)/abs(xspline(i))) .GT. 1.0e-10) .and. (j .LT. 1000) )
         !get new x
         call B_Spline_Single(n,n_cp,x,u(i),x_new)
         !get derivative of new x
@@ -603,7 +604,7 @@ subroutine GET_U_NEWTON(n,n_cp,x,nspline,xspline,u)
         if(u_dummy .LT. 0.d0) u_dummy=0.d0!+1.0e-12
         if(u_dummy .GT. 1.d0) u_dummy=1.d0!-1.0e-12
         !mann sheme (Iterative Algorithms)
-        beta=1.d0/(0.01d0+dble(j))
+        beta=(1.d0/dble(j))**0.5
         u(i)=(dble(1)-beta)*u(i)+(beta)*u_dummy
         !write(*,*) i,j, u(i),abs(xspline(i)-x_new)/abs(xspline(i)), beta
         !write(*,*) u(i)
