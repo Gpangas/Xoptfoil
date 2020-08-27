@@ -1031,7 +1031,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
                                                    moment, xtrt, xtrb
   double precision, dimension(:), allocatable :: fmin, relfmin, rad
   character(150), dimension(:), allocatable :: zoneinfo
-  character(100) :: restfile, foilfile, polarfile,histfile, text
+  character(100) :: restfile, foilfile, polarfile, histfile, text
   character(11) :: stepchar
   character(20) :: fminchar, radchar
   character(25) :: relfminchar

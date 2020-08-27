@@ -249,17 +249,22 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
   logical, intent(in) :: symmetrical
   integer, intent(out) :: nfunctions_top, nfunctions_bot
   integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
-  integer :: i, counter, idx, nbot_actual
+  integer :: i, counter, idx, nbot_actual, ndvs_top, ndvs_bot, ndvs_bot_actual
 
 
   !   The number of bottom shape functions actually used (0 for symmetrical)
 
+  call parametrization_dvs(nfunctions_top, nfunctions_bot,                     &
+                           parametrization_type, ndvs_top, ndvs_bot)
+  
   if (symmetrical) then
     nbot_actual = 0
+    ndvs_bot_actual = 0
   else
     nbot_actual = nfunctions_bot
+    ndvs_bot_actual = ndvs_bot
   end if
-    
+  
   !   Set design variables with side constraints
 
   if (trim(parametrization_type) == 'naca') then
@@ -301,8 +306,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
 
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
     counter = 0
-    do i = nfunctions_top + nbot_actual + 1,                                   &
-    nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
+    do i = ndvs_top + ndvs_bot_actual + 1,                                     &
+      ndvs_top + ndvs_bot_actual + nflap_optimize + int_x_flap_spec
       counter = counter + 1
       constrained_dvs(counter) = i
     end do
@@ -312,8 +317,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
 
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
     counter = 0
-    do i = nfunctions_top + nbot_actual + 1,                                   &
-      nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
+    do i = ndvs_top + ndvs_bot_actual + 1,                                     &
+      ndvs_top + ndvs_bot_actual + nflap_optimize + int_x_flap_spec
       counter = counter + 1
       constrained_dvs(counter) = i
     end do
