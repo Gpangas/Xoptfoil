@@ -35,8 +35,8 @@ subroutine allocate_parametrization(nmodest, nmodesb, npointst, npointsb, shapet
         
   elseif (trim(shapetype) == 'kulfan-bussoletti') then
   
-  elseif (trim(shapetype) == 'b_spline') then
-    call allocate_b_matrix(nmodest, nmodesb, npointst, npointsb)
+  elseif (trim(shapetype) == 'b-spline') then
+    !call allocate_b_matrix(nmodest, nmodesb, npointst, npointsb)
     
   else
 
@@ -59,8 +59,8 @@ subroutine deallocate_parametrization()
         
   elseif (trim(shape_functions) == 'kulfan-bussoletti') then
   
-  elseif (trim(shape_functions) == 'b_spline') then
-    call deallocate_b_matrix()
+  elseif (trim(shape_functions) == 'b-spline') then
+    !call deallocate_b_matrix()
     
   else
 
@@ -104,7 +104,7 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
     nmodestop = size(modestop,1)
     nmodesbot = size(modesbot,1)
     
-  elseif (trim(shapetype) == 'b_spline') then
+  elseif (trim(shapetype) == 'b-spline') then
     ! 
     nmodestop = size(modestop,1)
     nmodesbot = size(modesbot,1)
@@ -158,7 +158,7 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
     call KBP_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,       &
                           zt_new, zb_new, symmetrical, tcTE)
     
-  elseif (trim(shapetype) == 'b_spline') then
+  elseif (trim(shapetype) == 'b-spline') then
     !write(*,*) size(xcontrolt,1), size(xcontrolb,1), size(modest,1), size(modesb,1)
     call BSP_airfoil(upointst, xt_seed, zt_seed, upointsb, xb_seed, zb_seed,   &
       xcontrolt, xcontrolb, modest, modesb, xt_new, xb_new, zt_new, zb_new,    &
@@ -172,13 +172,13 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
     stop
   end if
 
-  !write(*,*) 'modest'
-  !do i = 1,size(modest,1)
-  !  write(*,*) modest(i)
+  !write(*,*) 't'
+  !do i = 1,size(zt_new,1)
+  !  write(*,*) zt_new(i), zt_seed(i), zt_new(i)-zt_seed(i)
   !end do
-  !write(*,*) 'modesb'
-  !do i = 1,size(modesb,1)
-  !  write(*,*) modesb(i)
+  !write(*,*) 'b'
+  !do i = 1,size(zb_new,1)
+  !  write(*,*) zb_new(i), zb_seed(i), zb_new(i)-zb_seed(i)
   !end do
 end subroutine create_airfoil
 
@@ -213,7 +213,7 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
     ndvs_top = nparams_top
     ndvs_bot = nparams_bot
   
-  elseif (trim(parametrization_type) == 'b_spline') then
+  elseif (trim(parametrization_type) == 'b-spline') then
     
     if (b_spline_xtype .EQ. 1) then
       ndvs_top = nparams_top-2
@@ -307,8 +307,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
       constrained_dvs(counter) = i
     end do
 
-  elseif (trim(parametrization_type) == 'b_spline') then
-    !     For b_spline, we will only constrain the flap deflection
+  elseif (trim(parametrization_type) == 'b-spline') then
+    !     For b-spline, we will only constrain the flap deflection
 
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
     counter = 0
@@ -407,7 +407,7 @@ subroutine parametrization_init(optdesign, x0)
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
   
-  elseif (trim(shape_functions) == 'b_spline') then
+  elseif (trim(shape_functions) == 'b-spline') then
     nfuncs = ndv - nflap_optimize - int_x_flap_spec
 
     x0(1:nshapedvtop) = modest_seed
@@ -514,7 +514,7 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
       xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
     end if
   
-  elseif (trim(shape_functions) == 'b_spline') then
+  elseif (trim(shape_functions) == 'b-spline') then
     nfuncs = ndv - nflap_optimize - int_x_flap_spec
     
     xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
@@ -596,16 +596,16 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     Write(*,*) ' RMSE of lower surface'
     Write(*,*) sum
   
-  elseif (trim(shape_functions) == 'b_spline') then
+  elseif (trim(shape_functions) == 'b-spline') then
     call BSP_init(xseedt, xseedb, zseedt, zseedb, modest_seed, modesb_seed)
     
     call BSP_airfoil(upointst, xseedt, zseedt, upointsb, xseedb, zseedb,       &
       xcontrolt, xcontrolb, modest_seed, modesb_seed, xseedt_new, xseedb_new,  &
       zseedt_new, zseedb_new, symmetrical)
-    Write(*,*) ' x control top'
-    do i = 1, size(xcontrolt,1)
-      write(*,*) xcontrolt(i)
-    end do
+    !Write(*,*) ' x control top'
+    !do i = 1, size(xcontrolt,1)
+    !  write(*,*) xcontrolt(i)
+    !end do
     
     sum=0.d0
     do i = 1, size(xseedt,1)
@@ -648,6 +648,7 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   end if
   zseedt=zseedt_new
   zseedb=zseedb_new
+  
   write(*,*) 'modest_seed'
   do i=1,size(modest_seed,1)
     write(*,*) modest_seed(i)
@@ -656,5 +657,6 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   do i=1,size(modesb_seed,1)
     write(*,*) modesb_seed(i)
   end do
+  
 end subroutine parametrization_new_seed
 end module parametrization

@@ -55,7 +55,7 @@ function objective_function(designvars)
   else
     objective_function = aero_objective_function(designvars)
   end if
-
+  !write(*,*) objective_function
 end function objective_function
 
 !=============================================================================80
@@ -359,7 +359,10 @@ function aero_objective_function(designvars, include_penalty)
                  use_flap, actual_x_flap, y_flap, y_flap_spec,                        &
                  actual_flap_degrees(1:noppoint), xfoil_options, lift, drag,   &
                  moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
-
+  !do i=1,size(lift,1)
+  !  write(*,*) lift(i), drag(i), moment(i), viscrms(i), alpha(i), xtrt(i), xtrb(i), ncrit_pt(i)
+  !end do
+  
 ! Add penalty for too large panel angles
 
   penaltyval = penaltyval + max(0.0d0,AMAX-25.d0)/5.d0
@@ -375,8 +378,9 @@ function aero_objective_function(designvars, include_penalty)
     aero_objective_function = penaltyval*1.0D+06
     return
   end if
+  !write(*,*) penaltyval
 
-! Determine if points need to be checked for xfoil consistency
+  ! Determine if points need to be checked for xfoil consistency
 
   ncheckpt = 0
   checkpt_list(:) = 0
@@ -612,6 +616,10 @@ function aero_objective_function(designvars, include_penalty)
     end do
   end if
 
+  !do i=1,size(lift,1)
+  !  write(*,*) lift(i), drag(i), moment(i), viscrms(i), alpha(i), xtrt(i), xtrb(i), ncrit_pt(i)
+  !end do
+  
 end function aero_objective_function
 
 !=============================================================================80
