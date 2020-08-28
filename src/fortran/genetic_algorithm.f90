@@ -127,8 +127,11 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   double precision, dimension(:,:), allocatable :: stackdv
   double precision, dimension(:), allocatable :: stackobjval
   logical :: use_x0, converged, signal_progress, new_history_file
+  double precision :: stepstart, steptime, restarttime 
+  character(14) :: timechar
   character(11) :: stepchar
-  character(20) :: fminchar, radchar
+  character(20) :: fminchar
+  character(15) :: radchar
   character(25) :: relfminchar
   character(80), dimension(20) :: commands
   character(100) :: histfile
@@ -188,12 +191,14 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 
     step = 0
     designcounter = 0
-
+    
+    ! Set restart time to zero
+    restarttime =  0.d0
   else
 
 !   Read restart data from file
 
-    call ga_read_restart(step, designcounter, dv, objval, fmin, xopt)
+    call ga_read_restart(step, designcounter, dv, objval, fmin, xopt, restarttime)
     mincurr = minval(objval,1)
 
   end if
@@ -219,12 +224,17 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
     open(unit=iunit, file=histfile, status='replace')
     if (ga_options%relative_fmin_report) then
       write(iunit,'(A)') "Iteration  Objective function  "//&
-                         "% Improvement over seed  Design radius"
+                         "% Improvement over seed  Design radius"//&
+                         "  Time (seconds)"
     else
-      write(iunit,'(A)') "Iteration  Objective function  Design radius"
+      write(iunit,'(A)') "Iteration  Objective function  Design radius"//&
+                         "  Time (seconds)"
     end if
     flush(iunit)
   end if
+  
+  ! Begin time
+  call cpu_time(stepstart)
 
 ! Begin optimization
 
@@ -358,19 +368,24 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
                           designcounter)
       end if
     end if
-
+    
+    !  Get step time
+    call cpu_time(steptime)
+    
 !   Write iteration history
 
     write(stepchar,'(I11)') step
     write(fminchar,'(F14.10)') fmin
     write(radchar,'(ES14.6)') radius
+    write(timechar,'(F10.3)') (steptime-stepstart)+restarttime
     if (ga_options%relative_fmin_report) then
       write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
-      write(iunit,'(A11,A20,A25,A20)') adjustl(stepchar), adjustl(fminchar),   &
-                                       adjustl(relfminchar), adjustl(radchar)
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                           adjustl(relfminchar), adjustl(radchar), &
+                                           adjustl(timechar)
     else
-      write(iunit,'(A11,2A20)') adjustl(stepchar), adjustl(fminchar),          &
-                                adjustl(radchar)
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                                adjustl(radchar), adjustl(timechar)
     end if
     flush(iunit)
     
@@ -390,7 +405,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 !   Write restart file if appropriate and update restart counter
 
     if (restartcounter == restart_write_freq) then
-      call ga_write_restart(step, designcounter, dv, objval, fmin, xopt)
+      call ga_write_restart(step, designcounter, dv, objval, fmin, xopt, (steptime-stepstart)+restarttime)
       restartcounter = 1
     else
       restartcounter = restartcounter + 1
@@ -431,7 +446,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 ! Write restart at end of optimization
 
   if (restartcounter /= 1)                                                     &
-    call ga_write_restart(step, designcounter, dv, objval, fmin, xopt)
+    call ga_write_restart(step, designcounter, dv, objval, fmin, xopt, (steptime-stepstart)+restarttime)
 
 end subroutine geneticalgorithm
 
@@ -722,7 +737,7 @@ end subroutine mutate
 ! Genetic algorithm restart write routine
 !
 !=============================================================================80
-subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt)
+subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time)
 
   use vardef, only : output_prefix
 
@@ -730,6 +745,7 @@ subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt)
   double precision, dimension(:,:), intent(in) :: dv
   double precision, dimension(:), intent(in) :: objval, xopt
   double precision, intent(in) :: fmin
+  double precision, intent(in) :: time
 
   character(100) :: restfile
   integer :: iunit
@@ -753,6 +769,7 @@ subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt)
   write(iunit) objval
   write(iunit) fmin
   write(iunit) xopt
+  write(iunit) time
 
 ! Close restart file
 
@@ -769,7 +786,7 @@ end subroutine ga_write_restart
 ! Genetic algorithm restart read routine
 !
 !=============================================================================80
-subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt)
+subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time)
 
   use vardef, only : output_prefix
 
@@ -777,6 +794,7 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt)
   double precision, dimension(:,:), intent(inout) :: dv
   double precision, dimension(:), intent(inout) :: objval, xopt
   double precision, intent(out) :: fmin
+  double precision, intent(out) :: time
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -806,6 +824,7 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt)
   read(iunit) objval
   read(iunit) fmin
   read(iunit) xopt
+  read(iunit) time
 
 ! Close restart file
 

@@ -1029,11 +1029,11 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   integer :: i, j
   double precision, dimension(:,:), allocatable :: x, z, alpha, lift, drag,    &
                                                    moment, xtrt, xtrb
-  double precision, dimension(:), allocatable :: fmin, relfmin, rad
+  double precision, dimension(:), allocatable :: fmin, relfmin, rad, time
   character(150), dimension(:), allocatable :: zoneinfo
   character(100) :: restfile, foilfile, polarfile, histfile, text
   character(11) :: stepchar
-  character(20) :: fminchar, radchar
+  character(20) :: fminchar, radchar, timechar
   character(25) :: relfminchar
 
 ! Print status
@@ -1084,6 +1084,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   allocate(fmin(step))
   allocate(relfmin(step))
   allocate(rad(step))
+  allocate(time(step))
 
 ! Open coordinates file
 
@@ -1157,7 +1158,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
 ! Read optimizer data at each iteration
 !write(*,*) step
   do i = 1, step
-    read(histunit,*) j, fmin(i), relfmin(i), rad(i)
+    read(histunit,*) j, fmin(i), relfmin(i), rad(i), time(i)
   end do
 
 ! Close history file
@@ -1168,14 +1169,17 @@ function write_function_restart_cleanup(restart_status, global_search,         &
 
   open(unit=histunit, file=histfile, status='replace')
   write(histunit,'(A)') "Iteration  Objective function  "//&
-                        "% Improvement over seed  Design radius"
+                        "% Improvement over seed  Design radius"//&
+                         "  Time (seconds)"
   do i = 1, step
     write(stepchar,'(I11)') i
     write(fminchar,'(F14.10)') fmin(i)
     write(relfminchar,'(F14.10)') relfmin(i)
     write(radchar,'(ES14.6)') rad(i)
-    write(histunit,'(A11,A20,A25,A20)') adjustl(stepchar), adjustl(fminchar),  &
-                                        adjustl(relfminchar), adjustl(radchar)
+    write(timechar,'(F10.3)') time(i)
+    write(histunit,'(A11,A20,A25,A20,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                         adjustl(relfminchar), adjustl(radchar), &
+                                         adjustl(timechar)
   end do
 
 ! Close history file
@@ -1196,6 +1200,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
     deallocate(fmin)
     deallocate(relfmin)
     deallocate(rad)
+    deallocate(time)
     write(*,*) 'Finished cleaning up unused designs.'
     write_function_restart_cleanup = 0
     return
@@ -1277,6 +1282,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   deallocate(fmin)
   deallocate(relfmin)
   deallocate(rad)
+  deallocate(time)
 
 ! Print status
 

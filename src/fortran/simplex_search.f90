@@ -84,9 +84,12 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   integer :: i, j, nvars, stat, designcounter, restartcounter, iunit, ioerr,   &
              prevsteps, k, ncommands
   logical :: converged, needshrink, signal_progress, new_history_file
+  double precision :: stepstart, steptime, restarttime
+  character(14) :: timechar
   character(3) :: filestat
   character(11) :: stepchar
-  character(20) :: fminchar, radchar
+  character(20) :: fminchar
+  character(15) :: radchar
   character(25) :: relfminchar
   character(80), dimension(20) :: commands
   character(100) :: histfile
@@ -150,12 +153,15 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
       prevsteps = instep
     end if
 
+    ! Set restart time to zero
+    restarttime =  0.d0
   else
 
 !   Get initial simplex and counters from restart file
 
     prevsteps = 0
-    call simplex_read_restart(step, designcounter, dv, objvals, f0, fevals)
+    call simplex_read_restart(step, designcounter, dv, objvals, f0, fevals,    &
+                              restarttime)
 
   end if
 
@@ -185,14 +191,19 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     open(unit=iunit, file=histfile, status='replace')
     if (ds_options%relative_fmin_report) then
       write(iunit,'(A)') "Iteration  Objective function  "//&
-                         "% Improvement over seed  Design radius"
+                         "% Improvement over seed  Design radius"//&
+                         "  Time (seconds)"
     else
-      write(iunit,'(A)') "Iteration  Objective function  Design radius"
+      write(iunit,'(A)') "Iteration  Objective function  Design radius"//&
+                         "  Time (seconds)"
     end if
     flush(iunit)
   end if
 
-! Iterative procedure for optimization
+  ! Begin time
+  call cpu_time(stepstart)
+
+  ! Iterative procedure for optimization
 
   restartcounter = 1
   needshrink = .false.
@@ -238,7 +249,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !   converterfunc is an optional function supplied to convert design variables
 !     into something more useful.  If not supplied, the design variables
 !     themselves are written to a file.
-
+    
     if (ds_options%write_designs .and. designcounter == 1) then
       filestat = 'new'
     else
@@ -254,27 +265,32 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
                           designcounter)
       end if
     end if
-
+    
+    !  Get step time
+    call cpu_time(steptime)
+    
 !   Write iteration history
 
+    flush(iunit)
     write(stepchar,'(I11)') step
     write(fminchar,'(F14.10)') fmin
     write(radchar,'(ES14.6)') radius
+    write(timechar,'(F10.3)') (steptime-stepstart)+restarttime
     if (ds_options%relative_fmin_report) then
       write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
-      write(iunit,'(A11,A20,A25,A20)') adjustl(stepchar), adjustl(fminchar),   &
-                                       adjustl(relfminchar), adjustl(radchar)
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                           adjustl(relfminchar), adjustl(radchar), &
+                                           adjustl(timechar)
     else
-      write(iunit,'(A11,2A20)') adjustl(stepchar), adjustl(fminchar),          &
-                                adjustl(radchar)
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                                adjustl(radchar), adjustl(timechar)
     end if
     flush(iunit)
-
 !   Write restart file if appropriate and update restart counter
 
     if (restartcounter == restart_write_freq) then
       ! 'step' to correct the number on simplex restart
-      call simplex_write_restart(step, designcounter, dv, objvals, f0, fevals)
+      call simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, (steptime-stepstart)+restarttime)
       restartcounter = 1
     else
       restartcounter = restartcounter + 1
@@ -415,7 +431,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
   if (restartcounter /= 1)                                                     &
     call simplex_write_restart(step+prevsteps, designcounter, dv, objvals, f0, &
-                               fevals)
+                               fevals, (steptime-stepstart)+restarttime)
 
 end subroutine simplexsearch
 
@@ -424,7 +440,7 @@ end subroutine simplexsearch
 ! Simplex restart write routine
 !
 !=============================================================================80
-subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals)
+subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, time)
 
   use vardef, only : output_prefix
 
@@ -432,6 +448,7 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals)
   double precision, dimension(:,:), intent(in) :: dv
   double precision, dimension(:), intent(in) :: objvals
   double precision, intent(in) :: f0
+  double precision, intent(in) :: time
 
   character(100) :: restfile
   integer :: iunit
@@ -454,6 +471,7 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals)
   write(iunit) objvals
   write(iunit) f0
   write(iunit) fevals
+  write(iunit) time
 
 ! Close restart file
 
@@ -470,7 +488,7 @@ end subroutine simplex_write_restart
 ! Particle swarm restart read routine
 !
 !=============================================================================80
-subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals)
+subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals, time)
 
   use vardef, only : output_prefix
 
@@ -478,6 +496,7 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals)
   double precision, dimension(:,:), intent(inout) :: dv
   double precision, dimension(:), intent(inout) :: objvals
   double precision, intent(out) :: f0
+  double precision, intent(out) :: time
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -506,6 +525,7 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals)
   read(iunit) objvals
   read(iunit) f0
   read(iunit) fevals
+  read(iunit) time
 
 ! Close restart file
 

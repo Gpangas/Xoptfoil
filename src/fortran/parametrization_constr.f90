@@ -604,7 +604,7 @@ subroutine GET_U_NEWTON(n,n_cp,x,nspline,xspline,u)
         if(u_dummy .LT. 0.d0) u_dummy=0.d0!+1.0e-12
         if(u_dummy .GT. 1.d0) u_dummy=1.d0!-1.0e-12
         !mann sheme (Iterative Algorithms)
-        beta=(1.d0/dble(j))**0.5
+        beta=(1.d0/dble(j))**0.5 !just a divergent series
         u(i)=(dble(1)-beta)*u(i)+(beta)*u_dummy
         !write(*,*) i,j, u(i),abs(xspline(i)-x_new)/abs(xspline(i)), beta
         !write(*,*) u(i)

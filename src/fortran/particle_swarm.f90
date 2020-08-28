@@ -102,8 +102,11 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   double precision, dimension(size(xmin,1),pso_options%pop) :: dv, vel,        &
                                                                bestdesigns
   logical :: use_x0, converged, signal_progress, new_history_file
+  double precision :: stepstart, steptime, restarttime 
+  character(14) :: timechar
   character(11) :: stepchar
-  character(20) :: fminchar, radchar
+  character(20) :: fminchar
+  character(15) :: radchar
   character(25) :: relfminchar
   character(80), dimension(20) :: commands
   character(100) :: histfile
@@ -199,12 +202,15 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
     wcurr = whigh
 
+    ! Set restart time to zero
+    restarttime =  0.d0
+    
   else
 
 !   Read restart data from file
 
     call pso_read_restart(step, designcounter, dv, objval, vel, speed,         &
-                          bestdesigns, minvals, wcurr)
+                          bestdesigns, minvals, wcurr, restarttime)
 
 !   Global and local best so far
 
@@ -236,14 +242,19 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
     open(unit=iunit, file=histfile, status='replace')
     if (pso_options%relative_fmin_report) then
       write(iunit,'(A)') "Iteration  Objective function  "//&
-                         "% Improvement over seed  Design radius"
+                         "% Improvement over seed  Design radius"//&
+                         "  Time (seconds)"
     else
-      write(iunit,'(A)') "Iteration  Objective function  Design radius"
+      write(iunit,'(A)') "Iteration  Objective function  Design radius"//&
+                         "  Time (seconds)"
     end if
     flush(iunit)
   end if
 
-! Begin optimization
+  ! Begin time
+  call cpu_time(stepstart)
+
+  ! Begin optimization
 
   restartcounter = 1
   converged = .false.
@@ -364,18 +375,23 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
       end if
     end if
 
+    !  Get step time
+    call cpu_time(steptime)
+    
 !   Write iteration history
 
     write(stepchar,'(I11)') step
     write(fminchar,'(F14.10)') fmin
     write(radchar,'(ES14.6)') radius
+    write(timechar,'(F10.3)') (steptime-stepstart)+restarttime
     if (pso_options%relative_fmin_report) then
       write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
-      write(iunit,'(A11,A20,A25,A20)') adjustl(stepchar), adjustl(fminchar),   &
-                                       adjustl(relfminchar), adjustl(radchar)
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                           adjustl(relfminchar), adjustl(radchar), &
+                                           adjustl(timechar)
     else
-      write(iunit,'(A11,2A20)') adjustl(stepchar), adjustl(fminchar),          &
-                                adjustl(radchar)
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                                adjustl(radchar), adjustl(timechar)
     end if
     flush(iunit)
     
@@ -396,7 +412,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
     if (restartcounter == restart_write_freq) then
       call pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
-                             bestdesigns, minvals, wcurr)
+                             bestdesigns, minvals, wcurr, (steptime-stepstart)+restarttime)
       restartcounter = 1
     else
       restartcounter = restartcounter + 1
@@ -432,7 +448,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
   if (restartcounter /= 1)                                                     &
     call pso_write_restart(step, designcounter, dv, objval, vel, speed,        &
-                           bestdesigns, minvals, wcurr)
+                           bestdesigns, minvals, wcurr, (steptime-stepstart)+restarttime)
 
 end subroutine particleswarm
 
@@ -442,7 +458,7 @@ end subroutine particleswarm
 !
 !=============================================================================80
 subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
-                             bestdesigns, minvals, wcurr)
+                             bestdesigns, minvals, wcurr, time)
 
   use vardef, only : output_prefix
 
@@ -450,6 +466,7 @@ subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
   double precision, dimension(:,:), intent(in) :: dv, vel, bestdesigns
   double precision, dimension(:), intent(in) :: objval, speed, minvals
   double precision, intent(in) :: wcurr
+  double precision, intent(in) :: time
 
   character(100) :: restfile
   integer :: iunit
@@ -475,6 +492,7 @@ subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
   write(iunit) bestdesigns
   write(iunit) minvals
   write(iunit) wcurr
+  write(iunit) time
 
 ! Close restart file
 
@@ -492,7 +510,7 @@ end subroutine pso_write_restart
 !
 !=============================================================================80
 subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
-                            bestdesigns, minvals, wcurr)
+                            bestdesigns, minvals, wcurr, time)
 
   use vardef, only : output_prefix
 
@@ -500,6 +518,7 @@ subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
   double precision, dimension(:,:), intent(inout) :: dv, vel, bestdesigns
   double precision, dimension(:), intent(inout) :: objval, speed, minvals
   double precision, intent(out) :: wcurr
+  double precision, intent(out) :: time
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -531,6 +550,7 @@ subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
   read(iunit) bestdesigns
   read(iunit) minvals
   read(iunit) wcurr
+  read(iunit) time
 
 ! Close restart file
 

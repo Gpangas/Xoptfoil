@@ -121,7 +121,7 @@ program main
   end if
   
   allocate(modest_seed(nshapedvtop),modesb_seed(nshapedvbot))
-  
+
   modest_seed=0.0d0
   modesb_seed=0.0d0
   tcTE=0.0d0
@@ -129,7 +129,7 @@ program main
       modesb_seed, symmetrical, tcTE, shape_functions)
   ! Make sure seed airfoil passes constraints, and get scaling factors for
   ! operating points
-  
+
   call check_seed()
   ! Optimize
   
