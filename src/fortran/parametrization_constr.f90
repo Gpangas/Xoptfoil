@@ -219,47 +219,105 @@ end subroutine KBParameterization_fitting
 ! ----------------------------------------------------------------------------
 ! Subroutine that implements the b-spline Parameterization, weights to coordinates.
 subroutine BSP_airfoil(ut_seed, xt_seed, zt_seed, ub_seed, xb_seed, zb_seed,   &
-xmodest, xmodesb, zmodest, zmodesb, xt_new, xb_new, zt_new, zb_new,            &
+xmodest, xmodesb, modest, modesb, zt_new, zb_new,            &
 symmetrical)
   
   use vardef, only : b_spline_xtype, b_spline_degree
 
   implicit none
 
-  real*8, dimension(:), intent (in) :: xmodest, xmodesb, zmodest, zmodesb
+  real*8, dimension(:), intent (in) :: xmodest, xmodesb, modest, modesb
   logical, intent(in) :: symmetrical
   real*8, dimension(:), intent (in) ::ut_seed, xt_seed, zt_seed
   real*8, dimension(:), intent (in) ::ub_seed, xb_seed, zb_seed
-  real*8, dimension(size(xt_seed,1)), intent (out) :: xt_new, zt_new
-  real*8, dimension(size(xb_seed,1)), intent (out) :: xb_new, zb_new
+  real*8, dimension(size(xt_seed,1)), intent (out) :: zt_new
+  real*8, dimension(size(xb_seed,1)), intent (out) :: zb_new
   
+  real*8, dimension(size(xt_seed,1)) :: xt_new
+  real*8, dimension(size(xb_seed,1)) :: xb_new
   integer :: i, nPointst, nPointsb, nmodest, nmodesb
-  real*8, dimension(size(xmodest,1)) :: zmodest_use
-  real*8, dimension(size(xmodesb,1)) :: zmodesb_use
-  
+  real*8, dimension(:), allocatable :: zmodest_use
+  real*8, dimension(:), allocatable :: zmodesb_use
+  real*8, dimension(:), allocatable :: xmodest_use
+  real*8, dimension(:), allocatable :: xmodesb_use
+  real*8, dimension(size(xt_seed,1)) :: ut_use
+  real*8, dimension(size(xb_seed,1)) :: ub_use
+  real*8:: v
   nmodest=size(xmodest,1)
   nmodesb=size(xmodesb,1)
+  
   nPointst=size(xt_seed,1)
   nPointsb=size(xb_seed,1)
-
-  zmodest_use(1)=zt_seed(1)
-  zmodest_use(nmodest)=zt_seed(nPointst)
-  zmodest_use(2:nmodest-1)=zmodest
   
-  zmodesb_use(1)=zb_seed(1)
-  zmodesb_use(nmodesb)=zb_seed(nPointsb)
-  zmodesb_use(2:nmodesb-1)=zmodesb
+  if (b_spline_xtype .EQ. 1) then
+    allocate(zmodest_use(nmodest),zmodesb_use(nmodesb))
+    
+    ! Construst full control points vector
+    zmodest_use(1)=zt_seed(1)
+    zmodest_use(nmodest)=zt_seed(nPointst)
+    zmodest_use(2:nmodest-1)=modest
   
-  ! Calculates the X, Z coordinates of the airfoil
-  !call BSpline_C2A(b_spline_degree,nmodest,xmodest,zmodest_use,nPointst,ut_seed,xt_new,zt_new)
-  call BSpline_C2A_b_matrix(nmodest,xmodest,zmodest_use,nPointst,top_b_matrix,xt_new,zt_new)
-  if (.not. symmetrical) then
-    !call BSpline_C2A(b_spline_degree,nmodesb,xmodesb,zmodesb_use,nPointsb,ub_seed,xb_new,zb_new)
-    call BSpline_C2A_b_matrix(nmodesb,xmodesb,zmodesb_use,nPointsb,bot_b_matrix,xb_new,zb_new)
-  else
-    ! For symmetrical airfoils, just mirror the top surface
-    xb_new = xt_new
-    zb_new = -zt_new
+    zmodesb_use(1)=zb_seed(1)
+    zmodesb_use(nmodesb)=zb_seed(nPointsb)
+    zmodesb_use(2:nmodesb-1)=modesb
+  
+    ! Calculates the X, Z coordinates of the airfoil
+    
+    !call BSpline_C2A(b_spline_degree,nmodest,xmodest,zmodest_use,nPointst,ut_seed,xt_new,zt_new)
+    call BSpline_C2A_b_matrix(nmodest,xmodest,zmodest_use,nPointst,top_b_matrix,xt_new,zt_new)
+    
+    if (.not. symmetrical) then
+      !call BSpline_C2A(b_spline_degree,nmodesb,xmodesb,zmodesb_use,nPointsb,ub_seed,xb_new,zb_new)
+      call BSpline_C2A_b_matrix(nmodesb,xmodesb,zmodesb_use,nPointsb,bot_b_matrix,xb_new,zb_new)
+    else
+      ! For symmetrical airfoils, just mirror the top surface
+      xb_new = xt_new
+      zb_new = -zt_new
+    end if
+    
+  else    
+    allocate(zmodest_use(nmodest),zmodesb_use(nmodesb))
+    allocate(xmodest_use(nmodest),xmodesb_use(nmodesb))
+    
+    ! Construst full control points vectors
+    xmodest_use(1)=0.0d0
+    xmodest_use(2)=0.0d0
+    xmodest_use(nmodest)=xt_seed(nPointst)
+    xmodest_use(3:nmodest-1)=modest(1:nmodest-3)
+  
+    xmodesb_use(1)=0.0d0
+    xmodesb_use(2)=0.0d0
+    xmodesb_use(nmodesb)=xb_seed(nPointsb)
+    xmodesb_use(3:nmodesb-1)=modesb(1:nmodesb-3)
+    
+    zmodest_use(1)=zt_seed(1)
+    zmodest_use(nmodest)=zt_seed(nPointst)
+    zmodest_use(2:nmodest-1)=modest(nmodest-2:2*nmodest-5)
+  
+    zmodesb_use(1)=zb_seed(1)
+    zmodesb_use(nmodesb)=zb_seed(nPointsb)
+    zmodesb_use(2:nmodesb-1)=modesb(nmodest-2:2*nmodest-5)
+    
+    ! get U
+    
+    call GET_U_NEWTON(b_spline_degree,nmodest,xmodest_use,nPointst,xt_seed,ut_use)
+    call GET_U_NEWTON(b_spline_degree,nmodesb,xmodesb_use,nPointsb,xb_seed,ub_use)
+    
+    ! Calculates the X, Z coordinates of the airfoil
+    
+    call BSpline_C2A(b_spline_degree,nmodest,xmodest_use,zmodest_use,nPointst,ut_use,xt_new,zt_new)
+    !call BSpline_C2A_b_matrix(nmodest,xmodest_use,zmodest_use,nPointst,top_b_matrix,xt_new,zt_new)
+    
+    if (.not. symmetrical) then
+      call BSpline_C2A(b_spline_degree,nmodesb,xmodesb_use,zmodesb_use,nPointsb,ub_use,xb_new,zb_new)
+      !call BSpline_C2A_b_matrix(nmodesb,xmodesb_use,zmodesb_use,nPointsb,bot_b_matrix,xb_new,zb_new)
+    else
+      ! For symmetrical airfoils, just mirror the top surface
+      xb_new = xt_new
+      zb_new = -zt_new
+    end if
+    
+    ! Interpolate to x seed
   end if
   
 end subroutine  BSP_airfoil
@@ -439,11 +497,12 @@ subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   implicit none
   
   real*8, dimension(:), intent (in) :: xseedt, xseedb, zseedt, zseedb
-  real*8, dimension(nparams_top-2), intent (out) :: modest
-  real*8, dimension(nparams_bot-2), intent (out) :: modesb
+  real*8, dimension(:), allocatable, intent (out) :: modest
+  real*8, dimension(:), allocatable, intent (out) :: modesb
   
-  real*8, dimension(nparams_top):: modest_full
-  real*8, dimension(nparams_bot):: modesb_full
+  real*8, dimension(:), allocatable:: modest_full
+  real*8, dimension(:), allocatable:: modesb_full
+
   integer:: npointst, npointsb
   
   npointst=size(xseedt,1)
@@ -452,23 +511,55 @@ subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   allocate(upointst(npointst), upointsb(npointsb))
   allocate(xcontrolt(nparams_top), xcontrolb(nparams_bot))
   
-  call allocate_b_matrix(size(modest,1), size(modesb,1), npointst, npointsb)
+  xcontrolt=0.d0
+  xcontrolb=0.d0
   
-  call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,      &
+  if (b_spline_xtype .EQ. 1) then
+    call allocate_b_matrix(nparams_top, nparams_bot, npointst, npointsb)
+    allocate(modest(nparams_top-2), modesb(nparams_bot-2))
+    allocate(modest_full(nparams_top), modesb_full(nparams_bot))
+    
+    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,    &
     xseedt,zseedt,upointst,nparams_top,xcontrolt,modest_full,top_b_matrix)
   
-  modest=modest_full(2:nparams_top-1)
-  
-  !if (b_spline_xtype .EQ. 1) then
-  !  BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,nspline,xspline,zspline,uspline,n_cp,xmodest,zmodest)
-  !else
-  !  BSpline_A2C_freex(b_spline_degree,b_spline_distribution,nspline,xspline,zspline,uspline,n_cp,x,z)
-  !end if
-  call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,      &
+    modest=modest_full(2:nparams_top-1)
+    
+    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,    &
     xseedb,zseedb,upointsb,nparams_bot,xcontrolb,modesb_full,bot_b_matrix)
-  
-  modesb=modesb_full(2:nparams_bot-1)
-  
+    
+    modesb=modesb_full(2:nparams_bot-1)
+  else
+    call allocate_b_matrix(nparams_top, nparams_bot, npointst, npointsb)
+    allocate(modest(2*nparams_top-5), modesb(2*nparams_bot-5))
+    allocate(modest_full(nparams_top*2), modesb_full(nparams_bot*2))
+
+    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,    &
+    xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
+    modest_full(1+nparams_top:2*nparams_top),top_b_matrix)
+
+   ! call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointst,     &
+   !xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
+   !modest_full(1+nparams_top:2*nparams_top))
+    
+    !x
+    modest(1:nparams_top-3)=modest_full(3:nparams_top-1)
+    !z
+    modest(nparams_top-2:2*nparams_top-5)=modest_full(nparams_top+2:2*nparams_top-1)
+    
+
+    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,    &
+    xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
+    modesb_full(1+nparams_bot:2*nparams_bot),bot_b_matrix)
+
+   ! call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointsb,     &
+   !xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
+   !modesb_full(1+nparams_bot:2*nparams_bot))
+    
+    !x
+    modesb(1:nparams_bot-3)=modesb_full(3:nparams_bot-1)
+    !z
+    modesb(nparams_bot-2:2*nparams_bot-5)=modesb_full(nparams_bot+2:2*nparams_bot-1)
+  end if
 
 end subroutine BSP_init
 
@@ -507,18 +598,18 @@ z,BMATRIX)
   call SetDistribution(option,n_cp-1,x(2:n_cp))
 
   !call SetDistribution(option,n_cp,x)
-  write(*,*) x
+  !write(*,*) x
 
   ! Get u from x control points and x airfoil coordinates
 
   call GET_U_NEWTON(n,n_cp,x,nspline,xspline,uspline)
-  write(*,*) 'GET_U_NEWTON test'
-  do i=1,nspline
-    call B_Spline_Single(n,n_cp,x,uspline(i),v)
-    write(*,*) uspline(i),v, xspline(i),v-xspline(i)
-  end do
+  !write(*,*) 'GET_U_NEWTON test'
+  !do i=1,nspline
+  !  call B_Spline_Single(n,n_cp,x,uspline(i),v)
+  !  write(*,*) uspline(i),v, xspline(i),v-xspline(i)
+  !end do
 
-  call GET_P_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BMATRIX)
+  call GET_Z_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BMATRIX)
   
 end subroutine BSpline_A2C_fixedx  
 
@@ -553,10 +644,10 @@ subroutine BSpline_A2C_freex(n,option,nspline,xspline,zspline,uspline,n_cp,x,z)
   call SetDistribution(option,nspline,uspline)
 
   ! Get X, computed from U and xspline, min squares
-  call GET_P_MINSQUARES(nspline,uspline,xspline,n,n_cp,x,BSPLINE_FULL)
+  call GET_X_MINSQUARES(nspline,uspline,xspline,n,n_cp,x,BSPLINE_FULL)
 
   ! Get Z, computed from U and zspline, min squares
-  call GET_P_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BSPLINE_FULL)
+  call GET_Z_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BSPLINE_FULL)
   
   end subroutine BSpline_A2C_freex  
 
@@ -617,7 +708,7 @@ end subroutine GET_U_NEWTON
 
 !--------------------------------------------------------------------
 ! Get p control points from u parametric vector and p airfoil coordinates
-subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL)
+subroutine GET_Z_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL)
 
   use math_deps, only : SOLVE_SVD  
   
@@ -662,6 +753,104 @@ subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   pcontrol(1)=pspline(1)
   pcontrol(n_cp)=pspline(nspline)
   
+  !write(*,*) pcontrol(1), pcontrol(n_cp)
+  
+  ! Create BSPLINE
+  BSPLINE_FULL=0.d0
+  j=1
+  do i=1,nspline
+    !write(*,*) i,j
+    if(.NOT. uspline(i).LE.t(j+n+1)) j=j+1
+    !write(*,*) t(j+n),uspline(i),t(j+n+1)
+    call d_BSpline(t,n,j+n,uspline(i),B_DUMMY)
+    !write(*,*) i, j, j+n
+    BSPLINE_FULL(i,j:j+n)=B_DUMMY
+  end do
+  !do i=1,nspline
+  ! write(*,*) (BSPLINE_FULL(i,j), j=1,n_cp)
+  !end do
+  !
+  !do i=2,nspline-1
+  ! write(*,*) pcontrol(n_cp)*BSPLINE_FULL(i,n_cp)
+  !end do
+  !
+  !write(*,*) pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
+  
+  !Create other matrixes
+  BSPLINE=BSPLINE_FULL(2:nspline-1,2:n_cp-1)
+  BSPLINE_T=transpose(BSPLINE)
+  A=matmul(BSPLINE_T,BSPLINE)
+  !do i=1,n_cp
+  ! write(*,*) (A(i,j), j=1,n_cp)
+  !end do
+  P_FULL=pspline
+  p=P_FULL(2:nspline-1)-pcontrol(1)*BSPLINE_FULL(2:nspline-1,1) &
+                       -pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
+  B=matmul(BSPLINE_T,p)
+  !do i=1,n_cp
+  ! write(*,*) B(i)
+  !end do
+  !write(*,*) 'B'
+  !do i=1,n_cp-2
+  ! write(*,*) B(i)
+  !end do
+  !Solve A.X=B
+  call Solve_SVD(n_cp-2,real(A,4),real(B,4),X)
+  pcontrol(2:n_cp-1)         = real(X,8)
+  !write(*,*) 'pcontrol'
+  !do i=1,n_cp
+  ! write(*,*) pcontrol(i)
+  !end do
+end subroutine GET_Z_MINSQUARES
+
+!--------------------------------------------------------------------
+! Get p control points from u parametric vector and p airfoil coordinates
+subroutine GET_X_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL)
+
+  use math_deps, only : SOLVE_SVD  
+  
+  ! Variables declaration.
+  implicit none
+
+  ! Input variables.
+  integer, intent(in) :: n_cp! number of control points
+  integer, intent(in) :: n !degree of spline
+  integer, intent(in) :: nspline! number of spline points
+  real*8, intent(in) :: pspline(nspline)! p spline point position
+  real*8, intent(in):: uspline(nspline)!parametric spline vector
+
+  ! Output variables.
+  real*8, intent(out) :: pcontrol(n_cp)! p-coordinate of control points
+  real*8, intent(out):: BSPLINE_FULL(nspline,n_cp)
+
+  ! Local variables
+  integer:: i,j
+  real*8:: P_FULL(nspline)!, BSPLINE_FULL(nspline,n_cp)
+  real*8:: BSPLINE_T(n_cp-3,nspline-3), BSPLINE(nspline-3,n_cp-3)
+  real*8:: B_DUMMY(n+1)
+  real*8:: p(nspline-3)
+  real*8:: A(n_cp-3,n_cp-3), B(n_cp-3)
+  real:: X(n_cp-3)
+  real*8, dimension(n_cp+n+1):: t 
+  
+  !Knot vector
+  do i =1,n_cp+n+1
+    if (i .LE. n+1) then
+      t(i)=0.d0
+    elseif (i .GT. n_cp) then
+      t(i)=1.d0
+    else
+      !uniform knot vector
+      t(i)=t(i-1)+1/(dble(n_cp-n))
+    end if
+  end do
+  
+  ! Assign known points
+  pcontrol=0.d0
+  pcontrol(1)=0.d0
+  pcontrol(2)=0.d0
+  pcontrol(n_cp)=pspline(nspline)
+  
   write(*,*) pcontrol(1), pcontrol(n_cp)
   
   ! Create BSPLINE
@@ -685,16 +874,17 @@ subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   !
   !write(*,*) pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
   
-  !Create ohter matrixes
-  BSPLINE=BSPLINE_FULL(2:nspline-1,2:n_cp-1)
+  !Create other matrixes
+  BSPLINE=BSPLINE_FULL(3:nspline-1,3:n_cp-1)
   BSPLINE_T=transpose(BSPLINE)
   A=matmul(BSPLINE_T,BSPLINE)
   !do i=1,n_cp
   ! write(*,*) (A(i,j), j=1,n_cp)
   !end do
   P_FULL=pspline
-  p=P_FULL(2:nspline-1)-pcontrol(1)*BSPLINE_FULL(2:nspline-1,1) &
-                       -pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
+  p=P_FULL(3:nspline-1)-pcontrol(1)*BSPLINE_FULL(3:nspline-1,1) &
+                       -pcontrol(2)*BSPLINE_FULL(3:nspline-1,2) &
+                       -pcontrol(n_cp)*BSPLINE_FULL(3:nspline-1,n_cp)
   B=matmul(BSPLINE_T,p)
   !do i=1,n_cp
   ! write(*,*) B(i)
@@ -704,13 +894,13 @@ subroutine GET_P_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   ! write(*,*) B(i)
   !end do
   !Solve A.X=B
-  call Solve_SVD(n_cp-2,real(A,4),real(B,4),X)
-  pcontrol(2:n_cp-1)         = real(X,8)
-  write(*,*) 'pcontrol'
-  do i=1,n_cp
-   write(*,*) pcontrol(i)
-  end do
-end subroutine GET_P_MINSQUARES
+  call Solve_SVD(n_cp-3,real(A,4),real(B,4),X)
+  pcontrol(3:n_cp-1)         = real(X,8)
+  !write(*,*) 'pcontrol'
+  !do i=1,n_cp
+  ! write(*,*) pcontrol(i)
+  !end do
+end subroutine GET_X_MINSQUARES
 
 !***************************************************************
 ! Given n control points of a b-spline and the parametric point u, it

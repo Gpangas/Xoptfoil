@@ -46,7 +46,7 @@ subroutine allocate_parametrization(nmodest, nmodesb, npointst, npointsb, shapet
     stop
 
   end if
-  write(*,*) 'check'
+
 end subroutine allocate_parametrization
 
 subroutine deallocate_parametrization() 
@@ -130,7 +130,7 @@ end subroutine create_shape_functions
 !
 !=============================================================================80
 subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
-                          zt_new, zb_new, shapetype, symmetrical)
+             zt_new, zb_new, shapetype, symmetrical)
   use vardef, only : tcTE,b_spline_degree,b_spline_xtype,b_spline_distribution,&
     upointst, upointsb, xcontrolt, xcontrolb
 
@@ -140,30 +140,31 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   double precision, dimension(:), intent(inout) :: zt_new, zb_new
   character(*), intent(in) :: shapetype
   logical, intent(in) :: symmetrical
-  integer :: i
+  
   double precision, dimension(size(xt_seed,1)) :: xt_new
   double precision, dimension(size(xb_seed,1)) :: xb_new
+  integer :: i
 
   if (trim(shapetype) == 'naca') then
     
     call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
                           zt_new, zb_new, symmetrical)
-    
+
   elseif (trim(shapetype) == 'hicks-henne') then
     
     call HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,        &
                           zt_new, zb_new, symmetrical)
-    
+
   elseif (trim(shapetype) == 'kulfan-bussoletti') then
     call KBP_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,       &
                           zt_new, zb_new, symmetrical, tcTE)
-    
+
   elseif (trim(shapetype) == 'b-spline') then
     !write(*,*) size(xcontrolt,1), size(xcontrolb,1), size(modest,1), size(modesb,1)
     call BSP_airfoil(upointst, xt_seed, zt_seed, upointsb, xb_seed, zb_seed,   &
-      xcontrolt, xcontrolb, modest, modesb, xt_new, xb_new, zt_new, zb_new,    &
+      xcontrolt, xcontrolb, modest, modesb, zt_new, zb_new,    &
       symmetrical)
-  
+
   else
 
     write(*,*)
@@ -219,8 +220,8 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
       ndvs_top = nparams_top-2
       ndvs_bot = nparams_bot-2
     else
-      ndvs_top = (nparams_top-2)*2
-      ndvs_bot = (nparams_bot-2)*2
+      ndvs_top = (nparams_top-2)*2-1
+      ndvs_bot = (nparams_bot-2)*2-1
     end if
     
   else
@@ -563,13 +564,13 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   character(*), intent(in) :: shape_functions
   double precision, dimension(:), intent(in) :: xseedt, xseedb
   double precision, dimension(:), intent(inout) :: zseedt, zseedb
-  double precision, dimension(:), intent(inout) :: modest_seed
-  double precision, dimension(:), intent(inout) :: modesb_seed
+  double precision, dimension(:), allocatable, intent(inout) :: modest_seed
+  double precision, dimension(:), allocatable, intent(inout) :: modesb_seed
   double precision, intent(inout) :: tcTE
   
-  double precision, dimension(size(xseedt,1)) :: xseedt_new, zseedt_new
-  double precision, dimension(size(xseedb,1)) :: xseedb_new, zseedb_new
-  double precision :: sum
+  double precision, dimension(size(xseedt,1)) :: zseedt_new
+  double precision, dimension(size(xseedb,1)) :: zseedb_new
+  double precision :: sum, sum_w,w
   integer :: i
       
   if (trim(shape_functions) == 'naca') then
@@ -586,63 +587,13 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     call KBP_init(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed)
     call KBP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed,            &
                       modesb_seed, zseedt_new, zseedb_new, symmetrical, tcTE)
-    sum=0.d0
-    do i = 1, size(zseedt,1)
-      sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
-    end do
-    sum=sum**0.5
-    Write(*,*) ' RMSE of upper surface'
-    Write(*,*) sum
-    sum=0.d0
-    do i = 1, size(zseedb,1)
-      sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
-    end do
-    sum=sum**0.5
-    Write(*,*) ' RMSE of lower surface'
-    Write(*,*) sum
   
   elseif (trim(shape_functions) == 'b-spline') then
     call BSP_init(xseedt, xseedb, zseedt, zseedb, modest_seed, modesb_seed)
     
     call BSP_airfoil(upointst, xseedt, zseedt, upointsb, xseedb, zseedb,       &
-      xcontrolt, xcontrolb, modest_seed, modesb_seed, xseedt_new, xseedb_new,  &
+      xcontrolt, xcontrolb, modest_seed, modesb_seed,  &
       zseedt_new, zseedb_new, symmetrical)
-    !Write(*,*) ' x control top'
-    !do i = 1, size(xcontrolt,1)
-    !  write(*,*) xcontrolt(i)
-    !end do
-    
-    sum=0.d0
-    do i = 1, size(xseedt,1)
-      sum=sum+(xseedt(i)-xseedt_new(i))**2./real(size(xseedt,1),8)
-    end do
-    sum=sum**0.5
-    Write(*,*) ' RMSE of x upper surface'
-    Write(*,*) sum
-    
-    sum=0.d0
-    do i = 1, size(zseedt,1)
-      sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
-    end do
-    sum=sum**0.5
-    Write(*,*) ' RMSE of z upper surface'
-    Write(*,*) sum
-    
-    sum=0.d0
-    do i = 1, size(xseedb,1)
-      sum=sum+(xseedb(i)-xseedb_new(i))**2./real(size(xseedb,1),8)
-    end do
-    sum=sum**0.5
-    Write(*,*) ' RMSE of x lower surface'
-    Write(*,*) sum
-    
-    sum=0.d0
-    do i = 1, size(zseedb,1)
-      sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
-    end do
-    sum=sum**0.5
-    Write(*,*) ' RMSE of z lower surface'
-    Write(*,*) sum
   
   else
 
@@ -651,17 +602,58 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     write(*,*)
     stop
   end if
+  
+  sum=0.d0
+  sum_w=0.d0
+  do i = 1, size(zseedt,1)
+    if (xseedt(i) .LT. 0.2d0) then
+      w=2.0d0
+    else
+      w=1.0d0
+    end if
+    sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
+    sum_w=sum_w+w*(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
+  end do
+  sum=sum**0.5
+  write(*,*)
+  Write(*,*) ' RMSE of upper surface'
+  Write(*,*) sum
+  write(*,*)
+  Write(*,*) ' Mean Weighted Difference Squared of upper surface'
+  Write(*,*) sum_w
+  sum=0.d0
+  sum_w=0.d0
+  do i = 1, size(zseedb,1)
+    if (xseedb(i) .LT. 0.2d0) then
+      w=2.0d0
+    else
+      w=1.0d0
+    end if
+    sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
+    sum_w=sum_w+w*(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
+  end do
+  sum=sum**0.5
+  write(*,*)
+  Write(*,*) ' RMSE of lower surface'
+  Write(*,*) sum
+  write(*,*)
+  Write(*,*) ' Mean Weighted Difference Squared of lower surface'
+  Write(*,*) sum_w
   zseedt=zseedt_new
   zseedb=zseedb_new
   
-  write(*,*) 'modest_seed'
-  do i=1,size(modest_seed,1)
-    write(*,*) modest_seed(i)
-  end do
-  write(*,*) 'modesb_seed'
-  do i=1,size(modesb_seed,1)
-    write(*,*) modesb_seed(i)
-  end do
+  !write(*,*) 'modest_seed'
+  !do i=1,size(modest_seed,1)
+  !  write(*,*) modest_seed(i)
+  !end do
+  !write(*,*) 'modesb_seed'
+  !do i=1,size(modesb_seed,1)
+  !  write(*,*) modesb_seed(i)
+  !end do
+  
+  write(*,*)
+  write(*,*) 'Press Enter to continue'
+  read(*,*) 
   
 end subroutine parametrization_new_seed
 end module parametrization

@@ -1033,7 +1033,9 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   character(150), dimension(:), allocatable :: zoneinfo
   character(100) :: restfile, foilfile, polarfile, histfile, text
   character(11) :: stepchar
-  character(20) :: fminchar, radchar, timechar
+  character(20) :: fminchar
+  character(15) :: radchar
+  character(14) :: timechar
   character(25) :: relfminchar
 
 ! Print status
@@ -1177,7 +1179,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
     write(relfminchar,'(F14.10)') relfmin(i)
     write(radchar,'(ES14.6)') rad(i)
     write(timechar,'(F10.3)') time(i)
-    write(histunit,'(A11,A20,A25,A20,A14)') adjustl(stepchar), adjustl(fminchar),   &
+    write(histunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
                                          adjustl(relfminchar), adjustl(radchar), &
                                          adjustl(timechar)
   end do

@@ -108,7 +108,7 @@ program main
   write(*,*)
   
   ! Allocate memory for airfoil analysis
-  write(*,*) 'allocate_airfoil_data'
+
   call allocate_airfoil_data()
 
   ! Set up for matching airfoils
