@@ -17,9 +17,11 @@
 
 module parametrization
 
-! Contains subroutines to create an airfoil shape from design variables
+! Contains subroutines that link the program to modules with routines that 
+! create the airfoil
   use parametrization_deform
   use parametrization_constr
+  
   implicit none
 
   contains
@@ -114,9 +116,9 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
     nmodesbot = size(modesbot,1)
     
   elseif (trim(shapetype) == 'bezier-parsec') then
-    ! all parameters set on top
-    nmodestop = 11
-    nmodesbot = 0
+    ! top is thickness, bot is camber
+    nmodestop = 5
+    nmodesbot = 5
   
   else
 
@@ -154,7 +156,10 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   double precision, dimension(size(xt_seed,1)) :: xt_new
   double precision, dimension(size(xb_seed,1)) :: xb_new
   integer :: i
-
+  double precision :: symm
+  
+  symm = 1.0d0
+  
   if (trim(shapetype) == 'naca') then
     
     call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
@@ -176,7 +181,9 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
       symmetrical)
   
   elseif (trim(shapetype) == 'bezier-parsec') then
-
+    if (symmetrical) symm=0.d0 ! no camber
+    call BPP_airfoil( xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb*symm, &
+      zt_new, zb_new)
     
   else
 
@@ -239,8 +246,8 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
   
   elseif (trim(parametrization_type) == 'bezier-parsec') then
     
-    ndvs_top = nparams_top
-    ndvs_bot = nparams_bot
+    ndvs_top = 5
+    ndvs_bot = 5
   
   else
 
@@ -654,7 +661,11 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
       zseedt_new, zseedb_new, symmetrical)
     
   elseif (trim(shape_functions) == 'bezier-parsec') then
-
+    call BPP_init(xseedt, xseedb, zseedt, zseedb, modest_seed, modesb_seed)
+    
+    if (symmetrical) modesb_seed=modesb_seed*0.d0 ! no camber
+    call BPP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed, &
+      zseedt_new, zseedb_new)
     
   else
 

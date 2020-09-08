@@ -486,7 +486,7 @@ subroutine d_BSpline(t,k,i,x,b)
   
 end subroutine d_BSpline  
 
-  ! ----------------------------------------------------------------------------
+! ----------------------------------------------------------------------------
 ! Subroutine that implements the Kulfan-Bussoletti Parameterization, coordinates to weights.
 subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
 
@@ -1141,5 +1141,875 @@ subroutine deallocate_b_matrix
   end if
   
 end subroutine deallocate_b_matrix
+
+!/////////////////////////////////////////////////////////////////////////////80
+!
+! BPP subroutines
+!
+!/////////////////////////////////////////////////////////////////////////////80
+
+! ----------------------------------------------------------------------------
+! Subroutine that implements the Bezier-PARSEC Parameterization, weights to coordinates.
+subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new)
+
+  implicit none
+
+  real*8, dimension(:), intent (in) :: modest, modesb
+
+  real*8, intent(in) ::    xPt(:),xPb(:)                     ! x values of data points
+  real*8, intent(in) ::    zPt(size(xPt,1)),zPb(size(xPb,1)) ! z values of data points
+  real*8, intent(out) ::   zPt_new(size(xPt,1)),zPb_new(size(xPb,1)) ! z values of data points
+  
+  integer ::               nPt, nPb                          ! no. of data points
+  
+  real*8 ::                Xt_max, Yt_max, Kt_max            ! Position and magnitude of the maximum thickness
+  real*8 ::                Xc_max, Yc_max, Kc_max            ! Position and magnitude of the maximum camber
+  real*8 ::                Rle                               ! Leading edge radius
+  real*8 ::                Gamma_le, Alpha_te                ! Leading and trailing edge angle
+  real*8 ::                Beta_te                           ! Trailing edge wedge angle
+  real*8 ::                Zte, dZte                         ! Trailing edge vertical coordinate and thickness
+
+  real*8, dimension(4) ::  Xt_le, Xt_te, Yt_le, Yt_te          ! control points for the thickness bezier curves
+  real*8, dimension(4) ::  Xc_le, Xc_te, Yc_le, Yc_te          ! control points for the camber bezier curves
+  
+  integer :: error_code_t, error_code_c
+  
+  nPt=size(xPt,1)
+  nPb=size(xPb,1)
+  
+  Xt_max=modest(1)
+  Yt_max=modest(2)
+  Kt_max=modest(3)
+  Xc_max=modesb(1)
+  Yc_max=modesb(2)
+  Kc_max=modesb(3)            
+  Rle=modest(4)                              
+  Gamma_le=modesb(4)
+  Alpha_te=modesb(5)                
+  Beta_te=modesb(5)                           
+  Zte = 0.d0
+  dZte = zPt(nPt)-zPb(nPb)
+  
+  ! Calculating the control points of the bezier curves.
+  call SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_max,Rle,Beta_te,dZte,error_code_t)
+
+  call SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,Gamma_le,Alpha_te,Zte,error_code_c)
+
+  ! Calculate the Z values top
+  call BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,xPt,zPt_new,nPt,0)
+  
+  ! Calculate the Z values bot
+  call BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,xPb,zPb_new,nPb,1)
+  
+  if (error_code_t /= 0) then
+    zPt_new=0.d0
+    zPb_new=0.d0
+  end if
+    
+end subroutine BPP_airfoil
+
+! -------------------------------------------------------------------
+subroutine SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_max,Rle,Beta_te,dZte,error_code)
+
+  implicit none
+
+  real*8, intent(in) :: Xt_max, Yt_max, Kt_max            ! Position and magnitude of the maximum thickness
+  real*8, intent(in) :: Rle                               ! Leading edge radius
+  real*8, intent(in) :: Beta_te                           ! Trailing edge wedge angle
+  real*8, intent(in) :: dZte                              ! Trailing edge thickness
+  real*8 :: Rt                                            ! Thickness auxiliar parameter
+
+  real*8, dimension(4), intent(inout) :: Xt_le, Xt_te, Yt_le, Yt_te  ! Control points for the thickness bezier curves
+  integer, intent(out) :: error_code
+  integer :: error
+  
+  ! Computes the Rt auxiliar parameter.
+  call Rt_calc(Rt,Kt_max,Xt_max,Yt_max,Rle,error_code)
+
+  ! Set the values of the leading edge Bezier curve control points.
+  Xt_le(1)=0.0d0
+  Xt_le(2)=0.0d0
+  Xt_le(3)=Rt
+  Xt_le(4)=Xt_max
+
+  ! Check the validity of the control points' values.
+  call BPPCheckControlPoints(Xt_le,0.0d0,Xt_max,1,error)
+
+  if (error /= 0) error_code=error
+  
+  Yt_le(1)=0.0d0
+  Yt_le(2)=3.0d0*Kt_max*(Xt_max-Rt)**2/2.0d0+Yt_max
+  Yt_le(3)=Yt_max
+  Yt_le(4)=Yt_max
+
+  call BPPCheckControlPoints(Yt_le,0.0d0,Yt_max,2,error)
+
+  if (error /= 0) error_code=error
+  
+  ! Set the values of the trailing edge Bezier curve control points.
+  Xt_te(1)=Xt_max
+  Xt_te(2)=2.0d0*Xt_max-Rt
+  Xt_te(3)=1.0d0+(dZte-(3.0d0*Kt_max*(Xt_max-Rt)**2/2.0d0+Yt_max))*1.0d0/tan(Beta_te)
+  Xt_te(4)=1.0d0
+
+  call BPPCheckControlPoints(Xt_te,Xt_max,1.0d0,3,error)
+
+  if (error /= 0) error_code=error
+  
+  Yt_te(1)=Yt_max
+  Yt_te(2)=Yt_max
+  Yt_te(3)=3.0d0*Kt_max*(Xt_max-Rt)**2/2.0d0+Yt_max
+  Yt_te(4)=dZte
+
+  call BPPCheckControlPoints(Yt_te,Yt_max,0.0d0,4,error)
+
+  if (error /= 0) error_code=error
+  
+end subroutine SetThicknessControlPoints
+
+! -------------------------------------------------------------------
+subroutine SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,Gamma_le,Alpha_te,Zte,error_code)
+
+  implicit none
+
+  real*8, intent(in) :: Xc_max, Yc_max, Kc_max            ! Position and magnitude of the maximum camber
+  real*8, intent(in) :: Gamma_le, Alpha_te                ! Leading and trailing edge angle
+  real*8, intent(in) :: Zte                               ! Trailing edge vertical coordinate
+  real*8 :: Rc                                            ! Camber auxiliar parameter
+
+  real*8, dimension(4), intent(inout) :: Xc_le, Xc_te, Yc_le, Yc_te  ! Control points for the camber bezier curves
+  integer, intent(out) :: error_code
+  integer :: error
+  
+  if (Yc_max.LE.0.0d0) then
+      Rc  = 0.0d0
+    else
+      call Rc_calc(Rc,Kc_max,Gamma_le,Alpha_te,Zte,Yc_max,error_code)
+  end if
+
+  ! Set the values of the leading edge Bezier curve control points.
+  Xc_le(1)=0.0d0
+  Xc_le(2)=Rc/tan(gamma_le)
+  Xc_le(3)=Xc_max-(2.0d0*(Rc-Yc_max)/(3.0d0*Kc_max))**0.5
+  Xc_le(4)=Xc_max
+
+  call BPPCheckControlPoints(Xc_le,0.0d0,Xc_max,5,error)
+
+  if (error /= 0) error_code=error
+  
+  Yc_le(1)=0.0d0
+  Yc_le(2)=Rc
+  Yc_le(3)=Yc_max
+  Yc_le(4)=Yc_max
+
+  call BPPCheckControlPoints(Yc_le,0.0d0,Yc_max,6,error)
+
+  if (error /= 0) error_code=error
+  
+  ! Set the values of the trailing edge Bezier curve control points.
+  Xc_te(1)=Xc_max
+  Xc_te(2)=Xc_max+(2.0d0*(Rc-Yc_max)/(3.0d0*Kc_max))**0.5
+  Xc_te(3)=1.0d0+(Zte-Rc)/(tan(Alpha_te))
+  Xc_te(4)=1.0d0
+
+  call BPPCheckControlPoints(Xc_te,Xc_max,1.0d0,7,error)
+
+  if (error /= 0) error_code=error
+  
+  Yc_te(1)=Yc_max
+  Yc_te(2)=Yc_max
+  Yc_te(3)=Rc
+  Yc_te(4)=Zte
+
+  call BPPCheckControlPoints(Yc_te,Yc_max,0.0d0,8,error)
+
+  if (error /= 0) error_code=error
+  
+end subroutine SetCamberControlPoints
+
+! -------------------------------------------------------------------
+subroutine Rt_calc(Rt,Kt_max,Xt_max,Yt_max,Rle,error_code)
+
+  use PolynomialRoots
+
+  implicit none
+
+  real*8, intent(in) :: Kt_max, Xt_max, Yt_max, Rle
+  real*8, intent(out) :: Rt
+  integer, intent(out) :: error_code
+  real*8, dimension(5) :: a                   ! Quartic polynomial coefficients in the form a(5)*x^4+a(4)*x^3+a(3)*x^2+a(2)*x+a(1)
+  complex*16, dimension(4) :: X_root          ! Roots of the polynomial
+
+  integer :: i
+
+  error_code=0
+  
+  ! Set the parameters for the solution of the quartic equation
+  a(5)=27.0d0*(Kt_max**2)/4.0d0
+  a(4)=-27.0d0*(Kt_max**2)*Xt_max
+  a(3)=9.0d0*Kt_max*Yt_max+(81.0d0*(Kt_max**2)*(Xt_max**2)/2.0d0)
+  a(2)=2.0d0*Rle-18.0d0*Kt_max*Xt_max*Yt_max-27.0d0*(Kt_max**2)*(Xt_max**3)
+  a(1)=3.0d0*(Yt_max**2)+9.0d0*Kt_max*(Xt_max**2)*Yt_max+(27.0d0*(Kt_max**2)*(Xt_max**4)/4.0d0)
+
+  ! Get the roots of the polynomial
+  call QuarticRoots(a,X_root)
+
+  ! Select the correct root
+  Rt=2.0d0*Xt_max  ! Presets the solution
+
+  do i=1,4
+    if(AImag(X_root(i)).NE.0) cycle                                                    ! Discard the complex roots
+    if(Real(X_root(i)).GT.max(0.d0,Xt_max-(-2.0d0*Yt_max/(3.0d0*Kt_max))**0.5)) then   ! Discard real roots smaller than the lower boundary
+        if(Real(X_root(i)).LT.Rt) then                                                 ! Make sure the used root is the smallest within the boundaries
+            Rt=Real(X_root(i))
+        end if
+    end if
+  end do
+  
+  !do i=1,4
+  !  write(*,*) X_root(i)
+  !end do
+  !
+  !write(*,*)
+  !write(*,*) Xt_max-(-2.0d0*Yt_max/(3.0d0*Kt_max))**0.5
+  
+  if(Rt.GE.Xt_max) then
+    !write(*,*) "No valid root found"
+    !write(*,*) 'error_code=1'
+    error_code=1
+    !Rt=huge(1)
+    Rt=Xt_max*Rand()
+  end if
+
+end subroutine Rt_calc
+
+! -------------------------------------------------------------------
+subroutine Rc_calc(Rc,Kc_max,Gamma_le,Alpha_te,Zte,Yc_max, error_code)
+
+  implicit none
+
+  real*8, intent(in) :: Kc_max, Gamma_le, Alpha_te, Zte, Yc_max
+  integer, intent(out) :: error_code
+  real*8, intent(out) :: Rc
+  real*8 :: Aux1, Aux2, Aux3, Aux4                  !Auxiliar parameters
+
+  error_code=0
+  
+  Aux4=16.0d0+6.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))*      &
+    (1.0d0-Yc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))+Zte/tan(alpha_te))
+  Aux1=4*(16.0d0+6.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))*   &
+    (1.0d0-Yc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))+Zte/tan(alpha_te)))**0.5
+  Aux2=(16.0d0+3.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))*(1.0d0+Zte/tan(alpha_te)))
+  Aux3=3.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))**2
+
+  if (((Aux2+Aux1)/Aux3).GT.0.AND.((Aux2+Aux1)/Aux3).LT.Yc_max) then
+      Rc=(Aux2+Aux1)/Aux3
+    elseif (((Aux2-Aux1)/Aux3).GT.0.AND.((Aux2-Aux1)/Aux3).LT.Yc_max) then
+      Rc=(Aux2-Aux1)/Aux3
+    elseif (Yc_max.EQ.0) then
+        Rc=0
+    else
+      !write(*,*) "Error calculating Rc parameter"
+      !if (Aux4.LT.0.0d0) write(*,*) "Non real root"
+      Rc=Yc_max*Rand()
+      !Rc=-1
+      !write(*,*) Aux2
+      !write(*,*) Aux1
+      !write(*,*) 'error_code=2'
+      error_code=2
+  end if
+
+end subroutine Rc_calc
+
+! -------------------------------------------------------------------
+subroutine BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,X,Z,nPoints,UpperLower_identifier)
+
+  implicit none
+
+  Real*8, dimension(4), intent(in) :: Xt_le, Xt_te, Yt_le, Yt_te, Xc_le, Xc_te, Yc_le, Yc_te
+  integer, intent(in) :: nPoints
+  integer, intent(in) :: UpperLower_identifier           ! Parameter that identifies the use of the upper, 0, or lower surface, 1
+  Real*8, dimension(npoints), intent(in) :: X         ! Airfoil coordinates
+  Real*8, dimension(npoints), intent(inout) :: Z         ! Airfoil coordinates
+
+  integer, dimension(2) :: LEte_identifier               ! Parameter that identifies the use of the leading edge or trailing edge bezier curve for the (thickness,camber)
+
+  integer :: i
+  real*8, dimension(2) :: t                              ! Parameter for the calculation of the bezir curves for the (thickness,camber)
+
+  do i=1,nPoints      
+    call BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X(i))
+    call BPP_Calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,X(i),Z,nPoints,i,UpperLower_identifier)
+  end do
+
+end subroutine BPP_Get_z
+
+! -------------------------------------------------------------------
+! Returns the value of the parameter of the bezier functions
+subroutine BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X)
+
+  use PolynomialRoots
+
+  implicit none
+
+  Real*8, dimension(4), intent(in) :: Xt_le, Xt_te, Xc_le, Xc_te
+  integer, dimension(2), intent(inout) :: LEte_identifier
+  real*8, dimension(2), intent(inout) :: t
+  real*8, intent(in) :: X
+  Complex*16, dimension(3) :: X_root      ! cubic roots
+  real*8, dimension(4) :: a               ! coeffitients to solve the cubic equation
+
+  integer :: i
+
+  !preset t to induce error
+  t(1)=2.0d0
+  t(2)=2.0d0
+
+  ! thickness bezier curve
+
+  a(1)=Xt_le(1)-X
+  a(2)=3.0d0*Xt_le(2)-3.0d0*Xt_le(1)
+  a(3)=3.0d0*Xt_le(3)-6.0d0*Xt_le(2)+.0d03*Xt_le(1)
+  a(4)=Xt_le(4)-3.0d0*Xt_le(3)+3.0d0*Xt_le(2)-Xt_le(1)
+
+  call CubicRoots(a,X_root)
+
+  do i=1,3
+    if (aimag(X_root(i)).NE.0.0d0) cycle
+    if (real(X_root(i)).GT.1.00001d0.OR.real(X_root(i)).LT.0.0d0) cycle
+    if (real(X_root(i)).NE.real(X_root(i))) cycle
+    t(1)=Real(X_root(i))
+    LEte_identifier(1)=0       ! Identifies the leading edge to be used in the thickness section
+  end do
+
+  if (t(1).GT.1.0d0.OR.t(1).LT.0.0d0) then
+    a(1)=Xt_te(1)-X
+    a(2)=3.0d0*Xt_te(2)-3.0d0*Xt_te(1)
+    a(3)=3.0d0*Xt_te(3)-6.0d0*Xt_te(2)+3.0d0*Xt_te(1)
+    a(4)=Xt_te(4)-3.0d0*Xt_te(3)+3.0d0*Xt_te(2)-Xt_te(1)
+
+    call CubicRoots(a,X_root)
+
+    do i=1,3
+        if (aimag(X_root(i)).NE.0.0d0) cycle
+        if (real(X_root(i)).GT.1.00001d0.OR.real(X_root(i)).LT.0.0d0) cycle
+        if (real(X_root(i)).NE.real(X_root(i))) cycle
+        t(1)=Real(X_root(i))
+        LEte_identifier(1)=1       ! Identifies the trailing edge to be used in the thickness section
+    end do
+
+  end if
+
+  if (t(1).LT.0.0d0.OR.t(1).GT.1.0d0) LEte_identifier(1)=-1       ! Identifies error in the thickness section
+
+  ! Camber Bezier curve
+
+  a(1)=Xc_le(1)-X
+  a(2)=3.0d0*Xc_le(2)-3.0d0*Xc_le(1)
+  a(3)=3.0d0*Xc_le(3)-6.0d0*Xc_le(2)+3.0d0*Xc_le(1)
+  a(4)=Xc_le(4)-3.0d0*Xc_le(3)+3.0d0*Xc_le(2)-Xc_le(1)
+
+  call CubicRoots(a,X_root)
+
+    do i=1,3
+      if (aimag(X_root(i)).NE.0.0d0) cycle
+      if (real(X_root(i)).GT.1.00001d0.OR.real(X_root(i)).LT.0.0d0) cycle
+      if (real(X_root(i)).NE.real(X_root(i))) cycle
+      t(2)=Real(X_root(i))
+      LEte_identifier(2)=0       ! Identifies the leading edge to be used in the thickness section
+    end do
+
+  if (t(2).GT.1.0d0.OR.t(2).LT.0.0d0) then
+      a(1)=Xc_te(1)-X
+      a(2)=3.0d0*Xc_te(2)-3.0d0*Xc_te(1)
+      a(3)=3.0d0*Xc_te(3)-6*Xc_te(2)+3.0d0*Xc_te(1)
+      a(4)=Xc_te(4)-3.0d0*Xc_te(3)+3.0d0*Xc_te(2)-Xc_te(1)
+
+      call CubicRoots(a,X_root)
+
+      do i=1,3
+          if (aimag(X_root(i)).NE.0.0d0) cycle
+          if (real(X_root(i)).GT.1.00001d0.OR.real(X_root(i)).LT.0.0d0) cycle
+          if (real(X_root(i)).NE.real(X_root(i))) cycle
+          t(2)=Real(X_root(i))
+          LEte_identifier(2)=1       ! Identifies the trailing edge to be used in the thickness section
+      end do
+
+  end if
+
+  if (t(2).LT.0.0d0.OR.t(2).GT.1.0d0) LEte_identifier(2)=-1       ! Identifies error in the thickness section
+
+end subroutine BPP_Get_t
+
+! -------------------------------------------------------------------
+subroutine BPP_calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,X,Z,nPoints,i,UpperLower_identifier)
+
+  implicit none
+
+  Real*8, dimension(4), intent(in) :: Yt_le, Yt_te, Yc_le, Yc_te
+  integer, dimension(2), intent(in) :: LEte_identifier
+  real*8, dimension(2), intent(in) :: t
+  real*8, intent(in) :: X
+  integer, intent(in) :: nPoints
+  real*8, dimension(nPoints), intent(inout) :: Z
+  integer, intent(in) :: i                            !number of the point
+  integer, intent(in) :: UpperLower_identifier
+  real*8 :: Z_thickness, Z_camber                     !Partial values of Z
+
+  if (LEte_identifier(1).EQ.0) then
+      Z_thickness=((1-t(1))**3)*Yt_le(1)+3*((1-t(1))**2)*t(1)*Yt_le(2)+3*(1-t(1))*(t(1)**2)*Yt_le(3)+(t(1)**3)*Yt_le(4)
+  elseif (LEte_identifier(1).EQ.1) then
+      Z_thickness=((1-t(1))**3)*Yt_te(1)+3*((1-t(1))**2)*t(1)*Yt_te(2)+3*(1-t(1))*(t(1)**2)*Yt_te(3)+(t(1)**3)*Yt_te(4)
+  end if
+
+  if (LEte_identifier(2).EQ.0) then
+      Z_camber=((1-t(2))**3)*Yc_le(1)+3*((1-t(2))**2)*t(2)*Yc_le(2)+3*(1-t(2))*(t(2)**2)*Yc_le(3)+(t(2)**3)*Yc_le(4)
+  elseif (LEte_identifier(2).EQ.1) then
+      Z_camber=((1-t(2))**3)*Yc_te(1)+3*((1-t(2))**2)*t(2)*Yc_te(2)+3*(1-t(2))*(t(2)**2)*Yc_te(3)+(t(2)**3)*Yc_te(4)
+  end if
+
+
+  !if (X.EQ.1.0d0) then
+  !  Z(i)=Yc_te(4)+Yt_te(4)
+  !  Z(nPoints)=Yc_te(4)-Yt_te(4)
+  !else if (X.EQ.0.0d0) then
+  !  Z(i)=0.0d0
+  if (UpperLower_identifier.EQ.0) then
+    Z(i)=Z_camber+Z_thickness/2.0d0
+  else
+    Z(i)=Z_camber-Z_thickness/2.0d0
+  end if
+
+end subroutine BPP_calc_z
+
+! -------------------------------------------------------------------
+subroutine BPPCheckControlPoints(Vec,Min_ini,Max_ini,identifier,error)
+
+  implicit none
+
+  Real*8, dimension(4), intent(inout) :: Vec      ! Input vector with the control points variables
+  real*8, intent(in) :: Min_ini, Max_ini          ! Minimum and maximum of the interval
+  integer, intent(in) :: identifier               ! Input value to specify which control points are being checked
+  integer, intent(out) :: error
+  
+  Real*8 :: Min, Max
+  integer :: i
+  
+  error=0
+  
+  if (Min_ini.NE.Min_ini) then
+    Min=0.5d0
+    error=1
+  else
+    Min=Min_ini
+  end if
+
+  if (Max_ini.NE.Max_ini) then
+    error=1  
+    Max=0.5d0
+  else
+    Max=Max_ini
+  end if
+
+  do i=1,4
+    if (abs(Vec(i)).GT.1.0d0.OR.Vec(i).NE.Vec(i)) then      ! Vec(i).NE.Vec(i) checks for NaN
+      error=1
+      Vec(i)=Min+(Max-Min)*(i-1)/3
+      !write(*,*) "Altered Control Point"
+      !select case (identifier)
+      !case(1)
+      !  write(*,*) "Xt_le"
+      !case(2)
+      !  write(*,*) "Yt_le"
+      !case(3)
+      !  write(*,*) "Xt_te"
+      !case(4)
+      !  write(*,*) "Yt_te"
+      !case(5)
+      !  write(*,*) "Xc_le"
+      !case(6)
+      !  write(*,*) "Yc_le"
+      !case(7)
+      !  write(*,*) "Xc_te"
+      !case(8)
+      !  write(*,*) "Yc_te"
+      !end select
+    end if
+  end do
+
+end subroutine BPPCheckControlPoints
+
+! ----------------------------------------------------------------------------
+! Subroutine that implements the Bezier-PARSEC Parameterization, coordinates to weights.
+subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
+
+  real*8, intent(in) :: xseedt(:), xseedb(:), zseedt(:), zseedb(:)
+  
+  real*8, intent(out) :: modest(5) ! Xt_max, Yt_max, Kt_max, Rle     , Beta_te
+  real*8, intent(out) :: modesb(5) ! Xc_max, Yc_max, Kc_max, Gamma_le, Alpha_te
+
+  real*8:: xBPP(12)               ! Xt_max,Yt_max,Kt_max, Xc_max,Yc_max,Kc_max,&
+                                  ! Rle, Gamma_le,Alpha_te,Beta_te, Zte,dZte
+  real*8, dimension(size(xseedt,1)) :: zseedb_interpolated
+  integer :: nPt, nPb
+  
+  real*8, dimension(size(xseedt,1)) :: zthick, zcamber, curvaturethick,        &
+    curvaturecamber, first_derivative_thick, first_derivative_camber 
+  real*8, dimension(size(xseedt,1)+size(xseedb,1)-1) :: xspline, zspline, curvaturespline
+  integer :: i
+  
+  nPt=size(xseedt,1)
+  nPb=size(xseedb,1)
+  
+  ! interpolate lower surface points to upper surface points  
+  call d_SplineAirfoilInterpolation(nPt,xseedt,zseedt,nPb,xseedb,zseedb,zseedb_interpolated)
+  
+  ! calculate thickness and camber distributions
+  
+  zthick=zseedt-zseedb_interpolated
+  zcamber=(zseedt+zseedb_interpolated)/2.0d0
+
+ do i=1,nPt
+    xspline(i)=xseedt(nPt+1-i)
+    zspline(i)=zseedt(nPt+1-i)
+  end do
+  
+  do i=2,nPb
+    xspline(i-1+nPt)=xseedb(i)
+    zspline(i-1+nPt)=zseedb(i)
+  end do
+    
+  curvaturethick=curvature(nPt, xseedt, zthick)
+  curvaturecamber=curvature(nPt, xseedt, zcamber)
+  
+  first_derivative_thick=first_derivative(nPt, xseedt, zthick)
+  first_derivative_camber=first_derivative(nPt, xseedt, zcamber)
+  
+  ! initialize xBPP
+  xBPP=0.d0
+  
+  ! get Xt_max,Yt_max,Kt_max
+
+  do i=1,nPt
+    if (xBPP(2) .LT. zthick(i)) then
+      xBPP(1)=xseedt(i)
+      xBPP(2)=zthick(i)
+      xBPP(3)=curvaturethick(i)
+    end if
+  end do
+  
+  ! get Xc_max,Yc_max,Kc_max
+
+  do i=1,nPt
+    if (xBPP(5) .LT. zcamber(i)) then
+      xBPP(4)=xseedt(i)
+      xBPP(5)=zcamber(i)
+      xBPP(6)=curvaturecamber(i)
+    end if
+  end do
+  
+  ! get Rle
+  
+  xBPP(7) = 1.d0/curvaturethick(nPt)
+  
+  ! get Gamma_le,Alpha_te,Beta_te
+  
+  xBPP(8)=abs(atan(first_derivative_camber(1)))
+  xBPP(9)=-atan(first_derivative_camber(nPt))
+  xBPP(10)=-atan(first_derivative_thick(nPt))
+  
+  ! get Zte,dZte
+  
+  xBPP(11)= zcamber(nPt)
+  xBPP(12)= zthick(nPt)
+  
+  ! set output
+  modest(1:3)=xBPP(1:3)
+  modest(4)=xBPP(7)
+  modest(5)=xBPP(10)
+  
+  modesb(1:3)=xBPP(4:6)
+  modesb(4:5)=xBPP(8:9)
+
+end subroutine BPP_init
+
+ !**************************************************************************
+! Subroutine to interpolate values in a set of x,y data, given a value x
+!   and using spline interpolation. Note: Spline coefficients are computed.
+!**************************************************************************
+subroutine d_SplineAirfoilInterpolation(ntop,xtop,ytop,nbot,xbot,ybot,ybot_at_xtop)
+
+  ! Modules.
+!  use IMSL
+
+  ! Variable declaration.
+  implicit none
+
+  ! Parameters.
+
+  ! Input variables.
+  integer, intent(in) ::                        ntop, nbot           ! no. of data points
+  real*8, dimension(ntop), intent(in) ::       xtop,ytop     ! x,y coordinates
+  real*8, dimension(nbot), intent(in) ::       xbot,ybot     ! x,y coordinates
+
+  ! Output variables.
+  real*8, dimension(ntop), intent(out) ::          ybot_at_xtop               ! y coordinate of interpolated point
+
+  ! Local variables.
+  integer ::                                    i
+  integer :: N
+  real*8, dimension(ntop+nbot-1) :: S, X, XP, Y, YP
+  real*8 :: SLE, SOPP, SI
+  logical :: SILENT_MODE
+
+  interface
+    double precision function SEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function SEVAL
+  end interface 
+  
+  SILENT_MODE=.true.
+  N = ntop+nbot-1
+  do i=1,ntop
+  X(i)=xtop(ntop+1-i)
+  Y(i)=ytop(ntop+1-i)
+  end do
+  
+  do i=2,nbot
+  X(i-1+ntop)=xbot(i)
+  Y(i-1+ntop)=ybot(i)
+  end do
+
+  CALL SCALC(X,Y,S,N)
+  CALL SEGSPL(X,XP,S,N)
+  CALL SEGSPL(Y,YP,S,N)
+  CALL LEFIND(SLE,X,XP,Y,YP,S,N,SILENT_MODE)
+  
+  i=1
+  SI=S(i)
+  do while(S(i) .LE. SLE)
+    call SOPPS(SOPP, SI, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    ybot_at_xtop(ntop+1-i) = SEVAL(SOPP,Y,YP,S,N)
+    i=i+1
+    SI=S(i)
+  end do
+  return
+  
+end subroutine d_SplineAirfoilInterpolation
+
+!=============================================================================80
+!
+! Computes curvature for a function gam(s) = x(s) + y(s)
+!
+!=============================================================================80
+function curvature(npt, x, y)
+
+  integer, intent(in) :: npt
+  double precision, dimension(npt), intent(in) :: x, y
+  double precision, dimension(npt) :: curvature
+
+  integer :: i
+  double precision, dimension(npt) :: svec
+  double precision :: xs, ys, xs2, ys2
+
+! Airfoil length vector s 
+
+  svec(1) = 0.d0
+  do i = 2, npt
+    svec(i) = svec(i-1) + sqrt((x(i)-x(i-1))**2.d0 + (y(i)-y(i-1))**2.d0)
+  end do
+
+! Compute first and second derivatives and curvature vector
+
+  do i = 1, npt
+
+    if (i == 1) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = derv1f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys = derv1f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      xs2 = derv2f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys2 = derv2f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+
+    elseif (i == npt) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = derv1b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys = derv1b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      xs2 = derv2b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys2 = derv2b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      
+    else
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = derv1c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys = derv1c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      xs2 = derv2c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys2 = derv2c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+
+    end if
+
+!   Curvature
+
+    curvature(i) = (xs*ys2 - ys*xs2) / (xs**2.d0 + ys**2.d0)**1.5d0
+
+  end do
+
+end function curvature
+
+!=============================================================================80
+!
+! Computes first derivative for a function gam(s) = x(s) + y(s)
+!
+!=============================================================================80
+function first_derivative(npt, x, y)
+
+  integer, intent(in) :: npt
+  double precision, dimension(npt), intent(in) :: x, y
+  double precision, dimension(npt) :: first_derivative
+
+  integer :: i
+  double precision, dimension(npt) :: svec
+  double precision :: xs, ys, xs2, ys2
+
+! Airfoil length vector s 
+
+  svec(1) = 0.d0
+  do i = 2, npt
+    svec(i) = svec(i-1) + sqrt((x(i)-x(i-1))**2.d0 + (y(i)-y(i-1))**2.d0)
+  end do
+
+! Compute first and second derivatives and curvature vector
+
+  do i = 1, npt
+
+    if (i == 1) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = derv1f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys = derv1f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      xs2 = derv2f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys2 = derv2f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+
+    elseif (i == npt) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = derv1b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys = derv1b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      xs2 = derv2b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys2 = derv2b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      
+    else
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = derv1c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys = derv1c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      xs2 = derv2c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys2 = derv2c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+
+    end if
+
+!   Curvature
+
+    first_derivative(i) = ys/xs
+
+  end do
+
+end function first_derivative
+
+
+!=============================================================================80
+!
+! Forward difference approximation for first derivative (2nd order),non uniform
+!
+!=============================================================================80
+function derv1f(u_plus2, u_plus1, u, h1 ,h2)
+
+  double precision, intent(in) :: u_plus2, u_plus1, u, h1, h2
+  double precision :: derv1f
+
+  derv1f = (h1+h2)/(h1*h2)*(u_plus1-u)-(h1)/(h1*h2+h2**2.d0)*(u_plus2-u)
+
+end function derv1f
+
+
+!=============================================================================80
+!
+! Backward difference approximation for first derivative (2nd order),non uniform
+!
+!=============================================================================80
+function derv1b(u_minus2, u_minus1, u, h1, h2)
+
+  double precision, intent(in) :: u_minus2, u_minus1, u, h1, h2
+  double precision :: derv1b
+
+  derv1b = (h2)/(h1*h2+h1**2.d0)*(u_minus2-u)-(h1+h2)/(h1*h2)*(u_minus1-u)
+
+end function derv1b
+
+!=============================================================================80
+!
+! Central difference approximation for first derivative (2nd order),non uniform
+!
+!=============================================================================80
+function derv1c(u_plus, u, u_minus, h1, h2)
+
+  double precision, intent(in) :: u_plus, u, u_minus, h1, h2
+  double precision :: derv1c
+
+  derv1c = -(h2)/(h1**2.d0+h1*h2)*(u_minus-u)+(h1)/(h2**2.d0+h1*h2)*(u_plus-u)
+
+end function derv1c
+
+!=============================================================================80
+!
+! Forward difference approximation for second-order derivative,non uniform
+!
+!=============================================================================80
+function derv2f(u_plus2, u_plus, u, h1, h2)
+
+  double precision, intent(in) :: u_plus2, u_plus, u, h1, h2
+  double precision :: derv2f
+
+  derv2f = 2.d0/(h2*(h1+h2))*(u_plus2-u)-2.d0/(h1*h2)*(u_plus-u)
+
+end function derv2f
+
+!=============================================================================80
+!
+! Backward difference approximation for second-order derivative,non uniform
+!
+!=============================================================================80
+function derv2b(u_minus2, u_minus, u, h1, h2)
+
+  double precision, intent(in) :: u_minus2, u_minus, u, h1, h2
+  double precision :: derv2b
+
+  derv2b = 2.d0/(h2*(h1+h2))*(u_minus2-u)-2.d0/(h1*h2)*(u_minus-u)
+
+end function derv2b
+
+!=============================================================================80
+!
+! Central difference approximation for second-order derivative,non uniform
+!
+!=============================================================================80
+function derv2c(u_plus, u, u_minus, h1, h2)
+
+  double precision, intent(in) :: u_plus, u, u_minus, h1, h2
+  double precision :: derv2c
+
+  derv2c = 2.d0/(h1*(h1+h2))*(u_minus-u)+2.d0/(h2*(h1+h2))*(u_plus-u)
+
+end function derv2c
+
 end module parametrization_constr
   
