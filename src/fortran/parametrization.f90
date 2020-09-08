@@ -37,6 +37,8 @@ subroutine allocate_parametrization(nmodest, nmodesb, npointst, npointsb, shapet
   
   elseif (trim(shapetype) == 'b-spline') then
     !call allocate_b_matrix(nmodest, nmodesb, npointst, npointsb)
+  
+  elseif (trim(shapetype) == 'bezier-parsec') then
     
   else
 
@@ -61,7 +63,9 @@ subroutine deallocate_parametrization()
   
   elseif (trim(shape_functions) == 'b-spline') then
     !call deallocate_b_matrix()
-    
+  
+  elseif (trim(shape_functions) == 'bezier-parsec') then
+  
   else
 
     write(*,*)
@@ -108,6 +112,12 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
     ! 
     nmodestop = size(modestop,1)
     nmodesbot = size(modesbot,1)
+    
+  elseif (trim(shapetype) == 'bezier-parsec') then
+    ! all parameters set on top
+    nmodestop = 11
+    nmodesbot = 0
+  
   else
 
     write(*,*)
@@ -164,7 +174,10 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
     call BSP_airfoil(upointst, xt_seed, zt_seed, upointsb, xb_seed, zb_seed,   &
       xcontrolt, xcontrolb, modest, modesb, zt_new, zb_new,    &
       symmetrical)
+  
+  elseif (trim(shapetype) == 'bezier-parsec') then
 
+    
   else
 
     write(*,*)
@@ -223,7 +236,12 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
       ndvs_top = (nparams_top-2)*2-1
       ndvs_bot = (nparams_bot-2)*2-1
     end if
+  
+  elseif (trim(parametrization_type) == 'bezier-parsec') then
     
+    ndvs_top = nparams_top
+    ndvs_bot = nparams_bot
+  
   else
 
     write(*,*)
@@ -322,8 +340,19 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
       ndvs_top + ndvs_bot_actual + nflap_optimize + int_x_flap_spec
       counter = counter + 1
       constrained_dvs(counter) = i
+      end do
+  
+  elseif (trim(parametrization_type) == 'bezier-parsec') then
+    !     For bezier-parsec, we will only constrain the flap deflection
+    
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    counter = 0
+    do i = ndvs_top + ndvs_bot_actual + 1,                                     &
+      ndvs_top + ndvs_bot_actual + nflap_optimize + int_x_flap_spec
+      counter = counter + 1
+      constrained_dvs(counter) = i
     end do
-            
+      
   else
 
     write(*,*)
@@ -427,6 +456,20 @@ subroutine parametrization_init(optdesign, x0)
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
   
+  elseif (trim(shape_functions) == 'bezier-parsec') then
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+
+    x0(1:nshapedvtop) = modest_seed
+    x0(nshapedvtop+1:nfuncs) = modesb_seed
+
+    !   Seed flap deflection as specified in input file
+
+    do i = nfuncs + 1, ndv - int_x_flap_spec
+      oppoint = flap_optimize_points(i-nfuncs)
+      x0(i) = flap_degrees(oppoint)*ffact
+    end do
+    if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+    
   else
     
     write(*,*)
@@ -534,6 +577,21 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
       xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
       xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
     end if  
+    
+  elseif (trim(shape_functions) == 'bezier-parsec') then
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    
+    xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
+    xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
+    xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
+    xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+    
+    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    if (int_x_flap_spec == 1) then
+      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+    end if  
   
   else
 
@@ -594,7 +652,10 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     call BSP_airfoil(upointst, xseedt, zseedt, upointsb, xseedb, zseedb,       &
       xcontrolt, xcontrolb, modest_seed, modesb_seed,  &
       zseedt_new, zseedb_new, symmetrical)
-  
+    
+  elseif (trim(shape_functions) == 'bezier-parsec') then
+
+    
   else
 
     write(*,*)

@@ -33,7 +33,7 @@ module airfoil_operations
 !
 !=============================================================================80
 subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
-                            xoffset, zoffset, foilscale)
+                            xoffset, zoffset, foilscale, foilangle)
 
   use vardef,             only : airfoil_type
   use xfoil_driver,       only : smooth_paneling
@@ -43,7 +43,7 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
   character(*), intent(in) :: seed_airfoil, airfoil_file
   type(naca_options_type), intent(in) :: naca_options
   type(airfoil_type), intent(out) :: foil
-  double precision, intent(out) :: xoffset, zoffset, foilscale
+  double precision, intent(out) :: xoffset, zoffset, foilscale, foilangle
 
   type(airfoil_type) :: tempfoil
   integer :: pointsmcl
@@ -80,7 +80,7 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
 
 ! Translate and scale
 
-  call transform_airfoil(foil, xoffset, zoffset, foilscale)
+  call transform_airfoil(foil, xoffset, zoffset, foilscale, foilangle)
 
 end subroutine get_seed_airfoil
 
@@ -377,18 +377,29 @@ end subroutine le_find
 ! leading edge is at the origin. Also outputs transformations performed.
 !
 !=============================================================================80
-subroutine transform_airfoil(foil, xoffset, zoffset, foilscale)
+subroutine transform_airfoil(foil, xoffset, zoffset, foilscale, foilangle)
 
   use vardef, only : airfoil_type
 
   type(airfoil_type), intent(inout) :: foil
-  double precision, intent(out) :: xoffset, zoffset, foilscale
+  double precision, intent(out) :: xoffset, zoffset, foilscale, foilangle
 
   integer :: npoints, i
+  double precision :: xte_foil, zte_foil 
+  double precision, dimension(2,2) :: R
+  double precision, dimension(2,1) :: X
 
   npoints = foil%npoint
-
-! Translate so that the leading edge is at the origin
+  
+  ! Get trailing edge
+  xte_foil = 0.5d0*(foil%x(1)+foil%x(npoints))
+  zte_foil = 0.5d0*(foil%z(1)+foil%z(npoints))
+  
+  foilangle = -atan(-(foil%zle-zte_foil)/(foil%xle-xte_foil))
+    
+  foilscale = 1.d0 / ((foil%zle-zte_foil)**2.0+(foil%xle-xte_foil)**2.0)**0.5
+  
+  ! Translate so that the leading edge is at the origin
 
   do i = 1, npoints
     foil%x(i) = foil%x(i) - foil%xle
@@ -399,9 +410,26 @@ subroutine transform_airfoil(foil, xoffset, zoffset, foilscale)
   foil%xle = 0.d0
   foil%zle = 0.d0
 
-! Scale airfoil so that it has a length of 1
+  ! Rotate airfoil so that angle of atack is 0
+  
+    ! set up rotation matrix
+  R(1,1) = cos(foilangle)
+  R(1,2) = sin(foilangle)
+  R(2,1) = -sin(foilangle)
+  R(2,2) = cos(foilangle)
+  
+  do i = 1, npoints
+    X(1,1) = foil%x(i)
+    X(2,1) = foil%z(i)
+    
+    X = matmul(R,X)
+    
+    foil%x(i) = X(1,1)
+    foil%z(i) = X(2,1)
+  end do
+    
+  ! Scale airfoil so that it has a chord of 1
 
-  foilscale = 1.d0 / maxval(foil%x)
   do i = 1, npoints
     foil%x(i) = foil%x(i)*foilscale
     foil%z(i) = foil%z(i)*foilscale

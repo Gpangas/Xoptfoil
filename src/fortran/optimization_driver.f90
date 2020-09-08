@@ -45,7 +45,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   type(naca_options_type) :: dummy_naca_options
   integer :: pointst, pointsb
   double precision, dimension(:), allocatable :: zttmp, zbtmp
-  double precision :: xoffmatch, zoffmatch, scale_match
+  double precision :: xoffmatch, zoffmatch, scale_match, angle_match
 
   write(*,*) 'Note: using the optimizer to match the seed airfoil to the '
   write(*,*) 'airfoil about to be loaded.'
@@ -60,7 +60,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
 ! Load airfoil to match
 
   call get_seed_airfoil('from_file', matchfoil_file, dummy_naca_options,       &
-                        match_foil, xoffmatch, zoffmatch, scale_match)
+                        match_foil, xoffmatch, zoffmatch, scale_match, angle_match)
 
 ! Split match_foil into upper and lower halves
 

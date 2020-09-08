@@ -52,7 +52,7 @@ module vardef
   integer :: nflap_optimize          ! Number of operating points where flap 
                                      !   setting will be optimized
   integer, dimension(max_op_points) :: flap_optimize_points
-  double precision :: xoffset, zoffset, foilscale
+  double precision :: xoffset, zoffset, foilscale, foilangle
 
   type(airfoil_type) :: curr_foil
   ! added min_flap_x and max_flap_x

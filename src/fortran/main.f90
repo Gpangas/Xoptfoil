@@ -71,7 +71,7 @@ program main
   ! Load seed airfoil into memory, including transformations and smoothing
 
   call get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, buffer_foil, &
-                        xoffset, zoffset, foilscale)
+                        xoffset, zoffset, foilscale, foilangle)
 
   ! Split up seed airfoil into upper and lower surfaces
 
@@ -81,9 +81,6 @@ program main
   allocate(xseedb(pointsb))
   allocate(zseedb(pointsb))
   call split_airfoil(buffer_foil, xseedt, xseedb, zseedt, zseedb, symmetrical)
-  
-  !Rotate Airfoil to put TE at (1,0) 
-  call RotateAirfoil(xseedt, xseedb, zseedt, zseedb)
 
   ! Deallocate the buffer airfoil (no longer needed)
 
