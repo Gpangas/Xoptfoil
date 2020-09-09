@@ -84,7 +84,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   integer :: i, j, nvars, stat, designcounter, restartcounter, iunit, ioerr,   &
              prevsteps, k, ncommands
   logical :: converged, needshrink, signal_progress, new_history_file
-  double precision :: stepstart, steptime, restarttime
+  integer :: stepstart, steptime, restarttime
   character(14) :: timechar
   character(3) :: filestat
   character(11) :: stepchar
@@ -201,7 +201,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   end if
 
   ! Begin time
-  call cpu_time(stepstart)
+  stepstart=time()
 
   ! Iterative procedure for optimization
 
@@ -267,7 +267,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     end if
     
     !  Get step time
-    call cpu_time(steptime)
+    steptime=time()
     
 !   Write iteration history
 
@@ -275,7 +275,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     write(stepchar,'(I11)') step
     write(fminchar,'(F14.10)') fmin
     write(radchar,'(ES14.6)') radius
-    write(timechar,'(F10.3)') (steptime-stepstart)+restarttime
+    write(timechar,'(I14)') (steptime-stepstart)+restarttime
     if (ds_options%relative_fmin_report) then
       write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
       write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
@@ -448,7 +448,7 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, t
   double precision, dimension(:,:), intent(in) :: dv
   double precision, dimension(:), intent(in) :: objvals
   double precision, intent(in) :: f0
-  double precision, intent(in) :: time
+  integer, intent(in) :: time
 
   character(100) :: restfile
   integer :: iunit
@@ -496,7 +496,7 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals, ti
   double precision, dimension(:,:), intent(inout) :: dv
   double precision, dimension(:), intent(inout) :: objvals
   double precision, intent(out) :: f0
-  double precision, intent(out) :: time
+  integer, intent(out) :: time
 
   character(100) :: restfile
   integer :: iunit, ioerr

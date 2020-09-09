@@ -102,7 +102,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   double precision, dimension(size(xmin,1),pso_options%pop) :: dv, vel,        &
                                                                bestdesigns
   logical :: use_x0, converged, signal_progress, new_history_file
-  double precision :: stepstart, steptime, restarttime 
+  integer :: stepstart, steptime, restarttime
   character(14) :: timechar
   character(11) :: stepchar
   character(20) :: fminchar
@@ -252,8 +252,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   end if
 
   ! Begin time
-  call cpu_time(stepstart)
-
+  stepstart=time()
   ! Begin optimization
 
   restartcounter = 1
@@ -376,14 +375,14 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
     end if
 
     !  Get step time
-    call cpu_time(steptime)
+    steptime=time()
     
 !   Write iteration history
 
     write(stepchar,'(I11)') step
     write(fminchar,'(F14.10)') fmin
     write(radchar,'(ES14.6)') radius
-    write(timechar,'(F10.3)') (steptime-stepstart)+restarttime
+    write(timechar,'(I14)') (steptime-stepstart)+restarttime
     if (pso_options%relative_fmin_report) then
       write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
       write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
@@ -466,7 +465,7 @@ subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
   double precision, dimension(:,:), intent(in) :: dv, vel, bestdesigns
   double precision, dimension(:), intent(in) :: objval, speed, minvals
   double precision, intent(in) :: wcurr
-  double precision, intent(in) :: time
+  integer, intent(in) :: time
 
   character(100) :: restfile
   integer :: iunit
@@ -518,7 +517,7 @@ subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
   double precision, dimension(:,:), intent(inout) :: dv, vel, bestdesigns
   double precision, dimension(:), intent(inout) :: objval, speed, minvals
   double precision, intent(out) :: wcurr
-  double precision, intent(out) :: time
+  integer, intent(out) :: time
 
   character(100) :: restfile
   integer :: iunit, ioerr
