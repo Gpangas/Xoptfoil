@@ -175,12 +175,12 @@ function aero_objective_function(designvars, include_penalty)
 ! and scaling to ensure Cm_x=0.25 doesn't change.
 
   do i = 1, nptt
-    curr_foil%x(i) = xseedt(nptt-i+1)/foilscale - xoffset
-    curr_foil%z(i) = zt_new(nptt-i+1)/foilscale - zoffset
+    curr_foil%x(i) = xseedt(nptt-i+1)!/foilscale - xoffset
+    curr_foil%z(i) = zt_new(nptt-i+1)!/foilscale - zoffset
   end do
   do i = 1, nptb-1
-    curr_foil%x(i+nptt) = xseedb(i+1)/foilscale - xoffset
-    curr_foil%z(i+nptt) = zb_new(i+1)/foilscale - zoffset
+    curr_foil%x(i+nptt) = xseedb(i+1)!/foilscale - xoffset
+    curr_foil%z(i+nptt) = zb_new(i+1)!/foilscale - zoffset
   end do
 
 ! Check geometry before running Xfoil: growth rates, LE and TE angles, etc.
@@ -750,12 +750,12 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 ! Format coordinates in a single loop in derived type
 
   do i = 1, nptt
-    curr_foil%x(i) = xseedt(nptt-i+1)/foilscale - xoffset
-    curr_foil%z(i) = zt_new(nptt-i+1)/foilscale - zoffset
+    curr_foil%x(i) = xseedt(nptt-i+1)!/foilscale - xoffset
+    curr_foil%z(i) = zt_new(nptt-i+1)!/foilscale - zoffset
   end do
   do i = 1, nptb-1
-    curr_foil%x(i+nptt) = xseedb(i+1)/foilscale - xoffset
-    curr_foil%z(i+nptt) = zb_new(i+1)/foilscale - zoffset
+    curr_foil%x(i+nptt) = xseedb(i+1)!/foilscale - xoffset
+    curr_foil%z(i+nptt) = zb_new(i+1)!/foilscale - zoffset
   end do
 
 ! Check that number of flap optimize points are correct
@@ -947,12 +947,12 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
 ! Format coordinates in a single loop in derived type
 
   do i = 1, nptt
-    curr_foil%x(i) = xseedt(nptt-i+1)/foilscale - xoffset
-    curr_foil%z(i) = zt_new(nptt-i+1)/foilscale - zoffset
+    curr_foil%x(i) = xseedt(nptt-i+1)!/foilscale - xoffset
+    curr_foil%z(i) = zt_new(nptt-i+1)!/foilscale - zoffset
   end do
   do i = 1, nptb-1
-    curr_foil%x(i+nptt) = xseedb(i+1)/foilscale - xoffset
-    curr_foil%z(i+nptt) = zb_new(i+1)/foilscale - zoffset
+    curr_foil%x(i+nptt) = xseedb(i+1)!/foilscale - xoffset
+    curr_foil%z(i+nptt) = zb_new(i+1)!/foilscale - zoffset
   end do
 
 ! Set output file names and identifiers

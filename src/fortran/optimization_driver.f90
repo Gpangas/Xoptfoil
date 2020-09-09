@@ -390,12 +390,12 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   final_airfoil%npoint = nptt + nptb - 1
   call allocate_airfoil(final_airfoil)
   do i = 1, nptt
-    final_airfoil%x(i) = xseedt(nptt-i+1)/foilscale - xoffset
-    final_airfoil%z(i) = zt_new(nptt-i+1)/foilscale - zoffset
+    final_airfoil%x(i) = xseedt(nptt-i+1)!/foilscale - xoffset
+    final_airfoil%z(i) = zt_new(nptt-i+1)!/foilscale - zoffset
   end do
   do i = 1, nptb - 1
-   final_airfoil%x(i+nptt) = xseedb(i+1)/foilscale - xoffset
-   final_airfoil%z(i+nptt) = zb_new(i+1)/foilscale - zoffset
+   final_airfoil%x(i+nptt) = xseedb(i+1)!/foilscale - xoffset
+   final_airfoil%z(i+nptt) = zb_new(i+1)!/foilscale - zoffset
   end do
 
 ! Use Xfoil to analyze final design

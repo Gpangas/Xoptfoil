@@ -92,12 +92,12 @@ subroutine check_seed()
 ! and scaling to ensure Cm_x=0.25 doesn't change.
 
   do i = 1, nptt
-    curr_foil%x(i) = xseedt(nptt-i+1)/foilscale - xoffset
-    curr_foil%z(i) = zseedt(nptt-i+1)/foilscale - zoffset
+    curr_foil%x(i) = xseedt(nptt-i+1)!/foilscale - xoffset
+    curr_foil%z(i) = zseedt(nptt-i+1)!/foilscale - zoffset
   end do
   do i = 1, nptb-1
-    curr_foil%x(i+nptt) = xseedb(i+1)/foilscale - xoffset
-    curr_foil%z(i+nptt) = zseedb(i+1)/foilscale - zoffset
+    curr_foil%x(i+nptt) = xseedb(i+1)!/foilscale - xoffset
+    curr_foil%z(i+nptt) = zseedb(i+1)!/foilscale - zoffset
   end do
   
 ! Too blunt or sharp leading edge
@@ -162,7 +162,7 @@ subroutine check_seed()
       gapallow = tegap + 2.d0 * heightfactor * (x_interp(nptint) -             &
                                                 x_interp(i))
       if (thickness(i) < gapallow) then
-        xtrans = x_interp(i)/foilscale - xoffset
+        xtrans = x_interp(i)!/foilscale - xoffset
         write(text,'(F8.4)') xtrans
         text = adjustl(text)
         write(*,*) "Detected too thin at x = "//trim(text)
@@ -244,10 +244,10 @@ subroutine check_seed()
       if (abs(curvt(i)) >= curv_threshold) then
         curv2 = curvt(i)
         if (curv2*curv1 < 0.d0) then
-          xtrans = xseedt(i)/foilscale - xoffset
+          xtrans = xseedt(i)!/foilscale - xoffset
           write(text,'(F8.4)') xtrans
           text = adjustl(text)
-          ztrans = zseedt(i)/foilscale - zoffset
+          ztrans = zseedt(i)!/foilscale - zoffset
           write(text2,'(F8.4)') ztrans
           text2 = adjustl(text2)
           write(*,*) "Curvature reversal on top surface near (x, z) = ("//&
@@ -272,10 +272,10 @@ subroutine check_seed()
       if (abs(curvb(i)) >= curv_threshold) then
         curv2 = curvb(i)
         if (curv2*curv1 < 0.d0) then
-          xtrans = xseedb(i)/foilscale - xoffset
+          xtrans = xseedb(i)!/foilscale - xoffset
           write(text,'(F8.4)') xtrans
           text = adjustl(text)
-          ztrans = zseedb(i)/foilscale - zoffset
+          ztrans = zseedb(i)!/foilscale - zoffset
           write(text2,'(F8.4)') ztrans
           text2 = adjustl(text2)
           write(*,*) "Curvature reversal on bot surface near (x, z) = ("//&
