@@ -904,5 +904,157 @@ endif
 return
 END
 
+!=============================================================================80
+!
+! interpolation subroutine to get zo at xi from spline defined by xt,zt,xb.zb
+!
+!=============================================================================80
+SUBROUTINE spline_interp(ntop,xtop,ztop,nbot,xbot,zbot,                  &
+  nitop,xitop,zotop,nibot,xibot,zobot)
+  
+  integer, intent(in) :: ntop,nbot,nitop,nibot
+  real*8, dimension(ntop), intent(in) :: xtop,ztop
+  real*8, dimension(nbot), intent(in) :: xbot,zbot
+  real*8, dimension(nitop), intent(in) :: xitop
+  real*8, dimension(nibot), intent(in) :: xibot
+  real*8, dimension(nitop), intent(out) :: zotop
+  real*8, dimension(nibot), intent(out) :: zobot
+  
+  interface
+    double precision function SEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function SEVAL
+  end interface 
+  
+  integer :: N
+  real*8, dimension(size(xtop,1)+size(xbot,1)-1) :: X,XP,Y,YP,S
+  real*8 :: SLE, SINTERP
+  logical :: SILENT_MODE, INDICATOR
+  integer :: i
+    
+  ! create the spline 
+  SILENT_MODE=.true.
+  
+  N = ntop+nbot-1
+  do i=1,ntop
+  X(i)=xtop(ntop+1-i)
+  Y(i)=ztop(ntop+1-i)
+  end do
+  
+  do i=2,nbot
+  X(i-1+ntop)=xbot(i)
+  Y(i-1+ntop)=zbot(i)
+  end do
+
+  ! get spline parameters
+  
+  CALL SCALC(X,Y,S,N)
+  CALL SEGSPL(X,XP,S,N)
+  CALL SEGSPL(Y,YP,S,N)
+  CALL LEFIND(SLE,X,XP,Y,YP,S,N,SILENT_MODE)
+  
+  ! interpolate top
+
+ INDICATOR = .TRUE.
+  do i = 1, nitop
+    call XINTERPS(SINTERP, xitop(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    zotop(i) = SEVAL(SINTERP,Y,YP,S,N)
+  end do
+
+  ! interpolate bot
+
+  INDICATOR = .FALSE.
+  do i = 1, nibot
+    call XINTERPS(SINTERP, xibot(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    zobot(i) = SEVAL(SINTERP,Y,YP,S,N)
+  end do
+  
+END SUBROUTINE spline_interp
+
+!=============================================================================80
+!
+!     Calculates arc length SINTERP of point 
+!     which is has the same x coordinate   
+!     of point XI
+!
+!=============================================================================80
+SUBROUTINE XINTERPS(SINTERP, XI, INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    
+  integer, intent(in) :: N
+  real*8, dimension(N), intent(in) :: X,XP,Y,YP,S
+  real*8, intent(in) :: XI
+  logical, intent(inout) :: INDICATOR ! true = 'top' or  false = 'bot'
+  real*8, intent(in) :: SLE
+  logical, intent(in) :: SILENT_MODE
+  real*8, intent(out) :: SINTERP
+  
+  real*8 :: SLEN, XLE, XTE, XFRAC, RES, RESD, DSINTERP, XINTERP, XINTERPD
+  integer :: ITER
+  
+  interface
+    double precision function SEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function SEVAL
+  end interface 
+    
+  interface
+    double precision function DEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function DEVAL
+  end interface 
+  
+  !---- reference length for testing convergence
+  SLEN = S(N) - S(1)
+
+  !---- check if INDICATOR = TRUE is top
+  if (Y(N-1) .GT. Y(2)) INDICATOR = (.NOT. INDICATOR)
+  
+  !---- intial value for SINTERP
+  XLE = SEVAL(SLE,X,XP,S,N)
+  XTE = 0.5*(X(1)+X(N))
+  
+  XFRAC = (XI-XLE)/(XTE-XLE)
+  
+  if (INDICATOR) then
+    SINTERP = SLE + XFRAC*(S(1)-SLE)
+  else
+    SINTERP = SLE + XFRAC*(S(N)-SLE)
+  end if
+
+  !---- converge on exact opposite point with same XI value
+  DO 300 ITER=1, 100
+    XINTERP  = SEVAL(SINTERP,X,XP,S,N)
+    XINTERPD = DEVAL(SINTERP,X,XP,S,N)
+
+    RES  =  XINTERP - XI
+    RESD =  XINTERPD
+
+    IF(ABS(RES)/SLEN .LT. 1.0E-8) GO TO 305
+    IF(RESD .EQ. 0.0) GO TO 303
+
+    DSINTERP = -RES/RESD
+    SINTERP = SINTERP + DSINTERP
+
+    IF(ABS(DSINTERP)/SLEN .LT. 1.0E-8) GO TO 305
+  300  CONTINUE
+  !     DP mod: added SILENT_MODE option
+  303  IF (.NOT. SILENT_MODE) WRITE(*,*)                                       &
+       'SOPPS: Opposite-point location failed. Continuing...'
+  if (INDICATOR) then
+    SINTERP = SLE + XFRAC*(S(1)-SLE)
+  else
+    SINTERP = SLE + XFRAC*(S(N)-SLE)
+  end if
+
+  305  CONTINUE
+  RETURN
+END SUBROUTINE XINTERPS
+
 end module math_deps
 

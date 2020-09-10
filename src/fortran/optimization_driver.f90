@@ -32,11 +32,12 @@ module optimization_driver
 subroutine matchfoils_preprocessing(matchfoil_file)
 
   use vardef,             only : airfoil_type, xmatcht, xmatchb, zmatcht,      &
-                                 zmatchb, xseedt, xseedb, symmetrical
+                                 zmatchb, xseedt, xseedb, zseedt, zseedb,      &
+                                 symmetrical
   use memory_util,        only : deallocate_airfoil
   use airfoil_operations, only : get_seed_airfoil, get_split_points,           &
                                  split_airfoil, my_stop
-  use math_deps,          only : interp_vector
+  use math_deps,          only : interp_vector, spline_interp
   use naca,               only : naca_options_type
 
   character(*), intent(in) :: matchfoil_file
@@ -46,7 +47,10 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   integer :: pointst, pointsb
   double precision, dimension(:), allocatable :: zttmp, zbtmp
   double precision :: xoffmatch, zoffmatch, scale_match, angle_match
-
+  double precision ::TE_seed, TE_match, TE_ratio, TE_dif
+  character :: choice
+  logical :: valid_choice
+  
   write(*,*) 'Note: using the optimizer to match the seed airfoil to the '
   write(*,*) 'airfoil about to be loaded.'
   write(*,*)
@@ -83,10 +87,56 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   allocate(zbtmp(pointsb))
   zttmp(pointst) = zmatcht(size(zmatcht,1))
   zbtmp(pointsb) = zmatchb(size(zmatchb,1))
-  call interp_vector(xmatcht, zmatcht, xseedt(1:pointst-1),                    &
-                     zttmp(1:pointst-1))
-  call interp_vector(xmatchb, zmatchb, xseedb(1:pointsb-1),                    &
-                     zbtmp(1:pointsb-1))
+
+  ! compare TE of match with seed
+  TE_seed=zseedt(pointst)-zseedb(pointsb)
+  TE_match=zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1))
+  TE_dif=TE_seed-TE_match
+  TE_ratio=TE_seed/TE_match
+  
+  write(*,*)
+  write(*,*) 'Trailing Edge of seed foil  = ', TE_seed
+  write(*,*) 'Trailing Edge of match foil = ', TE_match
+  write(*,*) 'Trailing Edge difference    = ', TE_dif
+  write(*,*) 'Trailing Edge ratio         = ', TE_ratio  
+  write(*,*) 
+  
+  ! scale match foil so that TE_dif=0
+  
+  valid_choice = .false.
+  do while (.not. valid_choice)
+  
+    write(*,'(A)', advance='no') 'Scale match foil so that Trailing Edge &
+      difference = 0 ? (y/n): '
+    read(*,'(A)') choice
+
+    if ( (choice == 'y') .or. (choice == 'Y') ) then
+      valid_choice = .true.
+      choice = 'y'
+      write(*,*)
+      write(*,*) 'Match foil scaled to eliminate difference'
+      write(*,*)
+      zmatcht=zmatcht*TE_ratio
+      zmatchb=zmatchb*TE_ratio
+      write(*,*) 'New Trailing Edge ratio    = ',                              &
+        (zseedt(pointst)-zseedb(pointsb)) /                                    &
+        (zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1)))
+      write(*,*)
+    else if ( ( choice == 'n') .or. (choice == 'N') ) then
+      valid_choice = .true.
+      choice = 'n'
+    else
+      write(*,'(A)') 'Please enter y or n.'
+      valid_choice = .false.
+    end if
+
+  end do
+  
+  ! interpolate points
+  
+  call spline_interp(pointst, xmatcht, zmatcht,  pointsb, xmatchb, zmatchb,    &
+  pointst-1, xseedt(1:pointst-1), zttmp(1:pointst-1),                          &
+  pointsb-1, xseedb(1:pointsb-1), zbtmp(1:pointsb-1))
 
 ! Re-set coordinates of foil to match from interpolated points
     
