@@ -158,8 +158,12 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   else
 
 !   Get initial simplex and counters from restart file
-
-    prevsteps = 0
+    if (.not. present(instep)) then
+      prevsteps = 0
+    else
+      prevsteps = instep
+    end if
+    
     call simplex_read_restart(step, designcounter, dv, objvals, f0, fevals,    &
                               restarttime)
 
