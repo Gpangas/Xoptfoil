@@ -119,7 +119,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
                     pso_options, ga_options, ds_options, restart,              &
                     restart_write_freq, optdesign, f0_ref, fmin, steps, fevals)
 
-  use vardef,             only : output_prefix 
+  use vardef,             only : output_prefix, global_search_stat,            &
+                                 local_search_stat, restart_stat
   use particle_swarm,     only : pso_options_type, particleswarm
   use genetic_algorithm,  only : ga_options_type, geneticalgorithm
   use simplex_search,     only : ds_options_type, simplexsearch
@@ -146,6 +147,11 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   character(19) :: restart_status
   character(14) :: stop_reason
 
+  ! Set search types
+  
+  global_search_stat=global_search
+  local_search_stat=local_search
+  
 ! Delete existing run_control file and rewrite it
 
   iunit = 23
@@ -182,6 +188,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
     restart_status = 'local_optimization'
   end if
 
+  restart_stat=restart_status
+  
 ! Read restart status from file for restart case
 
   if (restart) then
@@ -337,7 +345,8 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   use memory_util,        only : allocate_airfoil, deallocate_airfoil
   use airfoil_operations, only : airfoil_write
   use parametrization,    only : create_airfoil, parametrization_dvs
-  use airfoil_evaluation, only : xfoil_geom_options, xfoil_options
+  use airfoil_evaluation, only : xfoil_geom_options, xfoil_options,            &
+                                 get_last_design_parameters
   use xfoil_driver,       only : run_xfoil
 
   double precision, dimension(:), intent(in) :: optdesign
@@ -417,12 +426,10 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     actual_x_flap = optdesign(dvcounter)/fxfact + min_flap_x
     
 !   Run xfoil for requested operating points
+    !   Get lift, drag, moment, alpha, xtrt, xtrb
 
-    call run_xfoil(final_airfoil, xfoil_geom_options, op_point(1:noppoint),    &
-                   op_mode(1:noppoint), reynolds(1:noppoint), mach(1:noppoint),&
-                   use_flap, x_flap, y_flap, y_flap_spec,                      &
-                   actual_flap_degrees(1:noppoint), xfoil_options, lift, drag, &
-                   moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
+    call get_last_design_parameters(restart_stat, global_search_stat,          &
+      local_search_stat, lift, drag, moment, alpha, xtrt, xtrb)
 
 !   Write summary to screen and file
 
@@ -437,8 +444,10 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     write(iunit,'(A)')                                                         &
                    " ----------------------------------------------------------"
     if (int_x_flap_spec == 1) then
-      write(*,'(A13,F9.5)') " Flap chord: ", actual_x_flap
-      write(iunit,'(A13,F9.5)') " Flap chord: ", actual_x_flap
+      write(*,'(A,F9.5)') " Flap x hinge position: ", actual_x_flap
+      write(iunit,'(A,F9.5)') " Flap x hinge position: ", actual_x_flap
+      write(*,*)
+      write(iunit,*)
     end if
     
     do i = 1, noppoint

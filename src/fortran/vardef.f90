@@ -89,7 +89,9 @@ module vardef
   integer, parameter :: max_addthickconst = 10 ! remove limit?
   double precision, dimension(max_addthickconst) :: addthick_x, addthick_min,  &
                                                     addthick_max
-
+  character(19) :: restart_stat
+  character(80) :: global_search_stat, local_search_stat
+    
 !$omp threadprivate(curr_foil)
 
 end module vardef

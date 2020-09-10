@@ -1295,4 +1295,108 @@ function write_function_restart_cleanup(restart_status, global_search,         &
 
 end function write_function_restart_cleanup
 
+
+!=============================================================================80
+!
+! Cleans up unused designs written prior to a restart
+!
+!=============================================================================80
+subroutine get_last_design_parameters(restart_status, global_search,           &
+  local_search, lift_lt, drag_lt, moment_lt, alpha_lt, xtrt_lt, xtrb_lt)
+
+  character(*), intent(in) :: restart_status, global_search, local_search
+  double precision, dimension(noppoint) :: alpha_lt, lift_lt, drag_lt,         &
+                                           moment_lt, xtrt_lt, xtrb_lt
+
+  integer :: restunit, ioerr, step, designcounter, polarunit
+  integer :: i, j
+  double precision, dimension(:,:), allocatable :: alpha, lift, drag,          &
+                                                   moment, xtrt, xtrb
+  character(100) :: restfile, polarfile
+
+! Print status
+
+  restunit = 12
+  polarunit = 14
+
+! Read last written design from restart file
+
+  if (trim(restart_status) == 'global_optimization') then
+    if (trim(global_search) == 'particle_swarm') then
+      restfile = 'restart_pso_'//trim(output_prefix)
+    else if (trim(global_search) == 'genetic_algorithm') then
+      restfile = 'restart_ga_'//trim(output_prefix)
+    end if
+  else
+    if (trim(local_search) == 'simplex') then
+      restfile = 'restart_simplex_'//trim(output_prefix)
+    end if
+  end if
+
+  open(unit=restunit, file=restfile, status='old', form='unformatted',         &
+       iostat=ioerr)
+  read(restunit) step
+  read(restunit) designcounter
+  close(restunit)
+
+! Allocate size of data arrays
+
+  allocate(alpha(noppoint,designcounter+1))
+  allocate(lift(noppoint,designcounter+1))
+  allocate(drag(noppoint,designcounter+1))
+  allocate(moment(noppoint,designcounter+1))
+  allocate(xtrt(noppoint,designcounter+1))
+  allocate(xtrb(noppoint,designcounter+1))
+
+! Open polars file
+
+  polarfile = trim(output_prefix)//'_design_polars.dat'
+  open(unit=polarunit, file=polarfile, status='old', iostat=ioerr)
+
+! Skip file header
+
+  read(polarunit,*)
+  read(polarunit,*)
+
+! Read polars for each airfoil
+
+  do i = 1, designcounter + 1
+  
+!   Skip zone header
+
+    read(polarunit,*)
+
+!   Read polars
+
+    do j = 1, noppoint
+      read(polarunit,'(6ES14.6)') alpha(j,i), lift(j,i), drag(j,i),            &
+                                  moment(j,i), xtrt(j,i), xtrb(j,i)
+    end do
+
+  end do
+
+! Close polars file
+
+  close(polarunit)
+
+  ! Set output vectors
+  
+  alpha_lt = alpha(:,designcounter+1)
+  lift_lt = lift(:,designcounter+1)
+  drag_lt = drag(:,designcounter+1)
+  moment_lt = moment(:,designcounter+1)
+  xtrt_lt = xtrt(:,designcounter+1)
+  xtrb_lt = xtrb(:,designcounter+1)
+  
+! Deallocate data arrays
+
+  deallocate(lift)
+  deallocate(drag)
+  deallocate(moment)
+  deallocate(alpha)
+  deallocate(xtrt)
+  deallocate(xtrb)
+
+end subroutine get_last_design_parameters
+
 end module airfoil_evaluation
