@@ -224,7 +224,20 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   else
     if (ds_options%write_designs) write_designs = .true.
   end if
-    
+  
+  ! Set up stepsg
+  
+  if ((restart_status == 'local_optimization') .and.                            &
+    (trim(search_type) == 'global_and_local')) then 
+    if (trim(global_search) == 'genetic_algorithm') then
+      stepsg=ga_options%maxit
+    elseif (trim(global_search) == 'particle_swarm') then
+      stepsg=pso_options%maxit
+    end if
+  elseif(restart_status == 'local_optimization') then
+    stepsg=0
+  end if
+  
 ! Write seed airfoil coordinates and polars to file
 
   if (write_designs) then
@@ -239,7 +252,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 !     Remove unused entries in design polars and coordinates from previous run
  
       stat = write_function_restart_cleanup(restart_status, global_search,     &
-                                            local_search)
+                                            local_search, stepsg)
 
     end if
   end if
@@ -292,17 +305,6 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   end if
 
 ! Local optimization
-
-  if ((restart_status == 'local_optimization') .and.                            &
-    (trim(search_type) == 'global_and_local')) then 
-    if (trim(global_search) == 'genetic_algorithm') then
-      stepsg=ga_options%maxit
-    elseif (trim(global_search) == 'particle_swarm') then
-      stepsg=pso_options%maxit
-    end if
-  elseif(restart_status == 'local_optimization') then
-    stepsg=0
-  end if
   
   if (restart_status == 'local_optimization') then
 

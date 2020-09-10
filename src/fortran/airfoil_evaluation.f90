@@ -1019,9 +1019,10 @@ end function write_matchfoil_optimization_progress
 !
 !=============================================================================80
 function write_function_restart_cleanup(restart_status, global_search,         &
-                                        local_search)
+                                        local_search, prevstep)
 
   character(*), intent(in) :: restart_status, global_search, local_search
+  integer, intent(in) :: prevstep
   integer :: write_function_restart_cleanup
 
   integer :: restunit, ioerr, step, designcounter, foilunit, polarunit,        &
@@ -1029,7 +1030,8 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   integer :: i, j
   double precision, dimension(:,:), allocatable :: x, z, alpha, lift, drag,    &
                                                    moment, xtrt, xtrb
-  double precision, dimension(:), allocatable :: fmin, relfmin, rad, time
+  double precision, dimension(:), allocatable :: fmin, relfmin, rad
+  integer , dimension(:), allocatable :: time
   character(150), dimension(:), allocatable :: zoneinfo
   character(100) :: restfile, foilfile, polarfile, histfile, text
   character(11) :: stepchar
@@ -1083,10 +1085,10 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   allocate(xtrt(noppoint,designcounter+1))
   allocate(xtrb(noppoint,designcounter+1))
   allocate(zoneinfo(designcounter+1))
-  allocate(fmin(step))
-  allocate(relfmin(step))
-  allocate(rad(step))
-  allocate(time(step))
+  allocate(fmin(step+prevstep))
+  allocate(relfmin(step+prevstep))
+  allocate(rad(step+prevstep))
+  allocate(time(step+prevstep))
 
 ! Open coordinates file
 
@@ -1158,8 +1160,8 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   read(histunit,*)
 
 ! Read optimizer data at each iteration
-!write(*,*) step
-  do i = 1, step
+!write(*,*) step+prevstep
+  do i = 1, step+prevstep
     read(histunit,*) j, fmin(i), relfmin(i), rad(i), time(i)
   end do
 
@@ -1173,12 +1175,12 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   write(histunit,'(A)') "Iteration  Objective function  "//&
                         "% Improvement over seed  Design radius"//&
                          "  Time (seconds)"
-  do i = 1, step
+  do i = 1, step+prevstep
     write(stepchar,'(I11)') i
     write(fminchar,'(F14.10)') fmin(i)
     write(relfminchar,'(F14.10)') relfmin(i)
     write(radchar,'(ES14.6)') rad(i)
-    write(timechar,'(F10.3)') time(i)
+    write(timechar,'(I14)') time(i)
     write(histunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
                                          adjustl(relfminchar), adjustl(radchar), &
                                          adjustl(timechar)

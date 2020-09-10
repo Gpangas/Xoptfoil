@@ -214,13 +214,12 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   converged = .false.
   write(*,*) 'Simplex optimization progress:'
 
-  step = step + prevsteps
   main_loop: do while (.not. converged)
 
     step = step + 1
     ! '>=' instead of '==', to make sure it doesn't run after restart when max
     ! iterations has already been reached
-    if (step >= ds_options%maxit + prevsteps) converged = .true.
+    if (step >= ds_options%maxit) converged = .true.
 
 !   Sort according to ascending objective function value
 
@@ -243,7 +242,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
 !   Display progress
 
-    write(*,'(A12,I5)')   ' Iteration: ', step
+    write(*,'(A12,I5)')   ' Iteration: ', step + prevsteps
     write(*,'(A27,F9.6)') '   Objective function:    ', fmin
     if (ds_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')              &
                         '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
@@ -276,7 +275,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !   Write iteration history
 
     flush(iunit)
-    write(stepchar,'(I11)') step
+    write(stepchar,'(I11)') step + prevsteps
     write(fminchar,'(F14.10)') fmin
     write(radchar,'(ES14.6)') radius
     write(timechar,'(I14)') (steptime-stepstart)+restarttime
@@ -294,7 +293,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
     if (restartcounter == restart_write_freq) then
       ! 'step' to correct the number on simplex restart
-      call simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, (steptime-stepstart)+restarttime)
+      call simplex_write_restart(step, designcounter, dv, objvals,   &
+        f0,fevals, (steptime-stepstart)+restarttime)
       restartcounter = 1
     else
       restartcounter = restartcounter + 1
@@ -411,11 +411,6 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   xopt = dv(:,1)
   fmin = objvals(1)
 
-! Remove prevsteps from counter so we return just the number of steps for the
-! simplex search
-
-  step = step - prevsteps
-
 ! Check for convergence one more time
 
   radius = design_radius(dv)
@@ -434,7 +429,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 ! Write restart at end of optimization
 
   if (restartcounter /= 1)                                                     &
-    call simplex_write_restart(step+prevsteps, designcounter, dv, objvals, f0, &
+    call simplex_write_restart(step, designcounter, dv, objvals, f0, &
                                fevals, (steptime-stepstart)+restarttime)
 
 end subroutine simplexsearch
