@@ -74,7 +74,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                       mutant_probability, chromosome_mutation_rate,            &
                       mutation_range_factor
   integer :: nbot_actual, nmoment_constraint, nxtr_opt
-  integer :: i, iunit, ioerr, iostat1
+  integer :: i, j, iunit, ioerr, iostat1
   character(30) :: text
   character(3) :: family
   character(10) :: pso_convergence_profile, parents_selection_method
@@ -87,7 +87,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             restart_write_freq, write_designs
   namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
             use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, flap_selection,&
-            flap_degrees, weighting, optimization_type, ncrit_pt
+            flap_identical_op, flap_degrees, weighting, optimization_type,     &
+            ncrit_pt
   !added lift_constraint_type, min_lift, drag_constraint_type, max_drag
   !added min_flap_x, max_flap_x
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
@@ -169,6 +170,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   reynolds(:) = 1.0D+05
   mach(:) = 0.d0
   flap_selection(:) = 'specify'
+  flap_identical_op(:) = 0  
   flap_degrees(:) = 0.d0
   weighting(:) = 1.d0
   ncrit_pt(:) = -1.d0
@@ -213,8 +215,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   else
     int_x_flap_spec = 0
   end if  
+  
 ! Store operating points where flap setting will be optimized
-
   nflap_optimize = 0
   if (use_flap .and. (.not. match_foils)) then
     do i = 1, noppoint
@@ -224,7 +226,18 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       end if
     end do
   end if
-
+  
+! Store operating points where flap setting will be identical
+  nflap_identical = 0
+  if (use_flap .and. (.not. match_foils)) then
+    do i = 1, noppoint
+      if (flap_selection(i) == 'identical') then
+        nflap_identical = nflap_identical + 1
+        flap_identical_points(nflap_identical) = i
+      end if
+    end do
+  end if
+  
 ! Normalize weightings for operating points
 
   weighting = weighting/sum(weighting(1:noppoint))
@@ -546,6 +559,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     write(*,*) " mach("//trim(text)//") = ", mach(i)
     write(*,*) " flap_selection("//trim(text)//") = '"//                       &
                trim(flap_selection(i))//"'"
+    write(*,*) " flap_identical_op("//trim(text)//") = ", flap_identical_op(i)
     write(*,*) " flap_degrees("//trim(text)//") = ", flap_degrees(i)
     write(*,*) " weighting("//trim(text)//") = ", weighting(i)
     if (ncrit_pt(i) /= -1.d0)                                                  &
@@ -729,7 +743,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       trim(shape_functions) /= 'kulfan-bussoletti' .and.                       &
       trim(shape_functions) /= 'b-spline' .and.                                &
       trim(shape_functions) /= 'bezier-parsec')                            &
-    call my_stop("shape_functions must be 'hicks-henne' or 'naca' or           &
+    call my_stop("shape_functions must be 'hicks-henne' or 'naca' or &
                  &'kulfan-bussoletti' or 'b-spline' or 'bezier-parsec'.")
   if (nparameters_top < 0)                                                     &
     call my_stop("nparameters_top must be >= 0.")
@@ -773,8 +787,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     if (reynolds(i) <= 0.d0) call my_stop("reynolds must be > 0.")
     if (mach(i) < 0.d0) call my_stop("mach must be >= 0.")
     if (trim(flap_selection(i)) /= 'specify' .and.                             &
-        trim(flap_selection(i)) /= 'optimize')                                 &
-      call my_stop("flap_selection must be 'specify' or 'optimize'.")
+        trim(flap_selection(i)) /= 'optimize' .and.                            &
+        trim(flap_selection(i)) /= 'identical')                                &
+      call my_stop("flap_selection must be 'specify' or 'optimize' or "//      &
+                   "'identical'.")
+    
     if (flap_degrees(i) < -90.d0) call my_stop("flap_degrees must be > -90.")
     if (flap_degrees(i) > 90.d0) call my_stop("flap_degrees must be < 90.")
     if (weighting(i) <= 0.d0) call my_stop("weighting must be > 0.")
@@ -792,6 +809,20 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     if (ncrit_pt(i) <= 0.d0) call my_stop("ncrit_pt must be > 0 or -1.")
   end do
 
+  ! Check if flap_identical_op does not refer to a point in flap_identical_points
+
+  do i = 1, nflap_identical
+    do j = 1, nflap_identical
+      if (flap_identical_op(flap_identical_points(j)) .EQ.                     &
+        flap_identical_points(i)) then
+        write(text,*) flap_identical_points(j)
+        text = adjustl(text)
+        call my_stop("identical flap angle must refer to a 'specify' or "//    &
+                     "'optimize' flap type at oppoint("//trim(text)//")")
+      end if
+    end do
+  end do
+  
 ! Constraints
 
   if (min_thickness <= 0.d0) call my_stop("min_thickness must be > 0.")

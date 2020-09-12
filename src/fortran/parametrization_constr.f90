@@ -1186,9 +1186,9 @@ subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new)
   Rle=modest(4)                              
   Gamma_le=modesb(4)
   Alpha_te=modesb(5)                
-  Beta_te=modesb(5)                           
+  Beta_te=modest(5)                           
   Zte = 0.d0
-  dZte = zPt(nPt)-zPb(nPb)
+  dZte = modest(6)
   
   ! Calculating the control points of the bezier curves.
   call SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_max,Rle,Beta_te,dZte,error_code_t)
@@ -1645,7 +1645,7 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
 
   real*8, intent(in) :: xseedt(:), xseedb(:), zseedt(:), zseedb(:)
   
-  real*8, intent(out) :: modest(5) ! Xt_max, Yt_max, Kt_max, Rle     , Beta_te
+  real*8, intent(out) :: modest(6) ! Xt_max, Yt_max, Kt_max, Rle     , Beta_te
   real*8, intent(out) :: modesb(5) ! Xc_max, Yc_max, Kc_max, Gamma_le, Alpha_te
 
   real*8:: xBPP(12)               ! Xt_max,Yt_max,Kt_max, Xc_max,Yc_max,Kc_max,&
@@ -1727,6 +1727,7 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   modest(1:3)=xBPP(1:3)
   modest(4)=xBPP(7)
   modest(5)=xBPP(10)
+  modest(6)=xBPP(12)
   
   modesb(1:3)=xBPP(4:6)
   modesb(4:5)=xBPP(8:9)

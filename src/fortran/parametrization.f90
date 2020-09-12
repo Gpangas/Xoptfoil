@@ -117,7 +117,7 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
     
   elseif (trim(shapetype) == 'bezier-parsec') then
     ! top is thickness, bot is camber
-    nmodestop = 5
+    nmodestop = 6
     nmodesbot = 5
   
   else
@@ -157,9 +157,7 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   double precision, dimension(size(xb_seed,1)) :: xb_new
   integer :: i
   double precision :: symm
-  
-  symm = 1.0d0
-  
+    
   if (trim(shapetype) == 'naca') then
     
     call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
@@ -181,6 +179,7 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
       symmetrical)
   
   elseif (trim(shapetype) == 'bezier-parsec') then
+    symm = 1.0d0
     if (symmetrical) symm=0.d0 ! no camber
     call BPP_airfoil( xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb*symm, &
       zt_new, zb_new)
@@ -246,7 +245,7 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
   
   elseif (trim(parametrization_type) == 'bezier-parsec') then
     
-    ndvs_top = 5
+    ndvs_top = 6
     ndvs_bot = 5
   
   else

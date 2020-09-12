@@ -125,7 +125,7 @@ function aero_objective_function(designvars, include_penalty)
   integer :: nreversalst, nreversalsb, ndvs
   double precision :: actual_x_flap
   double precision :: gapallow, maxthick, ffact, fxfact
-  integer :: check_idx, flap_idx, dvcounter
+  integer :: check_idx, flap_idx, flap_idi, dvcounter
   double precision, parameter :: epsexit = 1.0D-04
   double precision, parameter :: epsupdate = 1.0D-08
   double precision :: pi
@@ -332,6 +332,12 @@ function aero_objective_function(designvars, include_penalty)
     penaltyval = penaltyval +                                                  &
                  max(0.d0,min_flap_degrees-actual_flap_degrees(flap_idx))
     dvcounter = dvcounter + 1
+  end do
+  
+! Set identical flap angles
+  do i = 1, nflap_identical
+    flap_idi = flap_identical_points(i)
+    actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
   end do
 
 ! Get actual flap chord based on design variable
@@ -714,7 +720,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: ffact, fxfact, maxt, xmaxt, maxc, xmaxc
   double precision :: actual_x_flap
-  integer :: ndvs, flap_idx, dvcounter
+  integer :: ndvs, flap_idx, flap_idi, dvcounter
  
   character(100) :: foilfile, polarfile, text
   character(8) :: maxtchar, xmaxtchar, maxcchar, xmaxcchar
@@ -776,6 +782,12 @@ function write_airfoil_optimization_progress(designvars, designcounter)
     flap_idx = flap_optimize_points(i)
     actual_flap_degrees(flap_idx) = designvars(dvcounter)/ffact
     dvcounter = dvcounter + 1
+  end do
+  
+! Set identical flap angles
+  do i = 1, nflap_identical
+    flap_idi = flap_identical_points(i)
+    actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
   end do
   
 ! Get actual flap chord based on design variable

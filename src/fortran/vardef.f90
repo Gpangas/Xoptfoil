@@ -40,18 +40,21 @@ module vardef
   integer, parameter :: max_op_points = 30
   double precision, dimension(:), allocatable :: xseedt, xseedb, zseedt, zseedb
   character(7), dimension(max_op_points) :: op_mode
-  character(8), dimension(max_op_points) :: flap_selection
+  character(9), dimension(max_op_points) :: flap_selection
   double precision, dimension(max_op_points) :: op_point, reynolds, mach,      &
                                  flap_degrees, weighting, scale_factor, ncrit_pt
+  integer, dimension(max_op_points) :: flap_identical_op
   double precision :: x_flap, y_flap
   character(3) :: y_flap_spec
   character(8) :: x_flap_spec        ! added x_flap_spec
   integer :: int_x_flap_spec         ! added int_x_flap_spec
   logical :: use_flap
   character(14), dimension(max_op_points) :: optimization_type
-  integer :: nflap_optimize          ! Number of operating points where flap 
-                                     !   setting will be optimized
-  integer, dimension(max_op_points) :: flap_optimize_points
+  integer :: nflap_optimize, nflap_identical
+                                     ! Number of operating points where flap 
+                                     !   setting will be optimized or identical
+  integer, dimension(max_op_points) :: flap_optimize_points,                   &
+                                       flap_identical_points
   double precision :: xoffset, zoffset, foilscale, foilangle
 
   type(airfoil_type) :: curr_foil

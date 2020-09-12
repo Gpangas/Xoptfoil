@@ -117,19 +117,20 @@ program main
     write(*,*)
   end if
   
+  ! Get initial values for modes
   allocate(modest_seed(nshapedvtop),modesb_seed(nshapedvbot))
-
+  
   modest_seed=0.0d0
   modesb_seed=0.0d0
   tcTE=0.0d0
   call parametrization_new_seed(xseedt, xseedb, zseedt, zseedb, modest_seed,   &
       modesb_seed, symmetrical, tcTE, shape_functions)
+  
   ! Make sure seed airfoil passes constraints, and get scaling factors for
   ! operating points
-
   call check_seed()
-  ! Optimize
   
+  ! Optimize
   call optimize(search_type, global_search, local_search, constrained_dvs,     &
                 pso_options, ga_options, ds_options, restart,                  &
                 restart_write_freq, optdesign, f0, fmin, steps, fevals)

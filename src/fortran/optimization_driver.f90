@@ -44,7 +44,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
 
   type(airfoil_type) :: match_foil
   type(naca_options_type) :: dummy_naca_options
-  integer :: pointst, pointsb
+  integer :: pointst, pointsb, i
   double precision, dimension(:), allocatable :: zttmp, zbtmp
   double precision :: xoffmatch, zoffmatch, scale_match, angle_match
   double precision ::TE_seed, TE_match, TE_ratio, TE_dif
@@ -101,36 +101,36 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   write(*,*) 'Trailing Edge ratio         = ', TE_ratio  
   write(*,*) 
   
-  ! scale match foil so that TE_dif=0
-  
-  valid_choice = .false.
-  do while (.not. valid_choice)
-  
-    write(*,'(A)', advance='no') 'Scale match foil so that Trailing Edge &
-      difference = 0 ? (y/n): '
-    read(*,'(A)') choice
-
-    if ( (choice == 'y') .or. (choice == 'Y') ) then
-      valid_choice = .true.
-      choice = 'y'
-      write(*,*)
-      write(*,*) 'Match foil scaled to eliminate difference'
-      write(*,*)
-      zmatcht=zmatcht*TE_ratio
-      zmatchb=zmatchb*TE_ratio
-      write(*,*) 'New Trailing Edge ratio    = ',                              &
-        (zseedt(pointst)-zseedb(pointsb)) /                                    &
-        (zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1)))
-      write(*,*)
-    else if ( ( choice == 'n') .or. (choice == 'N') ) then
-      valid_choice = .true.
-      choice = 'n'
-    else
-      write(*,'(A)') 'Please enter y or n.'
-      valid_choice = .false.
-    end if
-
-  end do
+  !! scale match foil so that TE_dif=0
+  !
+  !valid_choice = .false.
+  !do while (.not. valid_choice)
+  !
+  !  write(*,'(A)', advance='no') 'Scale match foil so that Trailing Edge &
+  !    difference = 0 ? (y/n): '
+  !  read(*,'(A)') choice
+  !
+  !  if ( (choice == 'y') .or. (choice == 'Y') ) then
+  !    valid_choice = .true.
+  !    choice = 'y'
+  !    write(*,*)
+  !    write(*,*) 'Match foil scaled to eliminate difference'
+  !    write(*,*)
+  !    zmatcht=zmatcht*TE_ratio
+  !    zmatchb=zmatchb*TE_ratio
+  !    write(*,*) 'New Trailing Edge ratio    = ',                              &
+  !      (zseedt(pointst)-zseedb(pointsb)) /                                    &
+  !      (zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1)))
+  !    write(*,*)
+  !  else if ( ( choice == 'n') .or. (choice == 'N') ) then
+  !    valid_choice = .true.
+  !    choice = 'n'
+  !  else
+  !    write(*,'(A)') 'Please enter y or n.'
+  !    valid_choice = .false.
+  !  end if
+  !
+  !end do
   
   ! interpolate points
   
@@ -152,6 +152,13 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   xmatchb = xseedb
   zmatcht = zttmp
   zmatchb = zbtmp
+  
+  do i = 1, pointst
+    write(*,*) xmatcht(pointst+1-i), zmatcht(pointst+1-i)
+  end do
+  do i = 1, pointsb
+    write(*,*) xmatchb(i), zmatchb(i)
+  end do
 
 ! Deallocate temporary arrays
 
@@ -423,7 +430,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: ffact, fxfact, actual_x_flap
   integer :: dvtbnd1, dvtbnd2, dvbbnd1, dvbbnd2, nmodest, nmodesb, nptt, nptb, i
-  integer :: flap_idx, dvcounter, iunit, ndvs_top, ndvs_bot
+  integer :: flap_idx, flap_idi, dvcounter, iunit, ndvs_top, ndvs_bot
   type(airfoil_type) :: final_airfoil
   character(80) :: output_file, aero_file
   character(30) :: text
@@ -483,6 +490,11 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
       flap_idx = flap_optimize_points(i)
       actual_flap_degrees(flap_idx) = optdesign(dvcounter)/ffact
       dvcounter = dvcounter + 1
+    end do
+!   Set identical flap angles
+    do i = 1, nflap_identical
+      flap_idi = flap_identical_points(i)
+      actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
     end do
 !   Get flap chord based on design variables
     fxfact = initial_perturb/(max_flap_x - min_flap_x)
