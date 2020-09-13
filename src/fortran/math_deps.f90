@@ -909,6 +909,59 @@ END
 ! interpolation subroutine to get zo at xi from spline defined by xt,zt,xb.zb
 !
 !=============================================================================80
+SUBROUTINE foil_interp(N,X,Y,xitop,zotop,xibot,zobot)
+  
+  integer, intent(in) :: N
+  real*8, dimension(N), intent(in) :: X, Y
+  real*8, intent(in) :: xitop
+  real*8, intent(in) :: xibot
+  real*8, intent(out) :: zotop
+  real*8, intent(out) :: zobot
+  
+  interface
+    double precision function SEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function SEVAL
+  end interface 
+  
+  real*8, dimension(N) :: XP,YP,S
+  real*8 :: SLE, SINTERP
+  logical :: SILENT_MODE, INDICATOR
+  integer :: i
+    
+  ! create the spline 
+  SILENT_MODE=.true.
+
+  ! get spline parameters
+  
+  CALL SCALC(X,Y,S,N)
+  CALL SEGSPL(X,XP,S,N)
+  CALL SEGSPL(Y,YP,S,N)
+  CALL LEFIND(SLE,X,XP,Y,YP,S,N,SILENT_MODE)
+  
+  ! interpolate top
+
+ INDICATOR = .TRUE.
+ 
+  call XINTERPS(SINTERP, xitop, INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+  zotop = SEVAL(SINTERP,Y,YP,S,N)
+
+  ! interpolate bot
+
+  INDICATOR = .FALSE.
+
+  call XINTERPS(SINTERP, xibot, INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+  zobot = SEVAL(SINTERP,Y,YP,S,N)
+
+END SUBROUTINE foil_interp
+
+!=============================================================================80
+!
+! interpolation subroutine to get zo at xi from spline defined by xt,zt,xb.zb
+!
+!=============================================================================80
 SUBROUTINE spline_interp(ntop,xtop,ztop,nbot,xbot,zbot,                  &
   nitop,xitop,zotop,nibot,xibot,zobot)
   

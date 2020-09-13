@@ -33,17 +33,20 @@ module airfoil_operations
 !
 !=============================================================================80
 subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
-                            xoffset, zoffset, foilscale, foilangle)
+                            xoffset, zoffset, foilscale, foilangle, TE_thick)
 
   use vardef,             only : airfoil_type
   use xfoil_driver,       only : smooth_paneling
   use naca,               only : naca_options_type, naca_456
   use airfoil_evaluation, only : xfoil_geom_options
+  use math_deps,          only : foil_interp
 
   character(*), intent(in) :: seed_airfoil, airfoil_file
   type(naca_options_type), intent(in) :: naca_options
   type(airfoil_type), intent(out) :: foil
-  double precision, intent(out) :: xoffset, zoffset, foilscale, foilangle
+  double precision, intent(out) :: xoffset, zoffset, foilscale, foilangle,     &
+                                   TE_thick
+  real*8 :: zotop, zobot
 
   type(airfoil_type) :: tempfoil
   integer :: pointsmcl
@@ -81,7 +84,27 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
 ! Translate and scale
 
   call transform_airfoil(foil, xoffset, zoffset, foilscale, foilangle)
-
+  
+! TE fix
+  
+  call foil_interp(foil%npoint,foil%x, foil%z,1.0d0,zotop,1.0d0,zobot)
+  
+  if (foil%z(1) .GT. foil%z(foil%npoint)) then
+    foil%x(1)=1.0d0
+    foil%z(1)=zotop
+  
+    foil%x(foil%npoint)=1.0d0
+    foil%z(foil%npoint)=zobot
+  else
+    foil%x(1)=1.0d0
+    foil%z(1)=zobot
+  
+    foil%x(foil%npoint)=1.0d0
+    foil%z(foil%npoint)=zotop
+  end if
+  
+  TE_thick=abs(zobot-zotop)
+  
 end subroutine get_seed_airfoil
 
 !=============================================================================80

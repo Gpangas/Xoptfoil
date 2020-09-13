@@ -83,23 +83,21 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   namelist /optimization_options/ search_type, global_search, local_search,    &
             seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
             nparameters_bot, initial_perturb, min_bump_width, b_spline_degree, &
-            b_spline_xtype, b_spline_distribution, restart,                     &
+            b_spline_xtype, b_spline_distribution, restart,                    &
             restart_write_freq, write_designs
   namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
-            use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, flap_selection,&
-            flap_identical_op, flap_degrees, weighting, optimization_type,     &
-            ncrit_pt
-  !added lift_constraint_type, min_lift, drag_constraint_type, max_drag
-  !added min_flap_x, max_flap_x
+            use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE, &
+            xltTE, flap_selection, flap_identical_op, flap_degrees, weighting, &
+            optimization_type, ncrit_pt
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
                          min_moment, lift_constraint_type,                     &
                          min_lift, drag_constraint_type,                       &
                          max_drag, min_te_angle, check_curvature,              &
                          max_curv_reverse_top, max_curv_reverse_bot,           &
                          curv_threshold, symmetrical, min_flap_degrees,        &
-                         max_flap_degrees, min_flap_x, max_flap_x, min_camber, &
-                         max_camber, naddthickconst, addthick_x, addthick_min, &
-                         addthick_max
+                         max_flap_degrees, min_flap_x, max_flap_x, max_tcTE,   &
+                         min_tcTE, max_camber, min_camber, naddthickconst,     &
+                         addthick_x, addthick_min, addthick_max
   namelist /naca_airfoil/ family, maxt, xmaxt, maxc, xmaxc, design_cl, a,      &
                           leidx, reflexed
   namelist /initialization/ feasible_init, feasible_limit,                     &
@@ -164,6 +162,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   x_flap_spec = 'specify' ! specify, optimize 
   y_flap = 0.d0
   y_flap_spec = 'y/c'
+  TE_spec = 'use_seed'    !'specify', 'use_seed' or 'optimize' 
+  tcTE = 1.0E-4           
+  xltTE = 0.0             
   op_mode(:) = 'spec-cl'
   op_point(:) = 0.d0
   optimization_type(:) = 'min-drag'
@@ -195,6 +196,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   max_flap_degrees = 15.d0
   min_flap_x = 0.7d0
   max_flap_x = 0.9d0
+  max_tcTE = 0.1
+  min_tcTE = 0.0
   naddthickconst = 0
   addthick_x(:) = 0.01d0
   addthick_min(:) = -1000.d0
@@ -208,35 +211,6 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   rewind(iunit)
   read(iunit, iostat=iostat1, nml=constraints)
   call namelist_check('constraints', iostat1, 'stop')
-
-! Avaliate type of flap chord
-  if (trim(x_flap_spec) == 'optimize') then
-    int_x_flap_spec = 1
-  else
-    int_x_flap_spec = 0
-  end if  
-  
-! Store operating points where flap setting will be optimized
-  nflap_optimize = 0
-  if (use_flap .and. (.not. match_foils)) then
-    do i = 1, noppoint
-      if (flap_selection(i) == 'optimize') then
-        nflap_optimize = nflap_optimize + 1
-        flap_optimize_points(nflap_optimize) = i
-      end if
-    end do
-  end if
-  
-! Store operating points where flap setting will be identical
-  nflap_identical = 0
-  if (use_flap .and. (.not. match_foils)) then
-    do i = 1, noppoint
-      if (flap_selection(i) == 'identical') then
-        nflap_identical = nflap_identical + 1
-        flap_identical_points(nflap_identical) = i
-      end if
-    end do
-  end if
   
 ! Normalize weightings for operating points
 
@@ -341,7 +315,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
 !   Set design variables with side constraints
     call parametrization_constrained_dvs(shape_functions, constrained_dvs,       &
-         nflap_optimize, int_x_flap_spec, nparameters_top, nparameters_bot,        &
+         nflap_optimize, int_x_flap_spec, int_tcTE_spec, nparameters_top, nparameters_bot,        &
          nbot_actual, symmetrical)
 
     if (trim(global_search) == 'particle_swarm') then
@@ -510,6 +484,43 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
   close(iunit)
 
+! Store operating points where flap setting will be optimized
+  nflap_optimize = 0
+  if ((use_flap) .and. (.not. match_foils)) then
+    do i = 1, noppoint
+      if (flap_selection(i) == 'optimize') then
+        nflap_optimize = nflap_optimize + 1
+        flap_optimize_points(nflap_optimize) = i
+      end if
+    end do
+  end if
+  write(*,*) 'nflap_optimize', nflap_optimize, match_foils
+! Store operating points where flap setting will be identical
+  nflap_identical = 0
+  if (use_flap .and. (.not. match_foils)) then
+    do i = 1, noppoint
+      if (flap_selection(i) == 'identical') then
+        nflap_identical = nflap_identical + 1
+        flap_identical_points(nflap_identical) = i
+      end if
+    end do
+  end if
+  
+  ! Avaliate type of flap chord
+  if ((trim(x_flap_spec) == 'optimize') .and. (use_flap) .and.                 &
+    (.not. match_foils) .and. (nflap_optimize/=0)) then
+    int_x_flap_spec = 1
+  else
+    int_x_flap_spec = 0
+  end if  
+  
+! Avaliate type of trailing edge
+  if (trim(TE_spec) == 'optimize') then
+    int_tcTE_spec = 1
+  else
+    int_tcTE_spec = 0
+  end if  
+  
 ! Echo namelist options for checking purposes
 
   write(*,*)
@@ -547,6 +558,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " x_flap_spec = "//trim(x_flap_spec)
   write(*,*) " y_flap = ", y_flap
   write(*,*) " y_flap_spec = "//trim(y_flap_spec)
+  write(*,*) " TE_spec = "//trim(TE_spec)
+  write(*,*) " tcTE = ", tcTE
+  write(*,*) " xltTE = ", xltTE
   write(*,*)
   do i = 1, noppoint
     write(text,*) i
@@ -597,6 +611,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " max_flap_degrees = ", max_flap_degrees
   write(*,*) " min_flap_x = ", min_flap_x
   write(*,*) " max_flap_x = ", max_flap_x
+  write(*,*) " min_tcTE = ", min_tcTE
+  write(*,*) " max_tcTE = ", max_tcTE
   write(*,*) " min_camber = ", min_camber
   write(*,*) " max_camber = ", max_camber
   write(*,*) " naddthickconst = ", naddthickconst
@@ -780,7 +796,14 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
         call my_stop("x_flap must be <= max_flap_x.")
   if ((use_flap) .and. (y_flap_spec /= 'y/c') .and. (y_flap_spec /= 'y/t'))    &
     call my_stop("y_flap_spec must be 'y/c' or 'y/t'.")
-
+  if (trim(TE_spec) /= 'use_seed' .and.                    &
+      trim(TE_spec) /= 'specify' .and.                       &
+      trim(TE_spec) /= 'optimize')                               &
+      call my_stop("TE_spec must be 'use_seed', 'specify', or 'optimize'.")
+  if (tcTE < 0.0) call my_stop("tcTE must be > 0.")
+  if (xltTE < 0.0) call my_stop("xltTE must be > 0.")
+  if (xltTE >= 1.0) call my_stop("xltTE must be < 1")
+  
   do i = 1, noppoint
     if (trim(op_mode(i)) /= 'spec-cl' .and. trim(op_mode(i)) /= 'spec-al')     &
       call my_stop("op_mode must be 'spec-al' or 'spec-cl'.")
@@ -867,6 +890,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("min_flap_x must be > 0.")
   if (max_flap_x >= 1.d0)                                               &
     call my_stop("max_flap_x must be < 1.")
+  if (min_tcTE >= max_tcTE)                                    &
+    call my_stop("min_tcTE must be < max_tcTE.")
+  if (min_tcTE < 0.d0)                                              &
+    call my_stop("min_tcTE must be >= 0.")
+  if (max_tcTE >= 1.d0)                                               &
+    call my_stop("max_tcTE must be < 1.")
   if (min_camber >= max_camber)                                                &
     call my_stop("min_camber must be < max_camber.")
   

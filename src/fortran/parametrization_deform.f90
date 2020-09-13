@@ -114,9 +114,9 @@ subroutine HH_shape(x, modes, shape_function)
 
     !     Check for problems with bump location and width parameters
 
-    if (t1 <= 0.d0) write(*,*) 'ERROR: t1 less than 0.0'!t1 = 0.001d0
-    if (t1 >= 1.d0) write(*,*) 'ERROR: t1 more than 1.0'!t1 = 0.999d0
-    if (t2 <= 0.d0) write(*,*) 'ERROR: t2 less than 0.0'!t2 = 0.001d0
+    if (t1 <= 0.d0) t1 = 0.001d0
+    if (t1 >= 1.d0) t1 = 0.999d0
+    if (t2 <= 0.d0) t2 = 0.001d0
 
     !     Create shape function
 

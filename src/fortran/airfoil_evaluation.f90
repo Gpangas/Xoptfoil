@@ -123,8 +123,8 @@ function aero_objective_function(designvars, include_penalty)
   logical :: check
   double precision :: increment, curv1, curv2
   integer :: nreversalst, nreversalsb, ndvs
-  double precision :: actual_x_flap
-  double precision :: gapallow, maxthick, ffact, fxfact
+  double precision :: actual_x_flap, actual_tcTE
+  double precision :: gapallow, maxthick, ffact, fxfact, tefact
   integer :: check_idx, flap_idx, flap_idi, dvcounter
   double precision, parameter :: epsexit = 1.0D-04
   double precision, parameter :: epsupdate = 1.0D-08
@@ -164,12 +164,25 @@ function aero_objective_function(designvars, include_penalty)
     dvbbnd2 = dvtbnd2
   end if
 
+  penaltyval = 0.d0
+  
+  ! Get actual trailing edge based on design variable
+  if (int_tcTE_spec == 1) then
+    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
+      int_tcTE_spec)/tefact + min_tcTE
+    penaltyval = penaltyval + max(0.d0,actual_tcTE-max_tcTE)
+    penaltyval = penaltyval + max(0.d0,min_tcTE-actual_tcTE)
+  else
+    actual_tcTE=tcTE
+  end if
+  
 ! Create top and bottom surfaces by perturbation of seed airfoil
   !write(*,*) 'a',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
   
   call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
                       designvars(dvtbnd1:dvtbnd2), designvars(dvbbnd1:dvbbnd2),&
-                      zt_new, zb_new, shape_functions, symmetrical)
+                      zt_new, zb_new, shape_functions, symmetrical, actual_tcTE)
 
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
@@ -185,7 +198,6 @@ function aero_objective_function(designvars, include_penalty)
 
 ! Check geometry before running Xfoil: growth rates, LE and TE angles, etc.
 
-  penaltyval = 0.d0
   maxgrowth = 0.d0
 
   len1 = sqrt((curr_foil%x(2)-curr_foil%x(1))**2.d0 +                          &
@@ -308,7 +320,7 @@ function aero_objective_function(designvars, include_penalty)
 
 ! Check that number of flap optimize points are correct
 
-  ndvs = size(designvars,1) - int_x_flap_spec 
+  ndvs = size(designvars,1) - int_x_flap_spec - int_tcTE_spec
   if (nflap_optimize /= (ndvs - dvbbnd2)) then
     write(*,*) nflap_optimize
     write(*,*) ndvs
@@ -645,6 +657,8 @@ function matchfoil_objective_function(designvars)
 
   double precision, dimension(size(xseedt,1)) :: zt_new
   double precision, dimension(size(xseedb,1)) :: zb_new
+  double precision :: actual_tcTE, tefact
+  
   integer :: nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd, ndvs_top, ndvs_bot
 
   nmodest = nparams_top
@@ -659,11 +673,20 @@ function matchfoil_objective_function(designvars)
   dvtbnd = ndvs_top
   dvbbnd = ndvs_top + ndvs_bot
 
+  ! Get actual trailing edge based on design variable
+  if (int_tcTE_spec == 1) then
+    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+         &
+      int_tcTE_spec)/tefact + min_tcTE
+  else
+    actual_tcTE=tcTE
+  end if
+  
 ! Create top and bottom surfaces by perturbation of seed airfoil
 
   call create_airfoil(xseedt, zseedt, xseedb, zseedb, designvars(1:dvtbnd),    &
                       designvars(dvtbnd+1:dvbbnd), zt_new, zb_new,             &
-                      shape_functions, .false.)
+                      shape_functions, .false., actual_tcTE)
 
 ! Evaluate the new airfoil, not counting fixed LE and TE points
 
@@ -718,8 +741,8 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   double precision, dimension(noppoint) :: alpha, lift, drag, moment, viscrms, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
-  double precision :: ffact, fxfact, maxt, xmaxt, maxc, xmaxc
-  double precision :: actual_x_flap
+  double precision :: ffact, fxfact, tefact, maxt, xmaxt, maxc, xmaxc
+  double precision :: actual_x_flap, actual_tcTE
   integer :: ndvs, flap_idx, flap_idi, dvcounter
  
   character(100) :: foilfile, polarfile, text
@@ -746,12 +769,21 @@ function write_airfoil_optimization_progress(designvars, designcounter)
     dvbbnd2 = dvtbnd2
   end if
 
+  ! Get actual trailing edge based on design variable
+  if (int_tcTE_spec == 1) then
+    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
+      int_tcTE_spec)/tefact + min_tcTE
+  else
+    actual_tcTE=tcTE
+  end if
+  
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
   !write(*,*) 'b',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
   call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
                       designvars(dvtbnd1:dvtbnd2), designvars(dvbbnd1:dvbbnd2),&
-                      zt_new, zb_new, shape_functions, symmetrical)
+                      zt_new, zb_new, shape_functions, symmetrical, actual_tcTE)
 
 ! Format coordinates in a single loop in derived type
 
@@ -766,7 +798,8 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
 ! Check that number of flap optimize points are correct
 
-  ndvs = size(designvars,1) - int_x_flap_spec
+  ndvs = size(designvars,1) - int_x_flap_spec - int_tcTE_spec
+  
   if (nflap_optimize /= (ndvs - dvbbnd2)) then
     write(*,*) "Wrong number of design variables for flap deflections."
     write(*,*) "Please report this bug.2"
@@ -933,7 +966,8 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
   double precision, dimension(size(xseedt,1)) :: zt_new
   double precision, dimension(size(xseedb,1)) :: zb_new
   integer :: i, nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd, ndvs_top, ndvs_bot
-
+  double precision :: tefact, actual_tcTE
+  
   character(100) :: foilfile, text
   integer :: foilunit
 
@@ -949,12 +983,21 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
   dvtbnd = ndvs_top
   dvbbnd = ndvs_top + ndvs_bot
 
+  ! Get actual trailing edge based on design variable
+  if (int_tcTE_spec == 1) then
+    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+         &
+      int_tcTE_spec)/tefact + min_tcTE
+  else
+    actual_tcTE=tcTE
+  end if
+  
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
 
   call create_airfoil(xseedt, zseedt, xseedb, zseedb, designvars(1:dvtbnd),    &
                       designvars(dvtbnd+1:dvbbnd), zt_new, zb_new,             &
-                      shape_functions, .false.)
+                      shape_functions, .false., actual_tcTE)
 
 ! Format coordinates in a single loop in derived type
 
@@ -1312,7 +1355,7 @@ end function write_function_restart_cleanup
 
 !=============================================================================80
 !
-! Cleans up unused designs written prior to a restart
+! get_last_design_parameters
 !
 !=============================================================================80
 subroutine get_last_design_parameters(restart_status, global_search,           &
@@ -1413,4 +1456,96 @@ subroutine get_last_design_parameters(restart_status, global_search,           &
 
 end subroutine get_last_design_parameters
 
+!=============================================================================80
+!
+! get_last_airfoil
+!
+!=============================================================================80
+subroutine get_last_airfoil(restart_status, global_search,           &
+  local_search, last_airfoil)
+
+  use vardef,             only : airfoil_type
+
+  character(*), intent(in) :: restart_status, global_search, local_search
+  type(airfoil_type), intent(inout) :: last_airfoil
+
+  integer :: restunit, ioerr, step, designcounter, foilunit, ncoord
+  integer :: i, j
+  double precision, dimension(:,:), allocatable :: x, z
+  character(100) :: restfile, foilfile
+
+
+  ! Print status
+
+  restunit = 12
+  foilunit = 13
+
+  ! Read last written design from restart file
+
+  if (trim(restart_status) == 'global_optimization') then
+    if (trim(global_search) == 'particle_swarm') then
+      restfile = 'restart_pso_'//trim(output_prefix)
+    else if (trim(global_search) == 'genetic_algorithm') then
+      restfile = 'restart_ga_'//trim(output_prefix)
+    end if
+  else
+    if (trim(local_search) == 'simplex') then
+      restfile = 'restart_simplex_'//trim(output_prefix)
+    end if
+  end if
+
+  open(unit=restunit, file=restfile, status='old', form='unformatted',         &
+       iostat=ioerr)
+  read(restunit) step
+  read(restunit) designcounter
+  close(restunit)
+
+  ! Allocate size of data arrays
+
+  ncoord = size(xseedt,1) + size(xseedb,1) - 1
+  allocate(x(ncoord,designcounter+1))
+  allocate(z(ncoord,designcounter+1))
+
+  ! Open coordinates file
+
+  foilfile = trim(output_prefix)//'_design_coordinates.dat'
+  open(unit=foilunit, file=foilfile, status='old', iostat=ioerr)
+
+  ! Skip file header
+
+  read(foilunit,*)
+  read(foilunit,*)
+
+  ! Read coordinates for each airfoil
+
+  do i = 1, designcounter + 1
+  
+  !   Read zone header
+
+    read(foilunit,*)
+
+  !   Read coordinates
+
+    do j = 1, ncoord
+      read(foilunit,'(2F14.6)') x(j,i), z(j,i)
+    end do
+
+  end do
+
+  ! Close coordinates file
+
+  close(foilunit)
+
+  ! Set output vectors
+  
+  last_airfoil%x = x(:,designcounter+1)
+  last_airfoil%z = z(:,designcounter+1)
+  
+  ! Deallocate data arrays
+
+  deallocate(x)
+  deallocate(z)
+  
+end subroutine get_last_airfoil  
+  
 end module airfoil_evaluation

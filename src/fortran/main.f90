@@ -71,7 +71,7 @@ program main
   ! Load seed airfoil into memory, including transformations and smoothing
 
   call get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, buffer_foil, &
-                        xoffset, zoffset, foilscale, foilangle)
+                        xoffset, zoffset, foilscale, foilangle, tcTE_seed)
 
   ! Split up seed airfoil into upper and lower surfaces
 
@@ -92,16 +92,17 @@ program main
   
   !added the flap chord as design variable
   if (.not. symmetrical) then
-    allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize+int_x_flap_spec))
+    allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize+int_x_flap_spec+int_tcTE_spec))
   else
-    allocate(optdesign(nshapedvtop+nflap_optimize+int_x_flap_spec))
+    allocate(optdesign(nshapedvtop+nflap_optimize+int_x_flap_spec+int_tcTE_spec))
   end if
 
-  write(*,*) "Number of Design Variables = ", size(optdesign,1)
-  write(*,*) "  for top shape            = ", nshapedvtop
-  write(*,*) "  for bot shape            = ", nshapedvbot
-  write(*,*) "  for flap deflexion       = ", nflap_optimize
-  write(*,*) "  for flap hinge position  = ", int_x_flap_spec
+  write(*,*) "Number of Design Variables     = ", size(optdesign,1)
+  write(*,*) "  for top shape                = ", nshapedvtop
+  write(*,*) "  for bot shape                = ", nshapedvbot
+  write(*,*) "  for flap deflexion           = ", nflap_optimize
+  write(*,*) "  for flap hinge position      = ", int_x_flap_spec
+  write(*,*) "  for trailing edge thickness  = ", int_tcTE_spec
   write(*,*)
   
   ! Allocate memory for airfoil analysis
@@ -122,9 +123,9 @@ program main
   
   modest_seed=0.0d0
   modesb_seed=0.0d0
-  tcTE=0.0d0
+
   call parametrization_new_seed(xseedt, xseedb, zseedt, zseedb, modest_seed,   &
-      modesb_seed, symmetrical, tcTE, shape_functions)
+      modesb_seed, symmetrical, shape_functions)
   
   ! Make sure seed airfoil passes constraints, and get scaling factors for
   ! operating points

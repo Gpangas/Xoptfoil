@@ -117,7 +117,7 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
     
   elseif (trim(shapetype) == 'bezier-parsec') then
     ! top is thickness, bot is camber
-    nmodestop = 6
+    nmodestop = 5
     nmodesbot = 5
   
   else
@@ -142,14 +142,15 @@ end subroutine create_shape_functions
 !
 !=============================================================================80
 subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
-             zt_new, zb_new, shapetype, symmetrical)
-  use vardef, only : tcTE,b_spline_degree,b_spline_xtype,b_spline_distribution,&
-    upointst, upointsb, xcontrolt, xcontrolb
+             zt_new, zb_new, shapetype, symmetrical, thick_TE)
+  use vardef, only : b_spline_degree,b_spline_xtype,b_spline_distribution,&
+    upointst, upointsb, xcontrolt, xcontrolb, TE_spec, xltTE, tcTE_seed
 
   double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
                                                 zb_seed
   double precision, dimension(:), intent(in) :: modest, modesb
   double precision, dimension(:), intent(inout) :: zt_new, zb_new
+  double precision, intent(in) :: thick_TE
   character(*), intent(in) :: shapetype
   logical, intent(in) :: symmetrical
   
@@ -162,27 +163,55 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
     
     call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
                           zt_new, zb_new, symmetrical)
-
+    if (trim(TE_spec) /= 'use_seed') then
+      ! if optimize or specify, recreate the airfoil
+      do i = 1, size(xt_seed,1)
+        ! do the top
+        if (xt_seed(i) .GT. xltTE) then
+          zt_new(i) = zt_new(i) + (xt_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+        end if
+      end do
+      do i = 1, size(xb_seed,1)
+        !do the bot
+        if (xb_seed(i) .GT. xltTE) then
+          zb_new(i) = zb_new(i) - (xb_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+        end if
+      end do
+    end if
   elseif (trim(shapetype) == 'hicks-henne') then
     
     call HH_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,        &
                           zt_new, zb_new, symmetrical)
-
+    if (trim(TE_spec) /= 'use_seed') then
+      ! if optimize or specify, recreate the airfoil
+      do i = 1, size(xt_seed,1)
+        ! do the top
+        if (xt_seed(i) .GT. xltTE) then
+          zt_new(i) = zt_new(i) + (xt_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+        end if
+      end do
+      do i = 1, size(xb_seed,1)
+        !do the bot
+        if (xb_seed(i) .GT. xltTE) then
+          zb_new(i) = zb_new(i) - (xb_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+        end if
+      end do
+    end if
   elseif (trim(shapetype) == 'kulfan-bussoletti') then
     call KBP_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,       &
-                          zt_new, zb_new, symmetrical, tcTE)
+                          zt_new, zb_new, symmetrical, thick_TE)
 
   elseif (trim(shapetype) == 'b-spline') then
     !write(*,*) size(xcontrolt,1), size(xcontrolb,1), size(modest,1), size(modesb,1)
     call BSP_airfoil(upointst, xt_seed, zt_seed, upointsb, xb_seed, zb_seed,   &
       xcontrolt, xcontrolb, modest, modesb, zt_new, zb_new,    &
-      symmetrical)
+      symmetrical, thick_TE)
   
   elseif (trim(shapetype) == 'bezier-parsec') then
     symm = 1.0d0
     if (symmetrical) symm=0.d0 ! no camber
     call BPP_airfoil( xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb*symm, &
-      zt_new, zb_new)
+      zt_new, zb_new, thick_TE)
     
   else
 
@@ -245,7 +274,7 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
   
   elseif (trim(parametrization_type) == 'bezier-parsec') then
     
-    ndvs_top = 6
+    ndvs_top = 5
     ndvs_bot = 5
   
   else
@@ -265,12 +294,12 @@ end subroutine parametrization_dvs
 !
 !=============================================================================80
 subroutine parametrization_constrained_dvs(parametrization_type,               &
-    constrained_dvs, nflap_optimize, int_x_flap_spec, nfunctions_top,          &
+    constrained_dvs, nflap_optimize, int_x_flap_spec, int_tcTE_spec, nfunctions_top,          &
     nfunctions_bot, nbot_actual, symmetrical)
 
   character(*), intent(in) :: parametrization_type
   integer, intent(in) :: nflap_optimize
-  integer, intent(in) :: int_x_flap_spec
+  integer, intent(in) :: int_x_flap_spec, int_tcTE_spec
   logical, intent(in) :: symmetrical
   integer, intent(out) :: nfunctions_top, nfunctions_bot
   integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
@@ -296,10 +325,11 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
 
     !     For NACA, we will only constrain the flap deflection
 
-    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
     do i = nfunctions_top + nbot_actual + 1,                                   &
-            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec
+            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+            int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
     end do
@@ -309,7 +339,7 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
     !     For Hicks-Henne, also constrain bump locations and width
 
     allocate(constrained_dvs(2*nfunctions_top + 2*nbot_actual +                &
-                              nflap_optimize + int_x_flap_spec))
+                              nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
     do i = 1, nfunctions_top + nbot_actual
       counter = counter + 1
@@ -321,7 +351,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
     end do
     
     do i = 3*(nfunctions_top + nbot_actual) + 1,                               &
-            3*(nfunctions_top + nbot_actual) + nflap_optimize + int_x_flap_spec
+            3*(nfunctions_top + nbot_actual) + nflap_optimize +                &
+            int_x_flap_spec + int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
     end do
@@ -329,10 +360,11 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
   elseif (trim(parametrization_type) == 'kulfan-bussoletti') then
     !     For kulfan-bussoletti, we will only constrain the flap deflection
 
-    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = ndvs_top + ndvs_bot_actual + 1,                                     &
-      ndvs_top + ndvs_bot_actual + nflap_optimize + int_x_flap_spec
+    do i = nfunctions_top + nbot_actual + 1,                                   &
+            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+            int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
     end do
@@ -340,21 +372,23 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
   elseif (trim(parametrization_type) == 'b-spline') then
     !     For b-spline, we will only constrain the flap deflection
 
-    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = ndvs_top + ndvs_bot_actual + 1,                                     &
-      ndvs_top + ndvs_bot_actual + nflap_optimize + int_x_flap_spec
+    do i = nfunctions_top + nbot_actual + 1,                                   &
+            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+            int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
-      end do
+    end do
   
   elseif (trim(parametrization_type) == 'bezier-parsec') then
     !     For bezier-parsec, we will only constrain the flap deflection
     
-    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec))
+    allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = ndvs_top + ndvs_bot_actual + 1,                                     &
-      ndvs_top + ndvs_bot_actual + nflap_optimize + int_x_flap_spec
+    do i = nfunctions_top + nbot_actual + 1,                                   &
+            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+            int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
     end do
@@ -383,6 +417,7 @@ subroutine parametrization_init(optdesign, x0)
                                  initial_perturb, min_flap_degrees,            &
                                  max_flap_degrees, flap_degrees, x_flap,       &
                                  int_x_flap_spec, min_flap_x, max_flap_x,      &
+                                 int_tcTE_spec, min_tcTE, max_tcTE, tcTE,      &
                                  flap_optimize_points, min_bump_width,         &
                                  xseedt, xseedb, zseedt, zseedb, nshapedvtop,  &
                                  nshapedvbot, modest_seed, modesb_seed
@@ -391,7 +426,7 @@ subroutine parametrization_init(optdesign, x0)
   double precision, dimension(size(optdesign,1)), intent(out) :: x0
 
   integer :: i, counter, nfuncs, oppoint, ndv
-  double precision :: t1fact, t2fact, ffact, fxfact
+  double precision :: t1fact, t2fact, ffact, fxfact, tefact
   
   ndv = size(optdesign,1)
   
@@ -399,10 +434,11 @@ subroutine parametrization_init(optdesign, x0)
   t2fact = initial_perturb/(10.d0 - min_bump_width)
   ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
   fxfact = initial_perturb/(max_flap_x - min_flap_x)
+  tefact = initial_perturb/(max_tcTE - min_tcTE)
   
   if (trim(shape_functions) == 'naca') then     
 
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
   !   Mode strength = 0 (aka seed airfoil)
 
@@ -410,15 +446,15 @@ subroutine parametrization_init(optdesign, x0)
 
   !   Seed flap deflection as specified in input file
 
-    do i = nfuncs + 1, ndv - int_x_flap_spec
+    do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
       oppoint = flap_optimize_points(i-nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-    
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
   elseif (trim(shape_functions) == 'hicks-henne') then
 
-    nfuncs = (ndv - nflap_optimize - int_x_flap_spec)/3
+    nfuncs = (ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec)/3
 
   !   Bump strength = 0 (aka seed airfoil)
 
@@ -428,53 +464,57 @@ subroutine parametrization_init(optdesign, x0)
       x0(counter+2) = 0.5d0*t1fact
       x0(counter+3) = 1.d0*t2fact
     end do
-    do i = 3*nfuncs+1, ndv - int_x_flap_spec
+    do i = 3*nfuncs+1, ndv - int_x_flap_spec - int_tcTE_spec
       oppoint = flap_optimize_points(i-3*nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-  
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
+    
   elseif (trim(shape_functions) == 'kulfan-bussoletti') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
     x0(1:nshapedvtop) = modest_seed
     x0(nshapedvtop+1:nfuncs) = modesb_seed
 
     !   Seed flap deflection as specified in input file
-
-    do i = nfuncs + 1, ndv - int_x_flap_spec
+    
+    do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
       oppoint = flap_optimize_points(i-nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
   
   elseif (trim(shape_functions) == 'b-spline') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
     x0(1:nshapedvtop) = modest_seed
     x0(nshapedvtop+1:nfuncs) = modesb_seed
 
     !   Seed flap deflection as specified in input file
 
-    do i = nfuncs + 1, ndv - int_x_flap_spec
+    do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
       oppoint = flap_optimize_points(i-nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
   
   elseif (trim(shape_functions) == 'bezier-parsec') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
     x0(1:nshapedvtop) = modest_seed
     x0(nshapedvtop+1:nfuncs) = modesb_seed
 
     !   Seed flap deflection as specified in input file
 
-    do i = nfuncs + 1, ndv - int_x_flap_spec
+    do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
       oppoint = flap_optimize_points(i-nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
     
   else
     
@@ -502,13 +542,14 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
                                  initial_perturb, min_flap_degrees,            &
                                  max_flap_degrees, nshapedvtop, nshapedvbot,   &
                                  int_x_flap_spec, min_flap_x, max_flap_x,      &
+                                 int_tcTE_spec, min_tcTE, max_tcTE, tcTE,      &
                                  min_bump_width, modest_seed, modesb_seed
   
   double precision, dimension(:), intent(in) :: optdesign
   double precision, dimension(size(optdesign,1)), intent(out) :: xmin, xmax
 
   integer :: i, counter, nfuncs, ndv
-  double precision :: t1fact, t2fact, ffact, fxfact
+  double precision :: t1fact, t2fact, ffact, fxfact, tefact
   
   ndv = size(optdesign,1)
   write(*,*) 'ndv'
@@ -518,23 +559,29 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
   t2fact = initial_perturb/(10.d0 - min_bump_width)
   ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
   fxfact = initial_perturb/(max_flap_x - min_flap_x)
-    
+  tefact = initial_perturb/(max_tcTE - min_tcTE)
+  
   if (trim(shape_functions) == 'naca') then
 
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
     xmin(1:nfuncs) = -0.5d0*initial_perturb
     xmax(1:nfuncs) = 0.5d0*initial_perturb
-    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
-    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact
     if (int_x_flap_spec == 1) then
-      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
-      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+      xmin(ndv-int_tcTE_spec) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv-int_tcTE_spec) = (max_flap_x - min_flap_x)*fxfact
     end if
+    if (int_tcTE_spec == 1) then
+      xmin(ndv) = (min_tcTE - min_tcTE)*tefact
+      xmax(ndv) = (max_tcTE - min_tcTE)*tefact
+    end if
+
 
   elseif (trim(shape_functions) == 'hicks-henne') then
 
-    nfuncs = (ndv - nflap_optimize - int_x_flap_spec)/3
+    nfuncs = (ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec)/3
 
     do i = 1, nfuncs
       counter = 3*(i-1)
@@ -545,59 +592,75 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
       xmin(counter+3) = min_bump_width*t2fact
       xmax(counter+3) = 10.d0*t2fact
     end do
-    do i = 3*nfuncs+1, ndv - int_x_flap_spec 
+    do i = 3*nfuncs+1, ndv - int_x_flap_spec - int_tcTE_spec
       xmin(i) = min_flap_degrees*ffact
       xmax(i) = max_flap_degrees*ffact
     end do
     if (int_x_flap_spec == 1) then
-      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
-      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+      xmin(ndv - int_tcTE_spec) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv - int_tcTE_spec) = (max_flap_x - min_flap_x)*fxfact
+    end if
+    if (int_tcTE_spec == 1) then
+      xmin(ndv) = (min_tcTE - min_tcTE)*tefact
+      xmax(ndv) = (max_tcTE - min_tcTE)*tefact
     end if
   
   elseif (trim(shape_functions) == 'kulfan-bussoletti') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
-    
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+
     xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
     xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
     xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
     xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
     
-    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
-    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact
     if (int_x_flap_spec == 1) then
-      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
-      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
+      xmin(ndv-int_tcTE_spec) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv-int_tcTE_spec) = (max_flap_x - min_flap_x)*fxfact
+    end if
+    if (int_tcTE_spec == 1) then
+      xmin(ndv) = (min_tcTE - min_tcTE)*tefact
+      xmax(ndv) = (max_tcTE - min_tcTE)*tefact
     end if
   
   elseif (trim(shape_functions) == 'b-spline') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
-    
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+
     xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
     xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
     xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
     xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
     
-    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
-    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact
     if (int_x_flap_spec == 1) then
-      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
-      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
-    end if  
+      xmin(ndv-int_tcTE_spec) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv-int_tcTE_spec) = (max_flap_x - min_flap_x)*fxfact
+    end if
+    if (int_tcTE_spec == 1) then
+      xmin(ndv) = (min_tcTE - min_tcTE)*tefact
+      xmax(ndv) = (max_tcTE - min_tcTE)*tefact
+    end if
     
   elseif (trim(shape_functions) == 'bezier-parsec') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec
-    
+    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+
     xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
     xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
     xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
     xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
     
-    xmin(nfuncs+1:ndv-int_x_flap_spec) = min_flap_degrees*ffact
-    xmax(nfuncs+1:ndv-int_x_flap_spec) = max_flap_degrees*ffact
+    xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
+    xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact
     if (int_x_flap_spec == 1) then
-      xmin(ndv) = (min_flap_x - min_flap_x)*fxfact
-      xmax(ndv) = (max_flap_x - min_flap_x)*fxfact
-    end if  
+      xmin(ndv-int_tcTE_spec) = (min_flap_x - min_flap_x)*fxfact
+      xmax(ndv-int_tcTE_spec) = (max_flap_x - min_flap_x)*fxfact
+    end if
+    if (int_tcTE_spec == 1) then
+      xmin(ndv) = (min_tcTE - min_tcTE)*tefact
+      xmax(ndv) = (max_tcTE - min_tcTE)*tefact
+    end if
   
   else
 
@@ -620,9 +683,10 @@ end subroutine parametrization_maxmin
 !
 !=============================================================================80
 subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
-  modest_seed, modesb_seed, symmetrical, tcTE, shape_functions)
+  modest_seed, modesb_seed, symmetrical, shape_functions)
   
-  use vardef, only: upointst, upointsb, xcontrolt, xcontrolb
+  use vardef, only: upointst, upointsb, xcontrolt, xcontrolb, TE_spec, xltTE,  &
+                    tcTE, tcTE_seed
   
   logical, intent(in) :: symmetrical
   character(*), intent(in) :: shape_functions
@@ -630,13 +694,36 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   double precision, dimension(:), intent(inout) :: zseedt, zseedb
   double precision, dimension(:), allocatable, intent(inout) :: modest_seed
   double precision, dimension(:), allocatable, intent(inout) :: modesb_seed
-  double precision, intent(inout) :: tcTE
   
   double precision, dimension(size(xseedt,1)) :: zseedt_new
   double precision, dimension(size(xseedb,1)) :: zseedb_new
   double precision :: sum, sum_w,w
   integer :: i
-      
+  
+  ! Set Trailing edge
+
+  if (trim(TE_spec) /= 'use_seed') then
+    ! if optimize or specify, recreate the airfoil
+    do i = 1, size(xseedt,1)
+      ! do the top
+      if (xseedt(i) .GT. xltTE) then
+        zseedt(i) = zseedt(i) + (xseedt(i)-xltTE) * (tcTE-tcTE_seed) / 2.0d0
+      end if
+    end do
+    do i = 1, size(xseedb,1)
+      !do the bot
+      if (xseedb(i) .GT. xltTE) then
+        zseedb(i) = zseedb(i) - (xseedb(i)-xltTE) * (tcTE-tcTE_seed) / 2.0d0
+      end if
+    end do
+  else
+    ! set value of tcTE
+    tcTE = tcTE_seed
+  end if
+  write(*,*) '    Trailing Edge of seed foil = ', tcTE_seed
+  write(*,*) 'New Trailing Edge of seed foil = ', tcTE
+  write(*,*)
+  
   if (trim(shape_functions) == 'naca') then
     
     zseedt_new=zseedt
@@ -657,15 +744,17 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     
     call BSP_airfoil(upointst, xseedt, zseedt, upointsb, xseedb, zseedb,       &
       xcontrolt, xcontrolb, modest_seed, modesb_seed,  &
-      zseedt_new, zseedb_new, symmetrical)
+      zseedt_new, zseedb_new, symmetrical, tcTE)
     
   elseif (trim(shape_functions) == 'bezier-parsec') then
     call BPP_init(xseedt, xseedb, zseedt, zseedb, modest_seed, modesb_seed)
     
     if (symmetrical) modesb_seed=modesb_seed*0.d0 ! no camber
     call BPP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed, &
-      zseedt_new, zseedb_new)
-    
+      zseedt_new, zseedb_new, tcTE)
+    if (ALL(zseedt_new .EQ. 0.0d0) .OR. ALL(zseedb_new .EQ. 0.0d0)) then
+      call my_stop("Bezier-PARSEC failed parametrization of inicial foil!")
+    end if
   else
 
     write(*,*)
@@ -713,13 +802,13 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   zseedt=zseedt_new
   zseedb=zseedb_new
   
-  !write(*,*) 'modest_seed'
-  !do i=1,size(modest_seed,1)
-  !  write(*,*) modest_seed(i)
+  !write(*,*) 'zseedt'
+  !do i=1,size(zseedt,1)
+  !  write(*,*) zseedt(i)
   !end do
-  !write(*,*) 'modesb_seed'
-  !do i=1,size(modesb_seed,1)
-  !  write(*,*) modesb_seed(i)
+  !write(*,*) 'zseedb'
+  !do i=1,size(zseedb,1)
+  !  write(*,*) zseedb(i)
   !end do
   
   write(*,*)
@@ -727,4 +816,28 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   read(*,*) 
   
 end subroutine parametrization_new_seed
+  
+!=============================================================================80
+!
+! Stops and prints an error message, or just warns
+!
+!=============================================================================80
+subroutine my_stop(message, stoptype)
+
+  character(*), intent(in) :: message
+  character(4), intent(in), optional :: stoptype
+
+  if ((.not. present(stoptype)) .or. (stoptype == 'stop')) then
+    write(*,*)
+    write(*,'(A)') 'Error: '//trim(message)
+    write(*,*)
+    stop 1
+  else
+    write(*,*)
+    write(*,'(A)') 'Warning: '//trim(message)
+    write(*,*)
+  end if
+
+end subroutine my_stop  
+  
 end module parametrization

@@ -33,7 +33,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
 
   use vardef,             only : airfoil_type, xmatcht, xmatchb, zmatcht,      &
                                  zmatchb, xseedt, xseedb, zseedt, zseedb,      &
-                                 symmetrical
+                                 symmetrical, tcTE, TE_spec, xltTE
   use memory_util,        only : deallocate_airfoil
   use airfoil_operations, only : get_seed_airfoil, get_split_points,           &
                                  split_airfoil, my_stop
@@ -46,7 +46,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   type(naca_options_type) :: dummy_naca_options
   integer :: pointst, pointsb, i
   double precision, dimension(:), allocatable :: zttmp, zbtmp
-  double precision :: xoffmatch, zoffmatch, scale_match, angle_match
+  double precision :: xoffmatch, zoffmatch, scale_match, angle_match, tcTE_match
   double precision ::TE_seed, TE_match, TE_ratio, TE_dif
   character :: choice
   logical :: valid_choice
@@ -64,7 +64,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
 ! Load airfoil to match
 
   call get_seed_airfoil('from_file', matchfoil_file, dummy_naca_options,       &
-                        match_foil, xoffmatch, zoffmatch, scale_match, angle_match)
+                        match_foil, xoffmatch, zoffmatch, scale_match, angle_match, tcTE_match)
 
 ! Split match_foil into upper and lower halves
 
@@ -87,50 +87,32 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   allocate(zbtmp(pointsb))
   zttmp(pointst) = zmatcht(size(zmatcht,1))
   zbtmp(pointsb) = zmatchb(size(zmatchb,1))
-
+  
+  ! Set Trailing edge
+  TE_match=zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1))
+  write(*,*) '    Trailing Edge of match foil = ', TE_match
+  
+  if (trim(TE_spec) == 'specify') then
+    do i = 1, size(xmatcht,1)
+      if (xmatcht(i) .GT. xltTE) then
+        zmatcht(i) = zmatcht(i) + (xmatcht(i)-xltTE) * (tcTE-TE_match) / 2.0d0
+      end if
+    end do
+    do i = 1, size(xmatchb,1)
+      if (xmatchb(i) .GT. xltTE) then
+        zmatchb(i) = zmatchb(i) - (xmatchb(i)-xltTE) * (tcTE-TE_match) / 2.0d0
+      end if
+    end do
+  
+  end if
+  
   ! compare TE of match with seed
   TE_seed=zseedt(pointst)-zseedb(pointsb)
   TE_match=zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1))
   TE_dif=TE_seed-TE_match
   TE_ratio=TE_seed/TE_match
   
-  write(*,*)
-  write(*,*) 'Trailing Edge of seed foil  = ', TE_seed
-  write(*,*) 'Trailing Edge of match foil = ', TE_match
-  write(*,*) 'Trailing Edge difference    = ', TE_dif
-  write(*,*) 'Trailing Edge ratio         = ', TE_ratio  
-  write(*,*) 
-  
-  !! scale match foil so that TE_dif=0
-  !
-  !valid_choice = .false.
-  !do while (.not. valid_choice)
-  !
-  !  write(*,'(A)', advance='no') 'Scale match foil so that Trailing Edge &
-  !    difference = 0 ? (y/n): '
-  !  read(*,'(A)') choice
-  !
-  !  if ( (choice == 'y') .or. (choice == 'Y') ) then
-  !    valid_choice = .true.
-  !    choice = 'y'
-  !    write(*,*)
-  !    write(*,*) 'Match foil scaled to eliminate difference'
-  !    write(*,*)
-  !    zmatcht=zmatcht*TE_ratio
-  !    zmatchb=zmatchb*TE_ratio
-  !    write(*,*) 'New Trailing Edge ratio    = ',                              &
-  !      (zseedt(pointst)-zseedb(pointsb)) /                                    &
-  !      (zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1)))
-  !    write(*,*)
-  !  else if ( ( choice == 'n') .or. (choice == 'N') ) then
-  !    valid_choice = .true.
-  !    choice = 'n'
-  !  else
-  !    write(*,'(A)') 'Please enter y or n.'
-  !    valid_choice = .false.
-  !  end if
-  !
-  !end do
+  write(*,*) 'New Trailing Edge of match foil = ', TE_match
   
   ! interpolate points
   
@@ -153,12 +135,12 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   zmatcht = zttmp
   zmatchb = zbtmp
   
-  do i = 1, pointst
-    write(*,*) xmatcht(pointst+1-i), zmatcht(pointst+1-i)
-  end do
-  do i = 1, pointsb
-    write(*,*) xmatchb(i), zmatchb(i)
-  end do
+  !do i = 1, pointst
+  !  write(*,*) xmatcht(pointst+1-i), zmatcht(pointst+1-i)
+  !end do
+  !do i = 1, pointsb
+  !  write(*,*) xmatchb(i), zmatchb(i)
+  !end do
 
 ! Deallocate temporary arrays
 
@@ -416,7 +398,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   use airfoil_operations, only : airfoil_write
   use parametrization,    only : create_airfoil, parametrization_dvs
   use airfoil_evaluation, only : xfoil_geom_options, xfoil_options,            &
-                                 get_last_design_parameters
+                                 get_last_design_parameters, get_last_airfoil
   use xfoil_driver,       only : run_xfoil
 
   double precision, dimension(:), intent(in) :: optdesign
@@ -428,7 +410,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   double precision, dimension(noppoint) :: alpha, lift, drag, moment, viscrms, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
-  double precision :: ffact, fxfact, actual_x_flap
+  double precision :: ffact, fxfact, actual_x_flap, tefact, actual_tcTE
   integer :: dvtbnd1, dvtbnd2, dvbbnd1, dvbbnd2, nmodest, nmodesb, nptt, nptb, i
   integer :: flap_idx, flap_idi, dvcounter, iunit, ndvs_top, ndvs_bot
   type(airfoil_type) :: final_airfoil
@@ -456,27 +438,20 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     dvbbnd2 = dvtbnd2
   end if
 
-! Format coordinates in a single loop in derived type. Also remove translation
-! and scaling to ensure Cm_x=0.25 doesn't change.
-  !write(*,*) 'c',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
+  ! Get actual trailing edge based on design variable
+  if (int_tcTE_spec == 1) then
+    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    actual_tcTE = optdesign(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
+      int_tcTE_spec)/tefact + min_tcTE
+  else
+    actual_tcTE=tcTE
+  end if
   
-  call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
-                      optdesign(dvtbnd1:dvtbnd2), optdesign(dvbbnd1:dvbbnd2),  &
-                      zt_new, zb_new, shapetype, symmetrical)
-
-! Format coordinates in a single loop (in airfoil_type derived type)
-
   final_airfoil%npoint = nptt + nptb - 1
-  call allocate_airfoil(final_airfoil)
-  do i = 1, nptt
-    final_airfoil%x(i) = xseedt(nptt-i+1)!/foilscale - xoffset
-    final_airfoil%z(i) = zt_new(nptt-i+1)!/foilscale - zoffset
-  end do
-  do i = 1, nptb - 1
-   final_airfoil%x(i+nptt) = xseedb(i+1)!/foilscale - xoffset
-   final_airfoil%z(i+nptt) = zb_new(i+1)!/foilscale - zoffset
-  end do
-
+  
+  call get_last_airfoil(restart_stat, global_search_stat, local_search_stat,   &
+    final_airfoil)
+  
 ! Use Xfoil to analyze final design
 
   if (.not. match_foils) then
@@ -501,7 +476,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     actual_x_flap = optdesign(dvcounter)/fxfact + min_flap_x
     
 !   Run xfoil for requested operating points
-    !   Get lift, drag, moment, alpha, xtrt, xtrb
+    !   Get lift, drag, moment, alpha, xtrt, xtrb from file
 
     call get_last_design_parameters(restart_stat, global_search_stat,          &
       local_search_stat, lift, drag, moment, alpha, xtrt, xtrb)
@@ -521,6 +496,13 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     if (int_x_flap_spec == 1) then
       write(*,'(A,F9.5)') " Flap x hinge position: ", actual_x_flap
       write(iunit,'(A,F9.5)') " Flap x hinge position: ", actual_x_flap
+      write(*,*)
+      write(iunit,*)
+    end if
+    
+    if (int_tcTE_spec == 1) then
+      write(*,'(A,F9.5)') " Trailing Edge thickness: ", actual_tcTE
+      write(iunit,'(A,F9.5)') " Trailing Edge thickness: ", actual_tcTE
       write(*,*)
       write(iunit,*)
     end if

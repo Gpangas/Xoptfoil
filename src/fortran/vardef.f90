@@ -44,10 +44,10 @@ module vardef
   double precision, dimension(max_op_points) :: op_point, reynolds, mach,      &
                                  flap_degrees, weighting, scale_factor, ncrit_pt
   integer, dimension(max_op_points) :: flap_identical_op
-  double precision :: x_flap, y_flap
+  double precision :: x_flap, y_flap, tcTE, xltTE
   character(3) :: y_flap_spec
-  character(8) :: x_flap_spec        ! added x_flap_spec
-  integer :: int_x_flap_spec         ! added int_x_flap_spec
+  character(8) :: x_flap_spec, TE_spec ! added x_flap_spec and TE_spec
+  integer :: int_x_flap_spec, int_tcTE_spec           ! added int_x_flap_spec
   logical :: use_flap
   character(14), dimension(max_op_points) :: optimization_type
   integer :: nflap_optimize, nflap_identical
@@ -58,10 +58,11 @@ module vardef
   double precision :: xoffset, zoffset, foilscale, foilangle
 
   type(airfoil_type) :: curr_foil
-  ! added min_flap_x and max_flap_x
+  ! added min_flap_x, max_flap_x, max_tcTE, min_tcTE
   double precision :: min_thickness, max_thickness, min_te_angle,              &
                       growth_allowed, min_flap_degrees, max_flap_degrees,      &
-                      min_flap_x, max_flap_x, min_camber, max_camber
+                      min_flap_x, max_flap_x, max_tcTE, min_tcTE, min_camber,  &
+                      max_camber
   double precision :: curv_threshold
   integer :: max_curv_reverse_top, max_curv_reverse_bot
   ! added lift and drag constraints
@@ -80,7 +81,7 @@ module vardef
   double precision, dimension(:), allocatable :: modest_seed
   double precision, dimension(:), allocatable :: modesb_seed
   
-  double precision :: initial_perturb, tcTE
+  double precision :: initial_perturb, tcTE_seed
   double precision :: min_bump_width
   integer :: b_spline_degree, b_spline_xtype, b_spline_distribution
   double precision, dimension(:), allocatable :: upointst, upointsb, xcontrolt,&

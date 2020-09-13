@@ -45,11 +45,11 @@ module parametrization_constr
 ! ----------------------------------------------------------------------------
 ! Subroutine that implements the Kulfan-Bussoletti Parameterization, weights to coordinates.
 subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
-                       symmetrical, tcTE)
+                       symmetrical, tTE)
 
   implicit none
 
-  real*8, intent (in) :: tcTE
+  real*8, intent (in) :: tTE
   real*8, dimension(:), intent (in) :: Wu
   real*8, dimension(:), intent (in) :: Wl
   logical, intent(in) :: symmetrical
@@ -65,11 +65,11 @@ subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
   
   ! Calculates the Z coordinate of the airfoil
   do i=1,nPointst
-    call KBP_Point(Wu, tcTE/2.0d0, nu, Xu_seed(i), Zu(i))
+    call KBP_Point(Wu, tTE/2.0d0, nu, Xu_seed(i), Zu(i))
   end do
   if (.not. symmetrical) then
     do i=1,nPointsb
-      call KBP_Point(Wl, -tcTE/2.0d0, nl, Xl_seed(i), Zl(i))
+      call KBP_Point(Wl, -tTE/2.0d0, nl, Xl_seed(i), Zl(i))
     end do
     
   ! For symmetrical airfoils, just mirror the top surface
@@ -84,16 +84,16 @@ subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
   
   ! ----------------------------------------------------------------------------
 ! Subroutine that computes one point in the the Kulfan-Bussoletti Parameterization.
-subroutine KBP_Point(weight,tcTE,BPO,x,z)
+subroutine KBP_Point(weight,tTE,BPO,x,z)
   use math_deps, only : surface_function
   implicit none
 
   integer, intent (in) ::       BPO                     ! BPO->Bernstein Polynomial Order
-  real*8, intent (in) ::        x, tcTE                 ! non-dimenstional
+  real*8, intent (in) ::        x, tTE                 ! non-dimenstional
   real*8, intent (out) ::       z
   real*8, dimension(BPO+1) ::   weight
 
-  z         = (x**0.5)*(1.0d0-x)*surface_function(x,weight,BPO)+x*tcTE
+  z         = (x**0.5)*(1.0d0-x)*surface_function(x,weight,BPO)+x*tTE
 
 end subroutine KBP_Point
 
@@ -101,7 +101,7 @@ end subroutine KBP_Point
 ! Subroutine that implements the Kulfan-Bussoletti Parameterization, coordinates to weights.
 subroutine KBP_init(Xu, Zu, Xl, Zl, Wu, Wl)
   
-  use vardef, only : nparams_top, nparams_bot, tcTE
+  use vardef, only : nparams_top, nparams_bot
 
   implicit none
 
@@ -112,11 +112,12 @@ subroutine KBP_init(Xu, Zu, Xl, Zl, Wu, Wl)
 
   integer ::                           nu, nl                ! n is the order of the polynomial
   integer ::                           i, j
+  real*8 ::                            tTE
   
   ! Set the value of zcTE, dimensionless trailing edge thickness
   i       = size(Zu,1)
   j       = size(Zl,1)
-  tcTE    = Zu(i)-Zl(j)
+  tTE    = Zu(i)-Zl(j)
 
   nu=nparams_top-1
   nl=nparams_bot-1
@@ -124,9 +125,9 @@ subroutine KBP_init(Xu, Zu, Xl, Zl, Wu, Wl)
   allocate(Wu_send(nu+1))
   allocate(Wl_send(nl+1))
   ! Set the weights of the Bernstein Polynomials.
-  call KBParameterization_fitting(i,Xu,Zu,nu,tcTE/2.0d0,Wu_send)
+  call KBParameterization_fitting(i,Xu,Zu,nu,tTE/2.0d0,Wu_send)
   Wu=Wu_send
-  call KBParameterization_fitting(j,Xl,Zl,nl,-tcTE/2.0d0,Wl_send)
+  call KBParameterization_fitting(j,Xl,Zl,nl,-tTE/2.0d0,Wl_send)
   Wl=Wl_send
 
 end subroutine KBP_init
@@ -220,7 +221,7 @@ end subroutine KBParameterization_fitting
 ! Subroutine that implements the b-spline Parameterization, weights to coordinates.
 subroutine BSP_airfoil(ut_seed, xt_seed, zt_seed, ub_seed, xb_seed, zb_seed,   &
 xmodest, xmodesb, modest, modesb, zt_new, zb_new,            &
-symmetrical)
+symmetrical , tTE)
   
   use vardef, only : b_spline_xtype, b_spline_degree
 
@@ -228,6 +229,7 @@ symmetrical)
 
   real*8, dimension(:), intent (in) :: xmodest, xmodesb, modest, modesb
   logical, intent(in) :: symmetrical
+  real*8, intent(in) :: tTE
   real*8, dimension(:), intent (in) ::ut_seed, xt_seed, zt_seed
   real*8, dimension(:), intent (in) ::ub_seed, xb_seed, zb_seed
   real*8, dimension(size(xt_seed,1)), intent (out) :: zt_new
@@ -253,12 +255,12 @@ symmetrical)
     allocate(zmodest_use(nmodest),zmodesb_use(nmodesb))
     
     ! Construst full control points vector
-    zmodest_use(1)=zt_seed(1)
-    zmodest_use(nmodest)=zt_seed(nPointst)
+    zmodest_use(1)=0.0d0
+    zmodest_use(nmodest)=+tTE/2.0d0
     zmodest_use(2:nmodest-1)=modest
   
-    zmodesb_use(1)=zb_seed(1)
-    zmodesb_use(nmodesb)=zb_seed(nPointsb)
+    zmodesb_use(1)=0.0d0
+    zmodesb_use(nmodesb)=-tTE/2.0d0
     zmodesb_use(2:nmodesb-1)=modesb
   
     ! Calculates the X, Z coordinates of the airfoil
@@ -290,12 +292,12 @@ symmetrical)
     xmodesb_use(nmodesb)=xb_seed(nPointsb)
     xmodesb_use(3:nmodesb-1)=modesb(1:nmodesb-3)
     
-    zmodest_use(1)=zt_seed(1)
-    zmodest_use(nmodest)=zt_seed(nPointst)
+    zmodest_use(1)=0.0d0
+    zmodest_use(nmodest)=+tTE/2.0d0
     zmodest_use(2:nmodest-1)=modest(nmodest-2:2*nmodest-5)
   
-    zmodesb_use(1)=zb_seed(1)
-    zmodesb_use(nmodesb)=zb_seed(nPointsb)
+    zmodesb_use(1)=0.0d0
+    zmodesb_use(nmodesb)=-tTE/2.0d0
     zmodesb_use(2:nmodesb-1)=modesb(nmodest-2:2*nmodest-5)
     
     ! get U
@@ -1150,7 +1152,7 @@ end subroutine deallocate_b_matrix
 
 ! ----------------------------------------------------------------------------
 ! Subroutine that implements the Bezier-PARSEC Parameterization, weights to coordinates.
-subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new)
+subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new, tTE)
 
   implicit none
 
@@ -1158,6 +1160,7 @@ subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new)
 
   real*8, intent(in) ::    xPt(:),xPb(:)                     ! x values of data points
   real*8, intent(in) ::    zPt(size(xPt,1)),zPb(size(xPb,1)) ! z values of data points
+  real*8, intent(in) ::    tTE
   real*8, intent(out) ::   zPt_new(size(xPt,1)),zPb_new(size(xPb,1)) ! z values of data points
   
   integer ::               nPt, nPb                          ! no. of data points
@@ -1188,7 +1191,7 @@ subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new)
   Alpha_te=modesb(5)                
   Beta_te=modest(5)                           
   Zte = 0.d0
-  dZte = modest(6)
+  dZte = tTE
   
   ! Calculating the control points of the bezier curves.
   call SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_max,Rle,Beta_te,dZte,error_code_t)
