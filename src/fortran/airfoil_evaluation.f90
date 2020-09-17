@@ -1028,6 +1028,20 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
     write(foilunit,'(A)') 'variables="x" "z"'
     write(foilunit,'(A)') 'zone t="Seed airfoil"'
 
+    ! Write seed coordinates to file
+
+    do i = 1, nptt + nptb - 1
+      write(foilunit,'(2F12.6)') curr_foil%x(i), curr_foil%z(i)
+    end do
+    
+    write(foilunit,'(A)') 'zone t="Match airfoil"'
+    
+    ! Write match coordinates to file
+
+    do i = 1, nptt + nptb - 1
+      write(foilunit,'(2F12.6)') match_foil%x(i), match_foil%z(i)
+    end do
+    
   else
 
 !   Format designcounter as string
@@ -1043,13 +1057,14 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
          err=910)
     write(foilunit,'(A)') 'zone t="Airfoil", SOLUTIONTIME='//trim(text)
 
+    ! Write coordinates to file
+
+    do i = 1, nptt + nptb - 1
+      write(foilunit,'(2F12.6)') curr_foil%x(i), curr_foil%z(i)
+    end do
+    
   end if
 
-! Write coordinates to file
-
-  do i = 1, nptt + nptb - 1
-    write(foilunit,'(2F12.6)') curr_foil%x(i), curr_foil%z(i)
-  end do
 
 ! Close output file
 

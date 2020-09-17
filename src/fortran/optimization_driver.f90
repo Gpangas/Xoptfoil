@@ -33,7 +33,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
 
   use vardef,             only : airfoil_type, xmatcht, xmatchb, zmatcht,      &
                                  zmatchb, xseedt, xseedb, zseedt, zseedb,      &
-                                 symmetrical, tcTE, TE_spec, xltTE
+                                 symmetrical, tcTE, TE_spec, xltTE, match_foil
   use memory_util,        only : deallocate_airfoil
   use airfoil_operations, only : get_seed_airfoil, get_split_points,           &
                                  split_airfoil, my_stop
@@ -42,7 +42,6 @@ subroutine matchfoils_preprocessing(matchfoil_file)
 
   character(*), intent(in) :: matchfoil_file
 
-  type(airfoil_type) :: match_foil
   type(naca_options_type) :: dummy_naca_options
   integer :: pointst, pointsb, i
   double precision, dimension(:), allocatable :: zttmp, zbtmp
@@ -74,10 +73,6 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   allocate(xmatchb(pointsb))
   allocate(zmatchb(pointsb))
   call split_airfoil(match_foil, xmatcht, xmatchb, zmatcht, zmatchb, .false.)
-
-! Deallocate derived type version of airfoil being matched
-
-  call deallocate_airfoil(match_foil)
 
 ! Interpolate x-vals of foil to match to seed airfoil points to x-vals
 
@@ -142,6 +137,21 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   !  write(*,*) xmatchb(i), zmatchb(i)
   !end do
 
+  deallocate(match_foil%x,match_foil%z)
+  allocate(match_foil%x(pointst+pointsb+1),match_foil%z(pointst+pointsb+1))
+  
+  match_foil%npoint=pointst+pointsb+1
+  
+  do i = 1, pointst
+    match_foil%x(i) = xmatcht(pointst-i+1)
+    match_foil%z(i) = zmatcht(pointst-i+1)
+  end do
+  do i = 1, pointsb-1
+    match_foil%x(i+pointst) = xmatchb(i+1)
+    match_foil%z(i+pointst) = zmatchb(i+1)
+  end do
+  
+  
 ! Deallocate temporary arrays
 
   deallocate(zttmp)

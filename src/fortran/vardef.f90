@@ -57,7 +57,7 @@ module vardef
                                        flap_identical_points
   double precision :: xoffset, zoffset, foilscale, foilangle
 
-  type(airfoil_type) :: curr_foil
+  type(airfoil_type) :: curr_foil, match_foil
   ! added min_flap_x, max_flap_x, max_tcTE, min_tcTE
   double precision :: min_thickness, max_thickness, min_te_angle,              &
                       growth_allowed, min_flap_degrees, max_flap_degrees,      &

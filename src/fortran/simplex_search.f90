@@ -46,7 +46,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
                          f0_ref, ds_options, restart, restart_write_freq,      &
                          indesigncounter, instep, converterfunc)
 
-  use optimization_util, only : bubble_sort, design_radius, write_design,      &
+  use optimization_util, only : bubble_sort, design_radius_simplex, write_design,      &
                                 read_run_control
 
   use vardef, only : output_prefix
@@ -237,7 +237,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
 !   Check for convergence
 
-    radius = design_radius(dv)
+    radius = design_radius_simplex(dv)
     if (radius < ds_options%tol) converged = .true.
 
 !   Display progress
@@ -413,7 +413,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
 ! Check for convergence one more time
 
-  radius = design_radius(dv)
+  radius = design_radius_simplex(dv)
 
 ! Display warning if max iterations are reached
 
