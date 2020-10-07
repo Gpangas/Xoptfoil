@@ -573,6 +573,39 @@ function aero_objective_function(designvars, include_penalty)
       
       if ( (i < noppoint) .and. (i > 1) ) increment = increment/2.d0 
       increment = scale_factor(i) / (increment + 4.d0*pi)
+      
+    elseif (trim(optimization_type(i)) == 'target-lift') then
+      
+      increment = scale_factor(i) * (1.D-9 +               &
+        (lift(i)-target_value(i))**2.d0 / (lift(i) + 1.D-9) )
+      write(*,*) increment
+    elseif (trim(optimization_type(i)) == 'target-drag') then
+      
+      increment = scale_factor(i) * (1.D-9 +               &
+        (drag(i)-target_value(i))**2.d0 / (drag(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-moment') then
+      
+      increment = scale_factor(i) * (1.D-9 +               &
+        (moment(i)-target_value(i))**2.d0 /                                    &
+        (moment(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-xtrt') then
+      
+      increment = scale_factor(i) * (1.D-9 +               &
+        (xtrt(i)-target_value(i))**2.d0 / (xtrt(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-xtrb') then
+      
+      increment = scale_factor(i) * (1.D-9 +               &
+        (xtrb(i)-target_value(i))**2.d0 / (xtrb(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-glide') then
+      
+      increment = scale_factor(i) * (1.D-9 +               &
+        (lift(i)/drag(i)-target_value(i))**2.d0 /                              &
+        (lift(i)/drag(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-sink') then
+      
+      increment = scale_factor(i) * (1.D-9 +               &
+        (lift(i)**1.5d0/drag(i)-target_value(i))**2.d0 /                       &
+        (lift(i)**1.5d0/drag(i) + 1.D-9) )
 
     else
 

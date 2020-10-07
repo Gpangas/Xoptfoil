@@ -470,7 +470,39 @@ subroutine check_seed()
 !     Cl_a < -4*pi (hopefully never encountered).
 
       checkval = 1.d0/(checkval + 4.d0*pi)
+    elseif (trim(optimization_type(i)) == 'target-lift') then
       
+      checkval = (1.D-9 +               &
+        (lift(i)-target_value(i))**2.d0 / (lift(i) + 1.D-9) )
+      write(*,*) checkval
+    elseif (trim(optimization_type(i)) == 'target-drag') then
+      
+      checkval = (1.D-9 +               &
+        (drag(i)-target_value(i))**2.d0 / (drag(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-moment') then
+      
+      checkval = (1.D-9 +               &
+        (moment(i)-target_value(i))**2.d0 /                  &
+        (moment(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-xtrt') then
+      
+      checkval = (1.D-9 +               &
+        (xtrt(i)-target_value(i))**2.d0 / (xtrt(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-xtrb') then
+      
+      checkval = (1.D-9 +               &
+        (xtrb(i)-target_value(i))**2.d0 / (xtrb(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-glide') then
+      
+      checkval = (1.D-9 +               &
+        (lift(i)/drag(i)-target_value(i))**2.d0 /            &
+        (lift(i)/drag(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'target-sink') then
+      
+      checkval = (1.D-9 +               &
+        (lift(i)**1.5d0/drag(i)-target_value(i))**2.d0 /     &
+        (lift(i)**1.5d0/drag(i) + 1.D-9) )
+
     else
       write(*,*)
       write(*,*) "Error: requested optimization_type for operating point "//   &

@@ -88,7 +88,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
             use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE, &
             xltTE, flap_selection, flap_identical_op, flap_degrees, weighting, &
-            optimization_type, ncrit_pt
+            optimization_type, target_value, ncrit_pt
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
                          min_moment, lift_constraint_type,                     &
                          min_lift, drag_constraint_type,                       &
@@ -166,8 +166,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   tcTE = 1.0E-4           
   xltTE = 0.0             
   op_mode(:) = 'spec-cl'
-  op_point(:) = 0.d0
+  target_value(:) = 0.d0
   optimization_type(:) = 'min-drag'
+  target_value(:) = 1.0d0
   reynolds(:) = 1.0D+05
   mach(:) = 0.d0
   flap_selection(:) = 'specify'
@@ -569,6 +570,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                trim(optimization_type(i))//"'"
     write(*,*) " op_mode("//trim(text)//") = '"//trim(op_mode(i))//"'"
     write(*,*) " op_point("//trim(text)//") = ", op_point(i)
+    write(*,*) " target_value("//trim(text)//") = ", target_value(i)
     write(*,'(A,es17.8)') "  reynolds("//trim(text)//") = ", reynolds(i)
     write(*,*) " mach("//trim(text)//") = ", mach(i)
     write(*,*) " flap_selection("//trim(text)//") = '"//                       &
@@ -823,9 +825,19 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       trim(optimization_type(i)) /= 'min-sink' .and.                           &
       trim(optimization_type(i)) /= 'max-lift' .and.                           &
       trim(optimization_type(i)) /= 'max-xtr' .and.                            &
+      trim(optimization_type(i)) /= 'target-lift' .and.                        &
+      trim(optimization_type(i)) /= 'target-drag' .and.                        &
+      trim(optimization_type(i)) /= 'target-moment' .and.                      &
+      trim(optimization_type(i)) /= 'target-xtrt' .and.                        &
+      trim(optimization_type(i)) /= 'target-xtrb' .and.                        &
+      trim(optimization_type(i)) /= 'target-glide' .and.                       &
+      trim(optimization_type(i)) /= 'target-sink'.and.                         &
       trim(optimization_type(i)) /= 'max-lift-slope')                          &
       call my_stop("optimization_type must be 'min-drag', 'max-glide', "//     &
-                   "min-sink', 'max-lift', 'max-xtr', or 'max-lift-slope'.")
+                   "min-sink', 'max-lift', 'max-xtr', "//                      &
+                   "'target-lift', 'target-drag', 'target-moment', "//         &
+                   "'target-xtrt', 'target-xtrb', 'target-glide', "//          &
+                   "'target-sink' or 'max-lift-slope'.")
     if ((trim(optimization_type(i)) == 'max-lift-slope') .and. (noppoint == 1))&
       call my_stop("at least two operating points are required for to "//      &
                    "maximize lift curve slope.")

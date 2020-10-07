@@ -42,7 +42,8 @@ module vardef
   character(7), dimension(max_op_points) :: op_mode
   character(9), dimension(max_op_points) :: flap_selection
   double precision, dimension(max_op_points) :: op_point, reynolds, mach,      &
-                                 flap_degrees, weighting, scale_factor, ncrit_pt
+                                 flap_degrees, weighting, scale_factor,        &
+                                 ncrit_pt, target_value
   integer, dimension(max_op_points) :: flap_identical_op
   double precision :: x_flap, y_flap, tcTE, xltTE
   character(3) :: y_flap_spec
