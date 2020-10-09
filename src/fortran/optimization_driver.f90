@@ -422,11 +422,11 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: ffact, fxfact, actual_x_flap, tefact, actual_tcTE
   integer :: dvtbnd1, dvtbnd2, dvbbnd1, dvbbnd2, nmodest, nmodesb, nptt, nptb, i
-  integer :: flap_idx, flap_idi, dvcounter, iunit, ndvs_top, ndvs_bot
+  integer :: flap_idx, flap_idi, dvcounter, iunit
   type(airfoil_type) :: final_airfoil
   character(80) :: output_file, aero_file
-  character(30) :: text
-  character(12) :: flapnote
+  character(80) :: text, text2
+  character(80) :: flapnote
 
   nmodest = nshapedvtop
   nmodesb = nshapedvbot
@@ -434,13 +434,11 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   nptb = size(xseedb,1)
 
 ! Set modes for top and bottom surfaces
-
-  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
   
   dvtbnd1 = 1
-  dvtbnd2 = ndvs_top
+  dvtbnd2 = nshapedvtop
   dvbbnd1 = dvtbnd2 + 1
-  dvbbnd2 = ndvs_top + ndvs_bot
+  dvbbnd2 = nshapedvtop + nshapedvbot
 ! Overwrite lower DVs for symmetrical airfoils (they are not used)
 
   if (symmetrical) then
@@ -465,7 +463,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
 ! Use Xfoil to analyze final design
 
   if (.not. match_foils) then
-
+    
 !   Get actual flap angles based on design variables
 
     ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
@@ -506,6 +504,8 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     if (int_x_flap_spec == 1) then
       write(*,'(A,F9.5)') " Flap x hinge position: ", actual_x_flap
       write(iunit,'(A,F9.5)') " Flap x hinge position: ", actual_x_flap
+      write(*,'(A,F9.5)') " Flap 1-x hinge position: ", 1.-actual_x_flap
+      write(iunit,'(A,F9.5)') " Flap 1-x hinge position: ", 1.-actual_x_flap
       write(*,*)
       write(iunit,*)
     end if
@@ -522,6 +522,11 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
       text = adjustl(text)
       if (flap_selection(i) == "specify") then
         flapnote = " (specified)"
+        flapnote = " (specified)"
+      elseif (flap_selection(i) == "identical") then
+        write(text2,*) flap_identical_op(i)
+        text2 = adjustl(text2)
+        flapnote = " (identical to "//trim(text2)//")"
       else
         flapnote = " (optimized)"
       end if
@@ -534,10 +539,10 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
       write(*,'(A8,F9.5)') " ncrit: ", ncrit_pt(i)
       write(iunit,'(A8,F9.5)') " ncrit: ", ncrit_pt(i)
       if (use_flap) then
-        write(*,'(A25,F9.5,A12)') " Flap setting (degrees): ",                 &
-                                  actual_flap_degrees(i), flapnote
-        write(iunit,'(A25,F9.5,A12)') " Flap setting (degrees): ",             &
-                                  actual_flap_degrees(i), flapnote
+        write(*,'(A25,F9.5,A)') " Flap setting (degrees): ",                 &
+                                  actual_flap_degrees(i), trim(flapnote)
+        write(iunit,'(A25,F9.5,A)') " Flap setting (degrees): ",             &
+                                  actual_flap_degrees(i), trim(flapnote)
       endif
       write(*,'(A18,F9.5)') " Angle of attack: ", alpha(i) 
       write(iunit,'(A18,F9.5)') " Angle of attack: ", alpha(i) 

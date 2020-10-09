@@ -1132,7 +1132,9 @@ function write_function_restart_cleanup(restart_status, global_search,         &
              histunit, ncoord
   integer :: i, j
   double precision, dimension(:,:), allocatable :: x, z, alpha, lift, drag,    &
-                                                   moment, xtrt, xtrb
+                                                   moment, xtrt, xtrb,         &
+                                                   actual_flap_degrees,        &
+                                                   actual_x_flap
   double precision, dimension(:), allocatable :: fmin, relfmin, rad
   integer , dimension(:), allocatable :: time
   character(150), dimension(:), allocatable :: zoneinfo
@@ -1187,6 +1189,8 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   allocate(moment(noppoint,designcounter+1))
   allocate(xtrt(noppoint,designcounter+1))
   allocate(xtrb(noppoint,designcounter+1))
+  allocate(actual_flap_degrees(noppoint,designcounter+1))
+  allocate(actual_x_flap(noppoint,designcounter+1))
   allocate(zoneinfo(designcounter+1))
   allocate(fmin(step+prevstep))
   allocate(relfmin(step+prevstep))
@@ -1304,6 +1308,8 @@ function write_function_restart_cleanup(restart_status, global_search,         &
     deallocate(moment)
     deallocate(xtrt)
     deallocate(xtrb)
+    deallocate(actual_flap_degrees)
+    deallocate(actual_x_flap)
     deallocate(fmin)
     deallocate(relfmin)
     deallocate(rad)
@@ -1338,8 +1344,9 @@ function write_function_restart_cleanup(restart_status, global_search,         &
 !   Read polars
 
     do j = 1, noppoint
-      read(polarunit,'(6ES14.6)') alpha(j,i), lift(j,i), drag(j,i),            &
-                                  moment(j,i), xtrt(j,i), xtrb(j,i)
+      read(polarunit,'(8ES14.6)') alpha(j,i), lift(j,i), drag(j,i),            &
+                                  moment(j,i), xtrt(j,i), xtrb(j,i),           &
+                                  actual_flap_degrees(j,i), actual_x_flap(j,i)
     end do
 
   end do
@@ -1351,8 +1358,10 @@ function write_function_restart_cleanup(restart_status, global_search,         &
 ! Re-write polars file without the unused designs
 
   open(unit=polarunit, file=polarfile, status='replace')
+  
   write(polarunit,'(A)') 'title="Airfoil polars"'
-  write(polarunit,'(A)') 'variables="cl" "cd"'
+  write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb" "flap deflexion" "flap hinge position"'
+
   do i = 0, designcounter
 !   Write zone header
 
@@ -1364,11 +1373,13 @@ function write_function_restart_cleanup(restart_status, global_search,         &
       write(polarunit,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
     end if
 
-!   Write polars
+    ! Write polars to file
 
     do j = 1, noppoint
-      write(polarunit,'(6ES14.6)') alpha(j,i+1), lift(j,i+1), drag(j,i+1),     &
-                                   moment(j,i+1), xtrt(j,i+1), xtrb(j,i+1)
+      write(polarunit,'(8ES14.6)') alpha(j,i+1), lift(j,i+1), drag(j,i+1),     &
+                                   moment(j,i+1), xtrt(j,i+1), xtrb(j,i+1),    &
+                                   actual_flap_degrees(j,i+1),                 &
+                                   actual_x_flap(j,i+1)
     end do
   end do
 
