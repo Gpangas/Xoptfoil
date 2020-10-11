@@ -82,9 +82,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
   namelist /optimization_options/ search_type, global_search, local_search,    &
             seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
-            nparameters_bot, initial_perturb, min_bump_width, b_spline_degree, &
-            b_spline_xtype, b_spline_distribution, restart,                    &
-            restart_write_freq, write_designs
+            nparameters_bot, flap_optimization_only, initial_perturb,          &
+            min_bump_width, b_spline_degree, b_spline_xtype,                   &
+            b_spline_distribution, restart, restart_write_freq, write_designs
   namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
             use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE, &
             xltTE, flap_selection, flap_identical_op, flap_degrees, weighting, &
@@ -136,6 +136,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   b_spline_distribution = 3
   nparameters_top = 4
   nparameters_bot = 4
+  flap_optimization_only = .false.
   initial_perturb = 0.025d0
   restart = .false.
   restart_write_freq = 20
@@ -543,6 +544,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " b_spline_distribution = ", b_spline_distribution
   write(*,*) " nparameters_top = ", nparameters_top
   write(*,*) " nparameters_bot = ", nparameters_bot
+  write(*,*) " flap_optimization_only = ", flap_optimization_only  
   write(*,*) " initial_perturb = ", initial_perturb
   write(*,*) " restart = ", restart
   write(*,*) " restart_write_freq = ", restart_write_freq
@@ -778,7 +780,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   if (b_spline_distribution /= 1 .and. b_spline_distribution /= 2 .and.          &
       b_spline_distribution /= 3)                                               &
     call my_stop("b_spline_distribution must be 1 or 2 or 3")
-
+  if ( (flap_optimization_only) .and. ((.not. use_flap) .or. (match_foils)) )  &
+    call my_stop("flap_optimization_only can only be used with use_flap=.true. &
+      &and match_foils=.false.")
+  if ( (flap_optimization_only) .and. (nflap_optimize==0))                    &
+    call my_stop("flap_optimization_only can only be used with with a number &
+      &of flaps to optimize diferent from 0")
 ! Operating points
 
   if (noppoint < 1) call my_stop("noppoint must be > 0.")

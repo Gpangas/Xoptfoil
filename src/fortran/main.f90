@@ -45,7 +45,7 @@ program main
   type(ga_options_type) :: ga_options
   type(ds_options_type) :: ds_options
   integer :: pointst, pointsb, steps, fevals,        &
-             restart_write_freq 
+             restart_write_freq , symmetrical_int, flap_optimization_only_int
   double precision, dimension(:), allocatable :: optdesign
   integer, dimension(:), allocatable :: constrained_dvs
   double precision :: f0, fmin
@@ -90,16 +90,27 @@ program main
 
   call parametrization_dvs(nparams_top, nparams_bot, shape_functions, nshapedvtop, nshapedvbot)
   
-  !added the flap chord as design variable
-  if (.not. symmetrical) then
-    allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize+int_x_flap_spec+int_tcTE_spec))
+  !Allocate the variables vector: optdesign
+  if (.not. flap_optimization_only) then
+    if (.not. symmetrical) then
+      allocate(optdesign(nshapedvtop+nshapedvbot+nflap_optimize+int_x_flap_spec+int_tcTE_spec))
+    else
+      allocate(optdesign(nshapedvtop+nflap_optimize+int_x_flap_spec+int_tcTE_spec))
+    end if
   else
-    allocate(optdesign(nshapedvtop+nflap_optimize+int_x_flap_spec+int_tcTE_spec))
+    allocate(optdesign(nflap_optimize+int_x_flap_spec))
   end if
-
+  
+  flap_optimization_only_int=0
+  symmetrical_int=0
+  if (.not. flap_optimization_only) flap_optimization_only_int=1
+  if (.not. symmetrical) symmetrical_int=1
+  
   write(*,*) "Number of Design Variables     = ", size(optdesign,1)
-  write(*,*) "  for top shape                = ", nshapedvtop
-  write(*,*) "  for bot shape                = ", nshapedvbot
+  write(*,*) "  for top shape                = ", nshapedvtop *                &
+    flap_optimization_only_int
+  write(*,*) "  for bot shape                = ", nshapedvbot *                &
+    flap_optimization_only_int * symmetrical_int
   write(*,*) "  for flap deflexion           = ", nflap_optimize
   write(*,*) "  for flap hinge position      = ", int_x_flap_spec
   write(*,*) "  for trailing edge thickness  = ", int_tcTE_spec

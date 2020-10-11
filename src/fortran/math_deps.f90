@@ -1010,7 +1010,7 @@ SUBROUTINE spline_interp(ntop,xtop,ztop,nbot,xbot,zbot,                  &
   
   ! interpolate top
 
- INDICATOR = .TRUE.
+  INDICATOR = .TRUE.
   do i = 1, nitop
     call XINTERPS(SINTERP, xitop(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
     zotop(i) = SEVAL(SINTERP,Y,YP,S,N)

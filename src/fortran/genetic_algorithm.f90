@@ -837,4 +837,50 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time)
 
 end subroutine ga_read_restart
 
+!=============================================================================80
+!
+! Genetic algorithm restart read routine
+!
+!=============================================================================80
+subroutine ga_read_step(step)
+
+  use vardef, only : output_prefix
+
+  integer, intent(inout) :: step
+
+  character(100) :: restfile
+  integer :: iunit, ioerr
+
+! Status notification
+
+  restfile = 'restart_ga_'//trim(output_prefix)
+  write(*,*) 'Reading genetic algorithm step data from file '//&
+             trim(restfile)//' ...'
+ 
+! Open output file for reading
+
+  iunit = 13
+  open(unit=iunit, file=restfile, status='old', form='unformatted',            &
+       iostat=ioerr)
+  if (ioerr /= 0) then
+    write(*,*) 'Error: could not find input file '//trim(restfile)//'.'
+    write(*,*)
+    stop
+  end if
+
+! Read restart data
+
+  read(iunit) step
+
+! Close restart file
+
+  close(iunit)
+
+! Status notification
+
+  write(*,*) 'Successfully read step algorithm restart file.'
+  write(*,*)
+
+end subroutine ga_read_step
+
 end module genetic_algorithm

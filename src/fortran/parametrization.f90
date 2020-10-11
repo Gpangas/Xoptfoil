@@ -420,7 +420,8 @@ subroutine parametrization_init(optdesign, x0)
                                  int_tcTE_spec, min_tcTE, max_tcTE, tcTE,      &
                                  flap_optimize_points, min_bump_width,         &
                                  xseedt, xseedb, zseedt, zseedb, nshapedvtop,  &
-                                 nshapedvbot, modest_seed, modesb_seed
+                                 nshapedvbot, modest_seed, modesb_seed,        &
+                                 flap_optimization_only
 
   double precision, dimension(:), intent(inout) :: optdesign
   double precision, dimension(size(optdesign,1)), intent(out) :: x0
@@ -438,12 +439,15 @@ subroutine parametrization_init(optdesign, x0)
   
   if (trim(shape_functions) == 'naca') then     
 
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+    if (.not. flap_optimization_only) then
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-  !   Mode strength = 0 (aka seed airfoil)
-
-    x0(1:nfuncs) = 0.d0
-
+    !   Mode strength = 0 (aka seed airfoil)
+      x0(1:nfuncs) = 0.d0
+    else 
+      nfuncs=0
+    end if
+    
   !   Seed flap deflection as specified in input file
 
     do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
@@ -452,18 +456,23 @@ subroutine parametrization_init(optdesign, x0)
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
     if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
+    
   elseif (trim(shape_functions) == 'hicks-henne') then
-
-    nfuncs = (ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec)/3
-
-  !   Bump strength = 0 (aka seed airfoil)
-
-    do i = 1, nfuncs
-      counter = 3*(i-1)
-      x0(counter+1) = 0.d0
-      x0(counter+2) = 0.5d0*t1fact
-      x0(counter+3) = 1.d0*t2fact
-    end do
+    
+    if (.not. flap_optimization_only) then
+      nfuncs = (ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec)/3
+      
+      !   Bump strength = 0 (aka seed airfoil)
+      do i = 1, nfuncs
+        counter = 3*(i-1)
+        x0(counter+1) = 0.d0
+        x0(counter+2) = 0.5d0*t1fact
+        x0(counter+3) = 1.d0*t2fact
+      end do
+    else 
+      nfuncs=0
+    end if
+    
     do i = 3*nfuncs+1, ndv - int_x_flap_spec - int_tcTE_spec
       oppoint = flap_optimize_points(i-3*nfuncs)
       x0(i) = flap_degrees(oppoint)*ffact
@@ -472,11 +481,15 @@ subroutine parametrization_init(optdesign, x0)
     if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
     
   elseif (trim(shape_functions) == 'kulfan-bussoletti') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+    
+    if (.not. flap_optimization_only) then
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-    x0(1:nshapedvtop) = modest_seed
-    x0(nshapedvtop+1:nfuncs) = modesb_seed
-
+      x0(1:nshapedvtop) = modest_seed
+      x0(nshapedvtop+1:nfuncs) = modesb_seed
+    else 
+      nfuncs=0
+    end if
     !   Seed flap deflection as specified in input file
     
     do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
@@ -487,11 +500,15 @@ subroutine parametrization_init(optdesign, x0)
     if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
   
   elseif (trim(shape_functions) == 'b-spline') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+    if (.not. flap_optimization_only) then
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-    x0(1:nshapedvtop) = modest_seed
-    x0(nshapedvtop+1:nfuncs) = modesb_seed
-
+      x0(1:nshapedvtop) = modest_seed
+      x0(nshapedvtop+1:nfuncs) = modesb_seed
+    else 
+      nfuncs=0
+    end if
+    
     !   Seed flap deflection as specified in input file
 
     do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
@@ -502,11 +519,15 @@ subroutine parametrization_init(optdesign, x0)
     if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
   
   elseif (trim(shape_functions) == 'bezier-parsec') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+    if (.not. flap_optimization_only) then
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-    x0(1:nshapedvtop) = modest_seed
-    x0(nshapedvtop+1:nfuncs) = modesb_seed
-
+      x0(1:nshapedvtop) = modest_seed
+      x0(nshapedvtop+1:nfuncs) = modesb_seed
+    else 
+      nfuncs=0
+    end if
+    
     !   Seed flap deflection as specified in input file
 
     do i = nfuncs + 1, ndv - int_x_flap_spec - int_tcTE_spec
@@ -543,7 +564,8 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
                                  max_flap_degrees, nshapedvtop, nshapedvbot,   &
                                  int_x_flap_spec, min_flap_x, max_flap_x,      &
                                  int_tcTE_spec, min_tcTE, max_tcTE, tcTE,      &
-                                 min_bump_width, modest_seed, modesb_seed
+                                 min_bump_width, modest_seed, modesb_seed,     &
+                                 flap_optimization_only
   
   double precision, dimension(:), intent(in) :: optdesign
   double precision, dimension(size(optdesign,1)), intent(out) :: xmin, xmax
@@ -562,11 +584,15 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
   tefact = initial_perturb/(max_tcTE - min_tcTE)
   
   if (trim(shape_functions) == 'naca') then
+    if (.not. flap_optimization_only) then
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
-
-    xmin(1:nfuncs) = -0.5d0*initial_perturb
-    xmax(1:nfuncs) = 0.5d0*initial_perturb
+      xmin(1:nfuncs) = -0.5d0*initial_perturb
+      xmax(1:nfuncs) = 0.5d0*initial_perturb
+    else 
+      nfuncs=0
+    end if
+    
     xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
     xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact
     if (int_x_flap_spec == 1) then
@@ -580,18 +606,22 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
 
 
   elseif (trim(shape_functions) == 'hicks-henne') then
+    if (.not. flap_optimization_only) then
+      nfuncs = (ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec)/3
 
-    nfuncs = (ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec)/3
-
-    do i = 1, nfuncs
-      counter = 3*(i-1)
-      xmin(counter+1) = -initial_perturb/2.d0
-      xmax(counter+1) = initial_perturb/2.d0
-      xmin(counter+2) = 0.0001d0*t1fact
-      xmax(counter+2) = 1.d0*t1fact
-      xmin(counter+3) = min_bump_width*t2fact
-      xmax(counter+3) = 10.d0*t2fact
-    end do
+      do i = 1, nfuncs
+        counter = 3*(i-1)
+        xmin(counter+1) = -initial_perturb/2.d0
+        xmax(counter+1) = initial_perturb/2.d0
+        xmin(counter+2) = 0.0001d0*t1fact
+        xmax(counter+2) = 1.d0*t1fact
+        xmin(counter+3) = min_bump_width*t2fact
+        xmax(counter+3) = 10.d0*t2fact
+      end do
+    else 
+      nfuncs=0
+    end if
+    
     do i = 3*nfuncs+1, ndv - int_x_flap_spec - int_tcTE_spec
       xmin(i) = min_flap_degrees*ffact
       xmax(i) = max_flap_degrees*ffact
@@ -606,12 +636,16 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
     end if
   
   elseif (trim(shape_functions) == 'kulfan-bussoletti') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+    if (.not. flap_optimization_only) then
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-    xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
-    xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
-    xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
-    xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+      xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
+      xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
+      xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
+      xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+    else 
+      nfuncs=0
+    end if
     
     xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
     xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact
@@ -625,12 +659,16 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
     end if
   
   elseif (trim(shape_functions) == 'b-spline') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+    if (.not. flap_optimization_only) then  
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-    xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
-    xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
-    xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
-    xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+      xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
+      xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
+      xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
+      xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+    else 
+      nfuncs=0
+    end if
     
     xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
     xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact
@@ -644,12 +682,16 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
     end if
     
   elseif (trim(shape_functions) == 'bezier-parsec') then
-    nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
+    if (.not. flap_optimization_only) then
+      nfuncs = ndv - nflap_optimize - int_x_flap_spec - int_tcTE_spec
 
-    xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
-    xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
-    xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
-    xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+      xmin(1:nshapedvtop) = modest_seed-initial_perturb/2.d0
+      xmax(1:nshapedvtop) = modest_seed+initial_perturb/2.d0
+      xmin(nshapedvtop+1:nfuncs) = modesb_seed-initial_perturb/2.d0
+      xmax(nshapedvtop+1:nfuncs) = modesb_seed+initial_perturb/2.d0
+    else 
+      nfuncs=0
+    end if
     
     xmin(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = min_flap_degrees*ffact
     xmax(nfuncs+1:ndv-int_x_flap_spec-int_tcTE_spec) = max_flap_degrees*ffact

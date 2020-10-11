@@ -561,5 +561,50 @@ subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
   write(*,*)
 
 end subroutine pso_read_restart
- 
+
+!=============================================================================80
+!
+! Particle swarm step read routine
+!
+!=============================================================================80
+subroutine pso_read_step(step)
+
+  use vardef, only : output_prefix
+
+  integer, intent(out) :: step
+
+  character(100) :: restfile
+  integer :: iunit, ioerr
+
+! Status notification
+
+  restfile = 'restart_pso_'//trim(output_prefix)
+  write(*,*) 'Reading PSO step data from file '//trim(restfile)//' ...'
+
+! Open output file for reading
+
+  iunit = 13
+  open(unit=iunit, file=restfile, status='old', form='unformatted',            &
+       iostat=ioerr)
+  if (ioerr /= 0) then
+    write(*,*) 'Error: could not find input file '//trim(restfile)//'.'
+    write(*,*)
+    stop
+  end if
+  
+! Read restart data
+
+  read(iunit) step
+
+! Close restart file
+
+  close(iunit)
+
+! Status notification
+
+  write(*,*) 'Successfully read PSO step data.'
+  write(*,*)
+
+end subroutine pso_read_step
+                            
 end module particle_swarm

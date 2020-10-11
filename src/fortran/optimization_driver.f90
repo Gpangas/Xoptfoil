@@ -170,8 +170,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
   use vardef,             only : output_prefix, global_search_stat,            &
                                  local_search_stat, restart_stat
-  use particle_swarm,     only : pso_options_type, particleswarm
-  use genetic_algorithm,  only : ga_options_type, geneticalgorithm
+  use particle_swarm,     only : pso_options_type, particleswarm, pso_read_step
+  use genetic_algorithm,  only : ga_options_type, geneticalgorithm, ga_read_step
   use simplex_search,     only : ds_options_type, simplexsearch
   use airfoil_evaluation, only : objective_function,                           &
                                  objective_function_nopenalty, write_function, &
@@ -276,12 +276,12 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   
   ! Set up stepsg
   
-  if ((restart_status == 'local_optimization') .and.                            &
+  if ((restart_status == 'local_optimization') .and.                           &
     (trim(search_type) == 'global_and_local')) then 
     if (trim(global_search) == 'genetic_algorithm') then
-      stepsg=ga_options%maxit
+      call ga_read_step(stepsg)
     elseif (trim(global_search) == 'particle_swarm') then
-      stepsg=pso_options%maxit
+      call pso_read_step(stepsg)
     end if
   elseif(restart_status == 'local_optimization') then
     stepsg=0
@@ -406,7 +406,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
   use vardef
   use memory_util,        only : allocate_airfoil, deallocate_airfoil
   use airfoil_operations, only : airfoil_write
-  use parametrization,    only : create_airfoil, parametrization_dvs
+  use parametrization,    only : parametrization_dvs
   use airfoil_evaluation, only : xfoil_geom_options, xfoil_options,            &
                                  get_last_design_parameters, get_last_airfoil
   use xfoil_driver,       only : run_xfoil
@@ -446,6 +446,13 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     dvbbnd2 = dvtbnd2
   end if
 
+  if (flap_optimization_only) then
+    dvtbnd1 = 0
+    dvtbnd2 = 0
+    dvbbnd1 = 0
+    dvbbnd2 = 0
+  end if
+    
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
     tefact = initial_perturb/(max_tcTE - min_tcTE)

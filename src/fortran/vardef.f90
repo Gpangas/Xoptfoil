@@ -49,7 +49,7 @@ module vardef
   character(3) :: y_flap_spec
   character(8) :: x_flap_spec, TE_spec ! added x_flap_spec and TE_spec
   integer :: int_x_flap_spec, int_tcTE_spec           ! added int_x_flap_spec
-  logical :: use_flap
+  logical :: use_flap, flap_optimization_only
   character(14), dimension(max_op_points) :: optimization_type
   integer :: nflap_optimize, nflap_identical
                                      ! Number of operating points where flap 

@@ -163,7 +163,14 @@ function aero_objective_function(designvars, include_penalty)
     dvbbnd1 = 1
     dvbbnd2 = dvtbnd2
   end if
-
+  
+  if (flap_optimization_only) then
+    dvtbnd1 = 0
+    dvtbnd2 = 0
+    dvbbnd1 = 0
+    dvbbnd2 = 0
+  end if
+  
   penaltyval = 0.d0
   
   ! Get actual trailing edge based on design variable
@@ -179,10 +186,15 @@ function aero_objective_function(designvars, include_penalty)
   
 ! Create top and bottom surfaces by perturbation of seed airfoil
   !write(*,*) 'a',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
-  
-  call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
+  if(.not. flap_optimization_only) then
+    call create_airfoil(xseedt, zseedt, xseedb, zseedb,                        &
                       designvars(dvtbnd1:dvtbnd2), designvars(dvbbnd1:dvbbnd2),&
                       zt_new, zb_new, shape_functions, symmetrical, actual_tcTE)
+  else
+    zt_new=zseedt
+    zb_new=zseedb
+  end if
+
 
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
@@ -319,17 +331,18 @@ function aero_objective_function(designvars, include_penalty)
   end if
 
 ! Check that number of flap optimize points are correct
-
-  ndvs = size(designvars,1) - int_x_flap_spec - int_tcTE_spec
-  if (nflap_optimize /= (ndvs - dvbbnd2)) then
-    write(*,*) nflap_optimize
-    write(*,*) ndvs
-    write(*,*) dvbbnd2
-    write(*,*) "Wrong number of design variables for flap deflections."
-    write(*,*) "Please report this bug.1"
-    stop
+  if (.not. flap_optimization_only) then
+    ndvs = size(designvars,1) - int_x_flap_spec - int_tcTE_spec
+    if (nflap_optimize /= (ndvs - dvbbnd2)) then
+      write(*,*) nflap_optimize
+      write(*,*) ndvs
+      write(*,*) dvbbnd2
+      write(*,*) "Wrong number of design variables for flap deflections."
+      write(*,*) "Please report this bug.1"
+      stop
+    end if
   end if
-
+  
 ! Get actual flap angles based on design variables
 ! Also add a penalty for flap deflections outside the specified bounds
   
@@ -717,9 +730,14 @@ function matchfoil_objective_function(designvars)
   
 ! Create top and bottom surfaces by perturbation of seed airfoil
 
-  call create_airfoil(xseedt, zseedt, xseedb, zseedb, designvars(1:dvtbnd),    &
-                      designvars(dvtbnd+1:dvbbnd), zt_new, zb_new,             &
-                      shape_functions, .false., actual_tcTE)
+  if(.not. flap_optimization_only) then
+    call create_airfoil(xseedt, zseedt, xseedb, zseedb,                        &
+                      designvars(1:dvtbnd), designvars(dvtbnd+1:dvbbnd),&
+                      zt_new, zb_new, shape_functions, .false., actual_tcTE)
+  else
+    zt_new=zseedt
+    zb_new=zseedb
+  end if
 
 ! Evaluate the new airfoil, not counting fixed LE and TE points
 
@@ -794,12 +812,20 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   dvtbnd2 = ndvs_top
   dvbbnd1 = dvtbnd2 + 1
   dvbbnd2 = ndvs_top + ndvs_bot
+  
 
 ! Overwrite lower DVs for symmetrical airfoils (they are not used)
 
   if (symmetrical) then
     dvbbnd1 = 1
     dvbbnd2 = dvtbnd2
+  end if
+  
+  if (flap_optimization_only) then
+    dvtbnd1 = 0
+    dvtbnd2 = 0
+    dvbbnd1 = 0
+    dvbbnd2 = 0
   end if
 
   ! Get actual trailing edge based on design variable
@@ -811,13 +837,17 @@ function write_airfoil_optimization_progress(designvars, designcounter)
     actual_tcTE=tcTE
   end if
   
-! Format coordinates in a single loop in derived type. Also remove translation
-! and scaling to ensure Cm_x=0.25 doesn't change.
-  !write(*,*) 'b',dvtbnd1,dvtbnd2,dvbbnd1,dvbbnd2
-  call create_airfoil(xseedt, zseedt, xseedb, zseedb,                          &
+  ! Get the airfoil
+  
+  if(.not. flap_optimization_only) then
+    call create_airfoil(xseedt, zseedt, xseedb, zseedb,                        &
                       designvars(dvtbnd1:dvtbnd2), designvars(dvbbnd1:dvbbnd2),&
                       zt_new, zb_new, shape_functions, symmetrical, actual_tcTE)
-
+  else
+    zt_new=zseedt
+    zb_new=zseedb
+  end if
+  
 ! Format coordinates in a single loop in derived type
 
   do i = 1, nptt
@@ -832,13 +862,14 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 ! Check that number of flap optimize points are correct
 
   ndvs = size(designvars,1) - int_x_flap_spec - int_tcTE_spec
-  
-  if (nflap_optimize /= (ndvs - dvbbnd2)) then
-    write(*,*) "Wrong number of design variables for flap deflections."
-    write(*,*) "Please report this bug.2"
-    stop
+  if (.not. flap_optimization_only) then
+    if (nflap_optimize /= (ndvs - dvbbnd2)) then
+      write(*,*) "Wrong number of design variables for flap deflections."
+      write(*,*) "Please report this bug.2"
+      stop
+    end if
   end if
-
+  
 ! Get actual flap angles based on design variables
 
   ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
@@ -1027,10 +1058,15 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
   
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
+  if(.not. flap_optimization_only) then
+    call create_airfoil(xseedt, zseedt, xseedb, zseedb,                        &
+                      designvars(1:dvtbnd), designvars(dvtbnd+1:dvbbnd),&
+                      zt_new, zb_new, shape_functions, .false., actual_tcTE)
+  else
+    zt_new=zseedt
+    zb_new=zseedb
+  end if
 
-  call create_airfoil(xseedt, zseedt, xseedb, zseedb, designvars(1:dvtbnd),    &
-                      designvars(dvtbnd+1:dvbbnd), zt_new, zb_new,             &
-                      shape_functions, .false., actual_tcTE)
 
 ! Format coordinates in a single loop in derived type
 
@@ -1267,7 +1303,7 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   read(histunit,*)
 
 ! Read optimizer data at each iteration
-!write(*,*) step+prevstep
+write(*,*) step+prevstep
   do i = 1, step+prevstep
     read(histunit,*) j, fmin(i), relfmin(i), rad(i), time(i)
   end do
