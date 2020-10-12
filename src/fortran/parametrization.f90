@@ -89,6 +89,8 @@ end subroutine deallocate_parametrization
 !=============================================================================80
 subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
 
+  use vardef, only : int_kulfan_bussoletti_LEM
+  
   double precision, dimension(:), intent(in) :: xtop, xbot, modestop, modesbot
   character(*), intent(in) :: shapetype
 
@@ -107,8 +109,8 @@ subroutine create_shape_functions(xtop, xbot, modestop, modesbot, shapetype)
     
   elseif (trim(shapetype) == 'kulfan-bussoletti') then
     ! Number of modes is order of polynomial +1
-    nmodestop = size(modestop,1)
-    nmodesbot = size(modesbot,1)
+    nmodestop = size(modestop,1)+int_kulfan_bussoletti_LEM
+    nmodesbot = size(modesbot,1)+int_kulfan_bussoletti_LEM
     
   elseif (trim(shapetype) == 'b-spline') then
     ! 
@@ -240,7 +242,7 @@ end subroutine create_airfoil
 !=============================================================================80
 subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
                                ndvs_top, ndvs_bot)
-  use vardef, only : b_spline_xtype
+  use vardef, only : b_spline_xtype, int_kulfan_bussoletti_LEM
   
   integer, intent(in) :: nparams_top, nparams_bot
   character(*), intent(in) :: parametrization_type
@@ -259,8 +261,8 @@ subroutine parametrization_dvs(nparams_top, nparams_bot, parametrization_type, &
     
   elseif (trim(parametrization_type) == 'kulfan-bussoletti') then
     
-    ndvs_top = nparams_top
-    ndvs_bot = nparams_bot
+    ndvs_top = nparams_top + int_kulfan_bussoletti_LEM
+    ndvs_bot = nparams_bot + int_kulfan_bussoletti_LEM
   
   elseif (trim(parametrization_type) == 'b-spline') then
     

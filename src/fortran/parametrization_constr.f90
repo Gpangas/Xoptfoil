@@ -46,30 +46,37 @@ module parametrization_constr
 ! Subroutine that implements the Kulfan-Bussoletti Parameterization, weights to coordinates.
 subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
                        symmetrical, tTE)
-
+  use vardef, only : int_kulfan_bussoletti_LEM
+  
   implicit none
 
   real*8, intent (in) :: tTE
-  real*8, dimension(:), intent (in) :: Wu
-  real*8, dimension(:), intent (in) :: Wl
+  real*8, dimension(:), intent (in) :: Wu ! weights
+  real*8, dimension(:), intent (in) :: Wl ! weights
   logical, intent(in) :: symmetrical
   real*8, dimension(:), intent (in) :: Xu_seed, Zu_seed, Xl_seed, Zl_seed
   real*8, dimension(size(Xu_seed,1)), intent (out) :: Zu
   real*8, dimension(size(Xl_seed,1)), intent (out) :: Zl
-  integer :: i, nPointst, nPointsb, nu, nl
+  integer :: i, nPointst, nPointsb
+  integer :: nu, nl ! degree of polynomial
 
-  nu=size(Wu,1)-1
-  nl=size(Wu,1)-1
+  nu=size(Wu,1)-1-int_kulfan_bussoletti_LEM
+  nl=size(Wu,1)-1-int_kulfan_bussoletti_LEM
   nPointst=size(Xu_seed,1)
   nPointsb=size(Xl_seed,1)
+  !write(*,*) nu, nl
+  !write(*,*)
+  !do i=1,size(wu,1)
+  !  write(*,*) wu(i), wl(i)
+  !end do
   
   ! Calculates the Z coordinate of the airfoil
   do i=1,nPointst
-    call KBP_Point(Wu, tTE/2.0d0, nu, Xu_seed(i), Zu(i))
+    call KBP_Point(Wu, tTE/2.0d0, nu, Xu_seed(i), Zu(i), int_kulfan_bussoletti_LEM)
   end do
   if (.not. symmetrical) then
     do i=1,nPointsb
-      call KBP_Point(Wl, -tTE/2.0d0, nl, Xl_seed(i), Zl(i))
+      call KBP_Point(Wl, -tTE/2.0d0, nl, Xl_seed(i), Zl(i), int_kulfan_bussoletti_LEM)
     end do
     
   ! For symmetrical airfoils, just mirror the top surface
@@ -84,16 +91,18 @@ subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
   
   ! ----------------------------------------------------------------------------
 ! Subroutine that computes one point in the the Kulfan-Bussoletti Parameterization.
-subroutine KBP_Point(weight,tTE,BPO,x,z)
+subroutine KBP_Point(weight,tTE,BPO,x,z, int_LEM)
   use math_deps, only : surface_function
+  
   implicit none
 
-  integer, intent (in) ::       BPO                     ! BPO->Bernstein Polynomial Order
-  real*8, intent (in) ::        x, tTE                 ! non-dimenstional
+  integer, intent (in) ::       BPO               ! BPO->Bernstein Polynomial Order
+  real*8, intent (in) ::        x, tTE            ! non-dimenstional
   real*8, intent (out) ::       z
-  real*8, dimension(BPO+1) ::   weight
+  integer, intent (in) ::       int_LEM           ! use LEM ? yes (1) or no (0)
+  real*8, dimension(BPO+1+int_LEM) ::   weight
 
-  z         = (x**0.5)*(1.0d0-x)*surface_function(x,weight,BPO)+x*tTE
+  z         = (x**0.5)*(1.0d0-x)*surface_function(x,weight,BPO, int_LEM)+x*tTE
 
 end subroutine KBP_Point
 
@@ -101,19 +110,19 @@ end subroutine KBP_Point
 ! Subroutine that implements the Kulfan-Bussoletti Parameterization, coordinates to weights.
 subroutine KBP_init(Xu, Zu, Xl, Zl, Wu, Wl)
   
-  use vardef, only : nparams_top, nparams_bot
+  use vardef, only : nparams_top, nparams_bot, int_kulfan_bussoletti_LEM
 
   implicit none
 
   real*8, dimension(:), intent(in) ::  Xu, Xl, Zu, Zl        ! airfoil coordinates
-  real*8, dimension(nparams_top), intent(inout) :: Wu                    ! array with the weights of the Bernstein polinomials
-  real*8, dimension(nparams_bot), intent(inout) :: Wl                    ! array with the weights of the Bernstein polinomials
+  real*8, dimension(nparams_top+int_kulfan_bussoletti_LEM), intent(inout) :: Wu                    ! array with the weights of the Bernstein polinomials
+  real*8, dimension(nparams_bot+int_kulfan_bussoletti_LEM), intent(inout) :: Wl                    ! array with the weights of the Bernstein polinomials
   real*8, dimension(:), allocatable :: Wu_send, Wl_send      ! array with the weights of the Bernstein polinomials
 
   integer ::                           nu, nl                ! n is the order of the polynomial
   integer ::                           i, j
   real*8 ::                            tTE
-  
+  write(*,*) "init", int_kulfan_bussoletti_LEM
   ! Set the value of zcTE, dimensionless trailing edge thickness
   i       = size(Zu,1)
   j       = size(Zl,1)
@@ -122,93 +131,81 @@ subroutine KBP_init(Xu, Zu, Xl, Zl, Wu, Wl)
   nu=nparams_top-1
   nl=nparams_bot-1
   
-  allocate(Wu_send(nu+1))
-  allocate(Wl_send(nl+1))
+  allocate(Wu_send(nu+1+int_kulfan_bussoletti_LEM))
+  allocate(Wl_send(nl+1+int_kulfan_bussoletti_LEM))
   ! Set the weights of the Bernstein Polynomials.
-  call KBParameterization_fitting(i,Xu,Zu,nu,tTE/2.0d0,Wu_send)
+  call KBParameterization_fitting(i,Xu,Zu,nu,tTE/2.0d0,int_kulfan_bussoletti_LEM,Wu_send)
   Wu=Wu_send
-  call KBParameterization_fitting(j,Xl,Zl,nl,-tTE/2.0d0,Wl_send)
+  call KBParameterization_fitting(j,Xl,Zl,nl,-tTE/2.0d0,int_kulfan_bussoletti_LEM,Wl_send)
   Wl=Wl_send
 
+  write(*,*) nu, nl
+  write(*,*) size(wu,1), size(wl,1)
+  write(*,*)
+  do i=1,size(wu,1)
+    write(*,*) wu(i), wl(i)
+  end do
+  
 end subroutine KBP_init
 
 ! ----------------------------------------------------------------------------
 ! Fits a KB Parameterization of order n to the XZ coordinates of a given airfoil (top or bottom half)
 !  using least squares to calculate the weights.
-subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,W)
+subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
 
   use math_deps, only : SOLVE_SVD, fx, BINCOEF
 
   implicit none
   
-  integer, intent(in) ::                              ndata           ! no. of data points
-  double precision, intent (in), dimension(ndata) ::  X, Z
-  double precision, intent (in) ::                    zcTE            ! dimensionless trailing edge thickness
-  integer, intent (in) ::                             n
-  double precision, intent (out), dimension(n+1) ::   W               ! weight vector for the KB parameterization Bernstein Polynomials
-  integer ::                                          i,j,k,a
-  double precision, dimension(n+1,n+1) ::             dSdw            ! matrix that stores the coeffitiens of the equation system to be solved (A.w=B)
-  double precision, dimension(n+1) ::                 B
-  real, dimension(n+1) ::                             W_send
-  k     = size(X,1)
+  integer, intent(in) ::                                      ndata           ! no. of data points
+  double precision, intent (in), dimension(ndata) ::          X, Z
+  double precision, intent (in) ::                            zcTE            ! dimensionless trailing edge thickness
+  integer, intent (in) ::                                     n        ! degree of polynomial
+  integer, intent (in) ::                                     int_LEM           ! use LEM ? yes (1) or no (0)
+  double precision, intent (out), dimension(n+1+int_LEM) ::   W               ! weight vector for the KB parameterization Bernstein Polynomials
+  
+  double precision, dimension(ndata,n+1+int_LEM) ::           G !G.W=F
+  double precision, dimension(ndata) ::                       F
+  
+  double precision, dimension(n+1+int_LEM,ndata) ::           G_trans
+  
+  double precision, dimension(n+1+int_LEM,n+1+int_LEM) ::     A
+  double precision, dimension(n+1+int_LEM) ::                 B
+  real, dimension(n+1+int_LEM) ::                             W_send
+  
+  integer ::                                                  i,j
+    
+  F  = 0.0d0
+  G  = 0.0d0  
 
-  dSdw  = 0.0d0
-  B     = 0.0d0
-  
-! Original (use -B)
-!  do i=0,n
-!	  do j=1,k
-!!		  dSdw(i+1,1)=dSdw(i+1,1)+(fx(X(j))**2)*2*(BinCoef(n,i)**2)*(X(j)**(2*i))*((1-X(j))**(2*(n-i)))
-!		  B(i+1)=B(i+1)+2*fx(X(j))*(X(j)*zcTE-Z(j))*BinCoef(n,i)*(X(j)**i)*((1-X(j))**(n-i))
-!		  do a=0,n
-!			  dSdw(i+1,a+1)=dSdw(i+1,a+1)+2*BinCoef(n,i)*BinCoef(n,a)*(X(j)**(i+a))*((1-x(j))**(2*n-i-a))*(fx(X(j))**2)
-!		  end do
-!	  end do
-!  end do
-  
-  ! Simplified
-  do i=0,n
-    do a=0,n
-      do j=1,k
-        if (a == 0) B(i+1)=B(i+1)+fx(X(j))*(Z(j)-X(j)*zcTE)*BinCoef(n,i)*(X(j)**i)*((1-X(j))**(n-i))
-        dSdw(i+1,a+1)=dSdw(i+1,a+1)+BinCoef(n,i)*BinCoef(n,a)*(X(j)**(i+a))*((1-x(j))**(2*n-i-a))*((fx(X(j)))**2)
-      end do
+  do i=1,ndata
+    F(i)=Z(i)-X(i)*zcTE
+    do j=0,n
+      if ( (X(i) .eq. 0) .or. (X(i) .eq. 1)) then
+         G(i,j+1) = 0.0d0
+      else
+        G(i,j+1) = fx(X(i)) * BINCOEF(n,j) * (X(i)**j)*((1.0d0-X(i))**(n-j))
+      end if
     end do
+    if (int_LEM .eq. 1) then
+      G(i,n+1+int_LEM) = fx(X(i)) * (X(i)**0.5d0)*((1.0d0-X(i))**(n-0.5d0))
+    end if
   end do
+    
+  A  = 0.0d0
+  B  = 0.0d0
+
+  G_trans=transpose(G)
+
+  A=matmul(G_trans, G)
+  B=matmul(G_trans, F)
   
-  !! Simplified with leading edge modification
-  !do i=0,n+1
-	 ! do a=0,n+1
-  !    do j=1,k
-  !      if ((a == 0) .AND. (i \= n+1)) B(i+1)=B(i+1)+fx(X(j))*(Z(j)-X(j)*zcTE)*BinCoef(n,i)*(X(j)**i)*((1-X(j))**(n-i))
-  !      if ((a == 0) .AND. (i == n+1)) B(i+1)=B(i+1)+(Z(j)-X(j)*zcTE)*(X(j)**0.5d0*(1-X(j))**(n-0.5d0))
-		!	  if ((a \= n+1) .AND. (i \= n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+BinCoef(n,i)*BinCoef(n,a)*(X(j)**(i+a))*((1-x(j))**(2*n-i-a))*((fx(X(j)))**2)
-  !      if ((a \= n+1) .AND. (i == n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+BinCoef(n,a)*(X(j)**(a))*((1-x(j))**(n-a))*(X(j)*(1-X(j))**(n+0.5d0))
-  !      if ((a == n+1) .AND. (i \= n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+BinCoef(n,i)*(X(j)**(i))*((1-x(j))**(n-i))*(X(j)*(1-X(j))**(n+0.5d0))
-  !      if ((a == n+1) .AND. (i == n+1)) dSdw(i+1,a+1)=dSdw(i+1,a+1)+(X(j)*(1-X(j))**(2*n-1.d0))
-		!  end do
-	 ! end do
-  !end do
-
-  !do i =1, n+1
-  !  write(*,*) (dSdw(i,j), j=1,n+1)
-  !end do
-  !write(*,*)
-  !
-  !do i =1, n+1
-  !  write(*,*) B(i)
-  !end do
   W_send    = real(W,4)
-  call Solve_SVD(n+1,real(dSdw,4),real(B,4),W_send)
+  call Solve_SVD(n+1+int_LEM,real(A,4),real(B,4),W_send)
   W         = real(W_send,8)
-
 
   W=W_send
 
-  !do i =1, n+1
-  !  write(*,*) W(i)
-  !end do
-  
 end subroutine KBParameterization_fitting
 
 !/////////////////////////////////////////////////////////////////////////////80

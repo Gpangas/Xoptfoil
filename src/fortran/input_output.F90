@@ -83,8 +83,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   namelist /optimization_options/ search_type, global_search, local_search,    &
             seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
             nparameters_bot, flap_optimization_only, initial_perturb,          &
-            min_bump_width, b_spline_degree, b_spline_xtype,                   &
-            b_spline_distribution, restart, restart_write_freq, write_designs
+            min_bump_width, kulfan_bussoletti_LEM, b_spline_degree,            &
+            b_spline_xtype, b_spline_distribution, restart, restart_write_freq,&
+            write_designs
   namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
             use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE, &
             xltTE, flap_selection, flap_identical_op, flap_degrees, weighting, &
@@ -131,6 +132,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   seed_airfoil = 'naca'
   shape_functions = 'hicks-henne'
   min_bump_width = 0.1d0
+  kulfan_bussoletti_LEM = .false.
   b_spline_degree = 3      
   b_spline_xtype = 1       
   b_spline_distribution = 3
@@ -485,7 +487,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 ! Close the input file
 
   close(iunit)
-
+  
+  ! Avaliate int_kulfan_bussoletti_LEM  
+  int_kulfan_bussoletti_LEM = 0
+  if (kulfan_bussoletti_LEM) int_kulfan_bussoletti_LEM = 1
+  
 ! Store operating points where flap setting will be optimized
   nflap_optimize = 0
   if ((use_flap) .and. (.not. match_foils)) then
@@ -496,7 +502,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       end if
     end do
   end if
-  write(*,*) 'nflap_optimize', nflap_optimize, match_foils
+  !write(*,*) 'nflap_optimize', nflap_optimize, match_foils
 ! Store operating points where flap setting will be identical
   nflap_identical = 0
   if (use_flap .and. (.not. match_foils)) then
@@ -539,6 +545,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " airfoil_file = '"//trim(airfoil_file)//"'"
   write(*,*) " shape_functions = '"//trim(shape_functions)//"'"
   write(*,*) " min_bump_width = ", min_bump_width
+  write(*,*) " kulfan_bussoletti_LEM = ", kulfan_bussoletti_LEM
   write(*,*) " b_spline_degree = ", b_spline_degree
   write(*,*) " b_spline_xtype = ", b_spline_xtype
   write(*,*) " b_spline_distribution = ", b_spline_distribution

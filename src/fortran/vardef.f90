@@ -84,6 +84,8 @@ module vardef
   
   double precision :: initial_perturb, tcTE_seed
   double precision :: min_bump_width
+  logical :: kulfan_bussoletti_LEM
+  integer :: int_kulfan_bussoletti_LEM
   integer :: b_spline_degree, b_spline_xtype, b_spline_distribution
   double precision, dimension(:), allocatable :: upointst, upointsb, xcontrolt,&
                                                  xcontrolb

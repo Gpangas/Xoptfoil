@@ -562,14 +562,15 @@ pure function fx(x)
 end function fx
 
   ! ----------------------------------------------------------------------------
-function surface_function(x,weight,BPO)
+function surface_function(x,weight,BPO, int_LEM)
 
   implicit none
 
   real*8 ::                     surface_function
   real*8, intent (in) ::        x
   integer, intent (in) ::       BPO
-  real*8, dimension(BPO+1) ::   weight
+  integer, intent (in) ::       int_LEM
+  real*8, dimension(BPO+1+int_LEM) ::   weight
   integer ::                    i
 
   ! Bezier initiation.
@@ -580,6 +581,10 @@ function surface_function(x,weight,BPO)
     surface_function = surface_function+weight(i+1)*BinCoef(BPO,i)*(x**i)*((1.0d0-x)**(BPO-i))
   end do
 
+  if (int_LEM .eq. 1) then
+    surface_function = surface_function+weight(BPO+1+int_LEM)*(x**0.5)*((1.0d0-x)**(BPO-0.5))
+  end if
+    
   return
 
   end function surface_function
@@ -962,8 +967,8 @@ END SUBROUTINE foil_interp
 ! interpolation subroutine to get zo at xi from spline defined by xt,zt,xb.zb
 !
 !=============================================================================80
-SUBROUTINE spline_interp(ntop,xtop,ztop,nbot,xbot,zbot,                  &
-  nitop,xitop,zotop,nibot,xibot,zobot)
+SUBROUTINE spline_interp(ntop,xtop,ztop, nbot,xbot,zbot,                  &
+  nitop,xitop,zotop, nibot,xibot,zobot)
   
   integer, intent(in) :: ntop,nbot,nitop,nibot
   real*8, dimension(ntop), intent(in) :: xtop,ztop
@@ -989,7 +994,7 @@ SUBROUTINE spline_interp(ntop,xtop,ztop,nbot,xbot,zbot,                  &
     
   ! create the spline 
   SILENT_MODE=.true.
-  
+      
   N = ntop+nbot-1
   do i=1,ntop
   X(i)=xtop(ntop+1-i)
@@ -1000,7 +1005,7 @@ SUBROUTINE spline_interp(ntop,xtop,ztop,nbot,xbot,zbot,                  &
   X(i-1+ntop)=xbot(i)
   Y(i-1+ntop)=zbot(i)
   end do
-
+  
   ! get spline parameters
   
   CALL SCALC(X,Y,S,N)

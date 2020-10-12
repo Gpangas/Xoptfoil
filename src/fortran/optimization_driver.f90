@@ -82,7 +82,7 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   allocate(zbtmp(pointsb))
   zttmp(pointst) = zmatcht(size(zmatcht,1))
   zbtmp(pointsb) = zmatchb(size(zmatchb,1))
-  
+    
   ! Set Trailing edge
   TE_match=zmatcht(size(zmatcht,1))-zmatchb(size(zmatchb,1))
   write(*,*) '    Trailing Edge of match foil = ', TE_match
@@ -111,9 +111,10 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   
   ! interpolate points
   
-  call spline_interp(pointst, xmatcht, zmatcht,  pointsb, xmatchb, zmatchb,    &
-  pointst-1, xseedt(1:pointst-1), zttmp(1:pointst-1),                          &
-  pointsb-1, xseedb(1:pointsb-1), zbtmp(1:pointsb-1))
+  call spline_interp(size(xmatcht,1), xmatcht, zmatcht,                        &
+                     size(xmatchb,1), xmatchb, zmatchb,                        &
+                     pointst-1, xseedt(1:pointst-1), zttmp(1:pointst-1),       &
+                     pointsb-1, xseedb(1:pointsb-1), zbtmp(1:pointsb-1))
 
 ! Re-set coordinates of foil to match from interpolated points
     
@@ -130,12 +131,14 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   zmatcht = zttmp
   zmatchb = zbtmp
   
+  !write(*,*)
   !do i = 1, pointst
   !  write(*,*) xmatcht(pointst+1-i), zmatcht(pointst+1-i)
   !end do
   !do i = 1, pointsb
   !  write(*,*) xmatchb(i), zmatchb(i)
   !end do
+  !write(*,*)
 
   deallocate(match_foil%x,match_foil%z)
   allocate(match_foil%x(pointst+pointsb+1),match_foil%z(pointst+pointsb+1))

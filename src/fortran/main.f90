@@ -131,6 +131,7 @@ program main
   
   ! Get initial values for modes
   allocate(modest_seed(nshapedvtop),modesb_seed(nshapedvbot))
+  write(*,*) "nshape", nshapedvtop, nshapedvbot
   
   modest_seed=0.0d0
   modesb_seed=0.0d0
