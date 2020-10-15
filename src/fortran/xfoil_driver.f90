@@ -208,6 +208,24 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
     write(*,*) 'Analyzing aerodynamics using the XFOIL engine ...'
   end if 
 
+  !!foil
+  !!geom_options
+  !do i=1,size(operating_points)
+  !  write(*,*) 'i',i
+  !  write(*,*) 'operating_points', operating_points(i)
+  !  write(*,*) 'op_modes',op_modes(i)
+  !!op_search
+  !  write(*,*) 'reynolds_numbers', reynolds_numbers(i)
+  !  write(*,*) 'mach_numbers', mach_numbers(i)
+  !  write(*,*) 'flap_degrees', flap_degrees(i)
+  !!xfoil_options
+  !  write(*,*) 'ncrit_per_point', ncrit_per_point(i)
+  !end do
+  !write(*,*) 'use_flap',use_flap
+  !write(*,*) 'x_flap', x_flap
+  !write(*,*) 'y_flap', y_flap
+  !write(*,*) 'y_flap_spec', y_flap_spec
+  
 ! Check to make sure xfoil is initialized
 
   if (.not. allocated(AIJ)) then

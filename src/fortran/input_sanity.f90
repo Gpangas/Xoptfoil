@@ -46,8 +46,9 @@ subroutine check_seed()
   double precision :: checkval, len1, len2, growth1, growth2, xtrans, ztrans
   double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
                                            xtrt, xtrb
+  double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: pi
-  integer :: i, nptt, nptb, nreversalst, nreversalsb, nptint
+  integer :: i, nptt, nptb, nreversalst, nreversalsb, nptint, flap_idi
   character(30) :: text, text2
   character(14) :: opt_type
   logical :: addthick_violation
@@ -320,14 +321,24 @@ subroutine check_seed()
 
   end do
 
+  ! Get actual flap angles based on input variables
+
+  actual_flap_degrees(1:noppoint) = flap_degrees(1:noppoint)
+  
+  ! Set identical flap angles
+  do i = 1, nflap_identical
+    flap_idi = flap_identical_points(i)
+    actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
+  end do
+  
 ! Analyze airfoil at requested operating conditions with Xfoil
   
   first_run_xfoil=.true.
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
                  op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
                  mach(1:noppoint), use_flap, x_flap, y_flap, y_flap_spec,      &
-                 flap_degrees(1:noppoint), xfoil_options, lift, drag, moment,  &
-                 viscrms, alpha, xtrt, xtrb, ncrit_pt)
+                 actual_flap_degrees(1:noppoint), xfoil_options, lift, drag,   &
+                 moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
   first_run_xfoil=.false.
   
 ! Penalty for too large panel angles
@@ -505,6 +516,7 @@ subroutine check_seed()
         (lift(i)**1.5d0/drag(i)-target_value(i))**2.d0 /     &
         (lift(i)**1.5d0/drag(i) + 1.D-9) )
     elseif (trim(optimization_type(i)) == 'max-lift-search') then
+
       checkval = 1.d0/lift(i)
     else
       write(*,*)
