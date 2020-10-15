@@ -33,6 +33,16 @@ module vardef
 
   end type airfoil_type
 
+  type op_search_type
+
+    integer :: noppoint
+    integer, dimension(:), allocatable :: oppoints
+    double precision, dimension(:), allocatable :: op_start
+    double precision, dimension(:), allocatable :: op_end
+    double precision, dimension(:), allocatable :: op_step
+    
+  end type op_search_type
+  
 ! Global variables (mainly needed to preserve generality of optimization
 ! routines)
 
@@ -44,13 +54,14 @@ module vardef
   double precision, dimension(max_op_points) :: op_point, reynolds, mach,      &
                                  flap_degrees, weighting, scale_factor,        &
                                  ncrit_pt, target_value
+  type(op_search_type) :: op_search
   integer, dimension(max_op_points) :: flap_identical_op
   double precision :: x_flap, y_flap, tcTE, xltTE
   character(3) :: y_flap_spec
   character(8) :: x_flap_spec, TE_spec ! added x_flap_spec and TE_spec
   integer :: int_x_flap_spec, int_tcTE_spec           ! added int_x_flap_spec
   logical :: use_flap, flap_optimization_only
-  character(14), dimension(max_op_points) :: optimization_type
+  character(15), dimension(max_op_points) :: optimization_type
   integer :: nflap_optimize, nflap_identical
                                      ! Number of operating points where flap 
                                      !   setting will be optimized or identical
@@ -89,7 +100,7 @@ module vardef
   integer :: b_spline_degree, b_spline_xtype, b_spline_distribution
   double precision, dimension(:), allocatable :: upointst, upointsb, xcontrolt,&
                                                  xcontrolb
-
+  logical ::  first_run_xfoil
   character(80) :: output_prefix
 
   integer :: naddthickconst

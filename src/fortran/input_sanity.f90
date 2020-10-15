@@ -321,13 +321,15 @@ subroutine check_seed()
   end do
 
 ! Analyze airfoil at requested operating conditions with Xfoil
-
+  
+  first_run_xfoil=.true.
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
-                 op_mode(1:noppoint), reynolds(1:noppoint), mach(1:noppoint),  &
-                 use_flap, x_flap, y_flap, y_flap_spec,                        &
+                 op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
+                 mach(1:noppoint), use_flap, x_flap, y_flap, y_flap_spec,      &
                  flap_degrees(1:noppoint), xfoil_options, lift, drag, moment,  &
                  viscrms, alpha, xtrt, xtrb, ncrit_pt)
-
+  first_run_xfoil=.false.
+  
 ! Penalty for too large panel angles
 
   if (AMAX > 25.d0) then
@@ -502,7 +504,8 @@ subroutine check_seed()
       checkval = (1.D-9 +               &
         (lift(i)**1.5d0/drag(i)-target_value(i))**2.d0 /     &
         (lift(i)**1.5d0/drag(i) + 1.D-9) )
-
+    elseif (trim(optimization_type(i)) == 'max-lift-search') then
+      checkval = 1.d0/lift(i)
     else
       write(*,*)
       write(*,*) "Error: requested optimization_type for operating point "//   &

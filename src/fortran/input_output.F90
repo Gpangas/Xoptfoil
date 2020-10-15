@@ -55,6 +55,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
   integer, dimension(max_addthickconst) :: sort_idxs
   double precision, dimension(max_addthickconst) :: temp_thickmin, temp_thickmax
+  double precision, dimension(max_op_points) :: op_point_start, op_point_end,  &
+                                                op_point_step
   type(naca_options_type), intent(out) :: naca_options
   type(pso_options_type), intent(out) :: pso_options
   type(ga_options_type), intent(out) :: ga_options
@@ -86,9 +88,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             min_bump_width, kulfan_bussoletti_LEM, b_spline_degree,            &
             b_spline_xtype, b_spline_distribution, restart, restart_write_freq,&
             write_designs
-  namelist /operating_conditions/ noppoint, op_mode, op_point, reynolds, mach, &
-            use_flap, x_flap, x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE, &
-            xltTE, flap_selection, flap_identical_op, flap_degrees, weighting, &
+  namelist /operating_conditions/ noppoint, op_mode, op_point, op_point_start, &
+            op_point_end, op_point_step, reynolds, mach, use_flap, x_flap,     &
+            x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE, xltTE,            &
+            flap_selection, flap_identical_op, flap_degrees, weighting,        &
             optimization_type, target_value, ncrit_pt
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
                          min_moment, lift_constraint_type,                     &
@@ -168,9 +171,13 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   TE_spec = 'use_seed'    !'specify', 'use_seed' or 'optimize' 
   tcTE = 1.0E-4           
   xltTE = 0.0             
+  
   op_mode(:) = 'spec-cl'
-  target_value(:) = 0.d0
   optimization_type(:) = 'min-drag'
+  op_point(:) = 1.0d0
+  op_point_start(:) = 1.0d0
+  op_point_end(:) = 1.0d0
+  op_point_step(:) = 1.0d0
   target_value(:) = 1.0d0
   reynolds(:) = 1.0D+05
   mach(:) = 0.d0
@@ -215,6 +222,36 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   rewind(iunit)
   read(iunit, iostat=iostat1, nml=constraints)
   call namelist_check('constraints', iostat1, 'stop')
+  
+! Set Search variable   
+  
+  op_search%noppoint = 0
+  do i=1, noppoint
+    if (optimization_type(i) .eq. 'max-lift-search') then
+      op_search%noppoint = op_search%noppoint + 1
+    end if
+  end do
+  
+  if (op_search%noppoint .ne. 0) then
+    
+    allocate(op_search%oppoints(op_search%noppoint))
+    allocate(op_search%op_start(op_search%noppoint))
+    allocate(op_search%op_end(op_search%noppoint))
+    allocate(op_search%op_step(op_search%noppoint))
+  
+    j=1
+    do i=1, noppoint
+      if (optimization_type(i) .eq. 'max-lift-search') then
+        op_search%oppoints(j) = i
+        op_search%op_start(j) = op_point_start(i)
+        op_search%op_end(j) = op_point_end(i)
+        op_search%op_step(j) = op_point_step(i)
+        j=j+1
+      end if
+    end do
+    
+  end if
+    
   
 ! Normalize weightings for operating points
 
@@ -579,6 +616,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                trim(optimization_type(i))//"'"
     write(*,*) " op_mode("//trim(text)//") = '"//trim(op_mode(i))//"'"
     write(*,*) " op_point("//trim(text)//") = ", op_point(i)
+    write(*,*) " op_point_start("//trim(text)//") = ", op_point_start(i)
+    write(*,*) " op_point_end("//trim(text)//") = ", op_point_end(i)
+    write(*,*) " op_point_step("//trim(text)//") = ", op_point_step(i)
     write(*,*) " target_value("//trim(text)//") = ", target_value(i)
     write(*,'(A,es17.8)') "  reynolds("//trim(text)//") = ", reynolds(i)
     write(*,*) " mach("//trim(text)//") = ", mach(i)
@@ -846,12 +886,13 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       trim(optimization_type(i)) /= 'target-xtrb' .and.                        &
       trim(optimization_type(i)) /= 'target-glide' .and.                       &
       trim(optimization_type(i)) /= 'target-sink'.and.                         &
-      trim(optimization_type(i)) /= 'max-lift-slope')                          &
+      trim(optimization_type(i)) /= 'max-lift-slope'.and.                      &
+      trim(optimization_type(i)) /= 'max-lift-search')                         &
       call my_stop("optimization_type must be 'min-drag', 'max-glide', "//     &
                    "min-sink', 'max-lift', 'max-xtr', "//                      &
                    "'target-lift', 'target-drag', 'target-moment', "//         &
                    "'target-xtrt', 'target-xtrb', 'target-glide', "//          &
-                   "'target-sink' or 'max-lift-slope'.")
+                   "'target-sink' or 'max-lift-slope' or 'max-lift-search'.")
     if ((trim(optimization_type(i)) == 'max-lift-slope') .and. (noppoint == 1))&
       call my_stop("at least two operating points are required for to "//      &
                    "maximize lift curve slope.")

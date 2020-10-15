@@ -386,10 +386,10 @@ function aero_objective_function(designvars, include_penalty)
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
-                 op_mode(1:noppoint), reynolds(1:noppoint), mach(1:noppoint),  &
-                 use_flap, actual_x_flap, y_flap, y_flap_spec,                        &
-                 actual_flap_degrees(1:noppoint), xfoil_options, lift, drag,   &
-                 moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
+                 op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
+                 mach(1:noppoint), use_flap, actual_x_flap, y_flap,            &
+                 y_flap_spec, actual_flap_degrees(1:noppoint), xfoil_options,  &
+                 lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
   !do i=1,size(lift,1)
   !  write(*,*) lift(i), drag(i), moment(i), viscrms(i), alpha(i), xtrt(i), xtrb(i), ncrit_pt(i)
   !end do
@@ -455,11 +455,11 @@ function aero_objective_function(designvars, include_penalty)
 
   anychecked: if (ncheckpt > 0) then
 
-    call run_xfoil(curr_foil, xfoil_geom_options, opp_check(1:ncheckpt),       &
-                   opm_check(1:ncheckpt), re_check(1:ncheckpt),                &
-                   ma_check(1:ncheckpt), use_flap, actual_x_flap, y_flap, y_flap_spec,&
-                   fd_check(1:ncheckpt), xfoil_options, clcheck, cdcheck,      &
-                   cmcheck, rmscheck, alcheck, xtrtcheck, xtrbcheck,           &
+    call run_xfoil(curr_foil, xfoil_geom_options, opp_check(1:ncheckpt),       & 
+                   opm_check(1:ncheckpt), op_search, re_check(1:ncheckpt),     &
+                   ma_check(1:ncheckpt), use_flap, actual_x_flap, y_flap,      &
+                   y_flap_spec, fd_check(1:ncheckpt), xfoil_options, clcheck,  &
+                   cdcheck, cmcheck, rmscheck, alcheck, xtrtcheck, xtrbcheck,  &
                    ncrit_check(1:ncheckpt))
 
 !   Keep the more conservative of the two runs
@@ -619,7 +619,15 @@ function aero_objective_function(designvars, include_penalty)
       increment = scale_factor(i) * (1.D-9 +               &
         (lift(i)**1.5d0/drag(i)-target_value(i))**2.d0 /                       &
         (lift(i)**1.5d0/drag(i) + 1.D-9) )
+    elseif (trim(optimization_type(i)) == 'max-lift-search') then
+!     Maximize Cl (at given angle of attack)
 
+      if (lift(i) > 0.d0) then
+        increment = scale_factor(i)/lift(i)
+      else
+        increment = 1.D9   ! Big penalty for lift <= 0
+      end if
+      
     else
 
       write(*,*)
@@ -898,10 +906,10 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
-                 op_mode(1:noppoint), reynolds(1:noppoint), mach(1:noppoint),  &
-                 use_flap, actual_x_flap, y_flap, y_flap_spec,                        &
-                 actual_flap_degrees(1:noppoint), xfoil_options, lift, drag,   &
-                 moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
+                 op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
+                 mach(1:noppoint), use_flap, actual_x_flap, y_flap,            &
+                 y_flap_spec, actual_flap_degrees(1:noppoint), xfoil_options,  &
+                 lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
 
 ! Get geometry info
 

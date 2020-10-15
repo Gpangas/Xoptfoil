@@ -143,6 +143,10 @@ program main
   ! operating points
   call check_seed()
   
+  write(*,*)
+  write(*,*) 'Press Enter to continue'
+  read(*,*) 
+  
   ! Optimize
   call optimize(search_type, global_search, local_search, constrained_dvs,     &
                 pso_options, ga_options, ds_options, restart,                  &

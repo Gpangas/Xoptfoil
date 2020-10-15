@@ -165,13 +165,13 @@ end subroutine xfoil_apply_flap_deflection
 !   viscrms: rms for viscous calculations (check for convergence)
 !
 !=============================================================================80
-subroutine run_xfoil(foil, geom_options, operating_points, op_modes,           &
+subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
                      reynolds_numbers, mach_numbers, use_flap, x_flap, y_flap, &
                      y_flap_spec, flap_degrees, xfoil_options, lift, drag,     &
                      moment, viscrms, alpha, xtrt, xtrb, ncrit_per_point)
 
   use xfoil_inc
-  use vardef,    only : airfoil_type
+  use vardef,    only : airfoil_type, first_run_xfoil, op_search_type
 
   type(airfoil_type), intent(in) :: foil
   type(xfoil_geom_options_type), intent(in) :: geom_options
@@ -182,6 +182,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes,           &
   character(3), intent(in) :: y_flap_spec
   logical, intent(in) :: use_flap
   character(7), dimension(:), intent(in) :: op_modes
+  type(op_search_type), intent(in) :: op_search
   type(xfoil_options_type), intent(in) :: xfoil_options
   double precision, dimension(size(operating_points,1)), intent(out) :: lift,  &
                                                            drag, moment, viscrms
@@ -189,13 +190,20 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes,           &
                                                    optional :: alpha, xtrt, xtrb
   double precision, dimension(:), intent(in), optional :: ncrit_per_point
 
-  integer :: i, noppoint
+  integer :: i, j, k, noppoint
+  integer :: current_search_point
   logical, dimension(size(operating_points,1)) :: point_converged, point_fixed 
   double precision :: newpoint
-  character(30) :: text
+  character(30) :: text, text1, text2
   character(150) :: message
+  
+  integer :: naddpoints
+  double precision, dimension(:), allocatable :: addpoints , addlift, adddrag, &
+                                           addmoment, addalpha, addxtrt,       &
+                                           addxtrb, addviscrms
+  logical, dimension(:), allocatable :: addconverged
 
-  if (.not. xfoil_options%silent_mode) then
+  if (.not. xfoil_options%silent_mode .or. first_run_xfoil) then
     write(*,*) 
     write(*,*) 'Analyzing aerodynamics using the XFOIL engine ...'
   end if 
@@ -236,10 +244,12 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes,           &
 
 ! Run xfoil for requested operating points
 
+  current_search_point = 1 ! for search optimization start
+  
   run_oppoints: do i = 1, noppoint
 
 !   Reset airfoil, smooth paneling, and apply flap deflection
-
+    
     if (use_flap) then
       call xfoil_set_airfoil(foil)
       call PANGEN(.not. SILENT_MODE)
@@ -262,77 +272,186 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes,           &
 !   Set ncrit per point
 
     if (present(ncrit_per_point)) ACRIT = ncrit_per_point(i)
-
-    if (op_modes(i) == 'spec-al') then
-
-      call xfoil_specal(operating_points(i), xfoil_options%viscous_mode,       &
-                        xfoil_options%maxit, lift(i), drag(i), moment(i))
-
-    elseif (op_modes(i) == 'spec-cl') then
-
-      call xfoil_speccl(operating_points(i), xfoil_options%viscous_mode,       &
-                        xfoil_options%maxit, lift(i), drag(i), moment(i))
-
-    else
-
-      write(*,*)
-      write(*,*) "Error in xfoil_driver: op_mode must be 'spec-al' or 'spec-cl'"
-      write(*,*)
-      stop
-
-    end if
-
-!   Get optional outputs
-
-    if (present(alpha)) alpha(i) = ALFA/DTOR
-    if (present(xtrt)) xtrt(i) = XOCTR(1)
-    if (present(xtrb)) xtrb(i) = XOCTR(2)
-
-!   Handling of unconverged points
-
-    if (xfoil_options%viscous_mode .and. .not. LVCONV .and.                    &
-        xfoil_options%fix_unconverged) then
-
-      point_converged(i) = .false.
-
-!     Try to initialize BL at new point (in the direction away from stall)
-
-      newpoint = operating_points(i) - 0.5d0*abs(operating_points(i))*sign(    &
-                                                 1.d0, operating_points(i))
-      if (newpoint == 0.d0) newpoint = 0.1d0
-
-      LIPAN = .false.
-      LBLINI = .false.
+    
+    
+    if (i .ne. op_search%oppoints(current_search_point)) then
+    
       if (op_modes(i) == 'spec-al') then
-        call xfoil_specal(newpoint, xfoil_options%viscous_mode,                & 
-                          xfoil_options%maxit, lift(i), drag(i), moment(i))
-      else
-        call xfoil_speccl(newpoint, xfoil_options%viscous_mode,                & 
-                          xfoil_options%maxit, lift(i), drag(i), moment(i))
-      end if
 
-!     Now try to run again at the old operating point
-
-      if (op_modes(i) == 'spec-al') then
         call xfoil_specal(operating_points(i), xfoil_options%viscous_mode,     &
                           xfoil_options%maxit, lift(i), drag(i), moment(i))
-      else
+
+      elseif (op_modes(i) == 'spec-cl') then
+
         call xfoil_speccl(operating_points(i), xfoil_options%viscous_mode,     &
                           xfoil_options%maxit, lift(i), drag(i), moment(i))
+
+      else
+
+        write(*,*)
+        write(*,*) "Error in xfoil_driver: op_mode must be 'spec-al' or 'spec-cl'"
+        write(*,*)
+        stop
+
       end if
 
-      if (LVCONV) point_fixed(i) = .true.
+  !   Get optional outputs
 
       if (present(alpha)) alpha(i) = ALFA/DTOR
       if (present(xtrt)) xtrt(i) = XOCTR(1)
       if (present(xtrb)) xtrb(i) = XOCTR(2)
 
+  !   Handling of unconverged points
+
+      if (xfoil_options%viscous_mode .and. .not. LVCONV .and.                  &
+          xfoil_options%fix_unconverged) then
+
+        point_converged(i) = .false.
+
+  !     Try to initialize BL at new point (in the direction away from stall)
+
+        newpoint = operating_points(i) - 0.5d0*abs(operating_points(i))*sign(  &
+                                                   1.d0, operating_points(i))
+        if (newpoint == 0.d0) newpoint = 0.1d0
+
+        LIPAN = .false.
+        LBLINI = .false.
+        if (op_modes(i) == 'spec-al') then
+          call xfoil_specal(newpoint, xfoil_options%viscous_mode,              & 
+                            xfoil_options%maxit, lift(i), drag(i), moment(i))
+        else
+          call xfoil_speccl(newpoint, xfoil_options%viscous_mode,              & 
+                            xfoil_options%maxit, lift(i), drag(i), moment(i))
+        end if
+
+  !     Now try to run again at the old operating point
+
+        if (op_modes(i) == 'spec-al') then
+          call xfoil_specal(operating_points(i), xfoil_options%viscous_mode,   &
+                            xfoil_options%maxit, lift(i), drag(i), moment(i))
+        else
+          call xfoil_speccl(operating_points(i), xfoil_options%viscous_mode,   &
+                            xfoil_options%maxit, lift(i), drag(i), moment(i))
+        end if
+
+        if (LVCONV) point_fixed(i) = .true.
+
+        if (present(alpha)) alpha(i) = ALFA/DTOR
+        if (present(xtrt)) xtrt(i) = XOCTR(1)
+        if (present(xtrb)) xtrb(i) = XOCTR(2)
+
+      end if
+
+  !   Convergence check
+
+      viscrms(i) = RMSBL
+    
+    else
+      
+      naddpoints = int((op_search%op_end(current_search_point)-                &
+                op_search%op_start(current_search_point))/                     &
+                op_search%op_step(current_search_point)+0.5)+1
+      if (naddpoints .LT. 1) then
+        write(*,*)
+        write(*,*) "Error in xfoil_driver op_point: start, end and step must "&
+          &"result in a valid interval"
+        write(*,*)
+        stop
+      end if
+      
+      allocate(addpoints(naddpoints), addlift(naddpoints), adddrag(naddpoints),&
+               addmoment(naddpoints), addalpha(naddpoints),                    &
+               addxtrt(naddpoints), addxtrb(naddpoints),                       &
+               addviscrms(naddpoints), addconverged(naddpoints))
+      
+      do j = 1, naddpoints
+        
+        addpoints(j) = op_search%op_start(current_search_point) +              &
+                       op_search%op_step(current_search_point)*real(j-1,8)
+      
+        if (op_modes(i) == 'spec-al') then
+
+          call xfoil_specal(addpoints(j), xfoil_options%viscous_mode,          &
+                      xfoil_options%maxit, addlift(j), adddrag(j), addmoment(j))
+
+        elseif (op_modes(i) == 'spec-cl') then
+
+          call xfoil_speccl(addpoints(j), xfoil_options%viscous_mode,          &
+                      xfoil_options%maxit, addlift(j), adddrag(j), addmoment(j))
+
+        else
+
+          write(*,*)
+          write(*,*) "Error in xfoil_driver: op_mode must be 'spec-al' or 'spec-cl'"
+          write(*,*)
+          stop
+
+        end if
+
+    !   Get optional outputs
+        
+        if (LVCONV) addconverged(j) = .true.
+        
+        if (present(alpha)) addalpha(j) = ALFA/DTOR
+        if (present(xtrt)) addxtrt(j) = XOCTR(1)
+        if (present(xtrb)) addxtrb(j) = XOCTR(2)
+        
+        addviscrms(j) = RMSBL
+      end do
+      
+      k=0
+      lift(i)=0.0d0
+      do j = 1, naddpoints
+        if (.not. isnan(addlift(j))) then
+          if (addlift(j) .GT. lift(i)) then
+            lift(i)=addlift(j)
+            drag(i)=adddrag(j)
+            moment(i)=addmoment(j)
+            alpha(i)=addalpha(j)
+            xtrt(i)=addxtrt(j)
+            xtrb(i)=addxtrb(j)
+            viscrms(i) = addviscrms(j)
+            k=k+1
+            point_converged(i) = addconverged(j)
+            point_fixed(i) = .false.
+          end if
+        end if
+      end do
+      
+      if (k .eq. 0) then
+        lift(i) = -1.D+08
+        drag(i) = 1.D+08
+        moment(i) = -1.D+08
+        viscrms(i) = 1.D+08
+        viscrms(i) = addviscrms(1)
+        point_converged(i) = .false.
+        point_fixed(i) = .false.
+      end if
+      
+      current_search_point = current_search_point + 1
+      
+      if (.not. xfoil_options%silent_mode .or. first_run_xfoil) then
+        do j = 1, naddpoints
+          write(text,*) j
+          write(text1,'(F8.4)') addalpha(j)
+          write(text2,'(F8.6)') addlift(j)
+          text = adjustl(text)
+          if (addconverged(j)) then
+            message = 'Search point '//trim(text)//' converged at '&
+              &//trim(text1)//' degrees with Cl of '//trim(text2)
+          elseif (.not. addconverged(j)) then
+            message = 'Search point '//trim(text)//' did not converge at '&
+              &//trim(text1)//' degrees.'
+          end if
+        write(*,*) trim(message)
+        end do
+      end if
+      
+      deallocate(addpoints, addlift, adddrag, addmoment, addalpha, addxtrt,    &
+                 addxtrb, addviscrms, addconverged)
+    
     end if
-
-!   Convergence check
-
-    viscrms(i) = RMSBL
-
+  
   end do run_oppoints
 
 ! Final check for NaNs
@@ -357,7 +476,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes,           &
 
 ! Print warnings about unconverged points
 
-  if (.not. xfoil_options%silent_mode) then
+  if (.not. xfoil_options%silent_mode .or. first_run_xfoil) then
 
     write(*,*)
 

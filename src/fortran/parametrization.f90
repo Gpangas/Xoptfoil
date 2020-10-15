@@ -855,10 +855,6 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   !  write(*,*) zseedb(i)
   !end do
   
-  write(*,*)
-  write(*,*) 'Press Enter to continue'
-  read(*,*) 
-  
 end subroutine parametrization_new_seed
   
 !=============================================================================80
