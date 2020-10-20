@@ -309,6 +309,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
     end if
   end if
   
+  !stop
+  
 ! Set temporary restart variable
 
   restart_temp = restart

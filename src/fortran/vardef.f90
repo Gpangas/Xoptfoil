@@ -61,6 +61,7 @@ module vardef
   character(8) :: x_flap_spec, TE_spec ! added x_flap_spec and TE_spec
   integer :: int_x_flap_spec, int_tcTE_spec           ! added int_x_flap_spec
   logical :: use_flap, flap_optimization_only
+  character(20) :: flap_transition
   character(15), dimension(max_op_points) :: optimization_type
   integer :: nflap_optimize, nflap_identical
                                      ! Number of operating points where flap 
@@ -88,6 +89,8 @@ module vardef
   logical :: match_foils
   logical :: check_curvature
   logical :: symmetrical
+  logical :: write_dvs_file
+  integer :: number_threads
 
   integer :: nparams_top, nparams_bot, nshapedvtop, nshapedvbot
   double precision, dimension(:), allocatable :: modest_seed

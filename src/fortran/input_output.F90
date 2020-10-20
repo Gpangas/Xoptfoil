@@ -87,11 +87,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             nparameters_bot, flap_optimization_only, initial_perturb,          &
             min_bump_width, kulfan_bussoletti_LEM, b_spline_degree,            &
             b_spline_xtype, b_spline_distribution, restart, restart_write_freq,&
-            write_designs
+            write_designs, write_dvs_file, number_threads
   namelist /operating_conditions/ noppoint, op_mode, op_point, op_point_start, &
-            op_point_end, op_point_step, reynolds, mach, use_flap, x_flap,     &
-            x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE, xltTE,            &
-            flap_selection, flap_identical_op, flap_degrees, weighting,        &
+            op_point_end, op_point_step, reynolds, mach, use_flap,  x_flap,    &
+            flap_transition, x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE,  &
+            xltTE, flap_selection, flap_identical_op, flap_degrees, weighting, &
             optimization_type, target_value, ncrit_pt
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
                          min_moment, lift_constraint_type,                     &
@@ -146,6 +146,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   restart = .false.
   restart_write_freq = 20
   write_designs = .true.
+  write_dvs_file = .false.
+  number_threads = 0
 
 ! Read main namelist options
 
@@ -164,6 +166,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
   noppoint = 1
   use_flap = .false.
+  flap_transition = 'smooth'
   x_flap = 0.75d0
   x_flap_spec = 'specify' ! specify, optimize 
   y_flap = 0.d0
@@ -472,10 +475,24 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   read(iunit, iostat=iostat1, nml=xfoil_paneling_options)
   call namelist_check('xfoil_paneling_options', iostat1, 'warn')
 
-! Ask about removing turbulent trips for max-xtr optimization
+  ! Set trasition points according to flap_transition
 
+  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
+    if (trim(flap_transition) .EQ. 'sharp-top') then
+      xtript=x_flap
+    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+      xtripb=x_flap
+    else
+      xtript=x_flap
+      xtripb=x_flap
+    end if
+  end if
+ 
+  ! Ask about removing turbulent trips for max-xtr optimization
+  
   nxtr_opt = 0
-  if ( (xtript < 1.d0) .or. (xtripb < 1.d0) ) then
+  if ( ((xtript < 1.d0) .or. (xtripb < 1.d0)) .or.                             &
+       (trim(flap_transition) .NE. 'smooth')  ) then
     do i = 1, noppoint
       if (trim(optimization_type(i)) == "max-xtr") nxtr_opt = nxtr_opt + 1
     end do
@@ -593,6 +610,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " restart = ", restart
   write(*,*) " restart_write_freq = ", restart_write_freq
   write(*,*) " write_designs = ", write_designs
+  write(*,*) " write_dvs_file = ", write_dvs_file
+  write(*,*) " number_threads = ", number_threads
   write(*,'(A)') " /"
   write(*,*)
 
@@ -601,6 +620,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,'(A)') " &operating_conditions"
   write(*,*) " noppoint = ", noppoint
   write(*,*) " use_flap = ", use_flap
+  write(*,*) " flap_transition = ", flap_transition
   write(*,*) " x_flap = ", x_flap
   write(*,*) " x_flap_spec = "//trim(x_flap_spec)
   write(*,*) " y_flap = ", y_flap
@@ -841,6 +861,16 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
      text = adjustl(text)
      call my_stop("noppoints must be <= "//trim(text)//".")
   end if
+  if (use_flap .and.                                                           &
+      trim(flap_transition) /= 'sharp' .and.                                   &
+      trim(flap_transition) /= 'sharp-top' .and.                               &
+      trim(flap_transition) /= 'sharp-bot' .and.                               &
+      trim(flap_transition) /= 'smooth')                                       &
+    call my_stop("flap_transition must be 'sharp', 'sharp-top', "//            &
+    &            "'sharp-bot' or 'smooth'.")
+  if ((nxtr_opt .NE. 0) .AND. trim(flap_transition) /= 'smooth')               &
+    call my_stop("flap_transition must be 'smooth' if using max-xtr "//        &
+    &            "optimization type.")
   if ((use_flap) .and. (x_flap <= 0.0)) call my_stop("x_flap must be > 0.")
   if ((use_flap) .and. (x_flap >= 1.0)) call my_stop("x_flap must be < 1.")
   if ((use_flap) .and. (x_flap_spec /= 'specify')                              &

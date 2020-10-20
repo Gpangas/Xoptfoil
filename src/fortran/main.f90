@@ -50,7 +50,12 @@ program main
   integer, dimension(:), allocatable :: constrained_dvs
   double precision :: f0, fmin
   logical :: restart
-
+  integer :: iMaxThreads, NumThreads
+  
+  interface
+    integer function OMP_GET_MAX_THREADS()
+    end function
+  end interface
   ! Set default names and read command line arguments
 
   input_file = 'inputs.txt'
@@ -67,6 +72,22 @@ program main
                    seed_airfoil, airfoil_file, nparams_top, nparams_bot,       &
                    restart, restart_write_freq, constrained_dvs, naca_options, &
                    pso_options, ga_options, ds_options, matchfoil_file)
+  
+  ! Set thread number
+  
+  iMaxThreads = OMP_GET_MAX_THREADS()	
+  if ((abs(number_threads).eq.0).or.(abs(number_threads).gt.iMaxThreads)) then
+    NumThreads = iMaxThreads
+  else
+    NumThreads = abs(number_threads)
+  end if
+  
+  write(*,*)
+  write(*,*) 'Maximum number of threads is : ', iMaxThreads 
+  write(*,*) 'Number of threads used is :    ', NumThreads 
+  write(*,*)
+  
+  call OMP_SET_NUM_THREADS(NumThreads)
   
   ! Load seed airfoil into memory, including transformations and smoothing
 

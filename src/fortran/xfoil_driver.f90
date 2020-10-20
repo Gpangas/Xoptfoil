@@ -232,7 +232,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
     write(*,*) "Error: xfoil is not initialized!  Call xfoil_init() first."
     stop
   end if
-
+  
 ! Set default Xfoil parameters
 
   call xfoil_defaults(xfoil_options)
@@ -463,6 +463,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
           end if
         write(*,*) trim(message)
         end do
+        !write(*,*) 'xtript', xfoil_options%xtript, 'xtripb', xfoil_options%xtripb
       end if
       
       deallocate(addpoints, addlift, adddrag, addmoment, addalpha, addxtrt,    &

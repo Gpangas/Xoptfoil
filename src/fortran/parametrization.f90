@@ -170,13 +170,13 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
       do i = 1, size(xt_seed,1)
         ! do the top
         if (xt_seed(i) .GT. xltTE) then
-          zt_new(i) = zt_new(i) + (xt_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+          zt_new(i) = zt_new(i) - (xt_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
         end if
       end do
       do i = 1, size(xb_seed,1)
         !do the bot
         if (xb_seed(i) .GT. xltTE) then
-          zb_new(i) = zb_new(i) - (xb_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+          zb_new(i) = zb_new(i) + (xb_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
         end if
       end do
     end if
@@ -189,13 +189,13 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
       do i = 1, size(xt_seed,1)
         ! do the top
         if (xt_seed(i) .GT. xltTE) then
-          zt_new(i) = zt_new(i) + (xt_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+          zt_new(i) = zt_new(i) - (xt_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
         end if
       end do
       do i = 1, size(xb_seed,1)
         !do the bot
         if (xb_seed(i) .GT. xltTE) then
-          zb_new(i) = zb_new(i) - (xb_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
+          zb_new(i) = zb_new(i) + (xb_seed(i)-xltTE) * (thick_TE-tcTE_seed) / 2.0d0
         end if
       end do
     end if

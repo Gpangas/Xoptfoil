@@ -64,7 +64,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   use math_deps,         only : norm_2
   use optimization_util, only : init_random_seed, initial_designs,             &
                                 design_radius, write_design, read_run_control
-  use vardef, only : output_prefix
+  use vardef, only : output_prefix, write_dvs_file
 
   double precision, dimension(:), intent(inout) :: xopt
   double precision, intent(out) :: fmin
@@ -352,7 +352,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
 !   Display progress 
 
-    radius = design_radius(dv)
+    radius = design_radius(dv,xmax,xmin)
     write(*,'(A12,I5)')   ' Iteration: ', step
     write(*,'(A27,F9.6)') '   Objective function:    ', fmin
     if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
@@ -417,6 +417,12 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
       restartcounter = restartcounter + 1
     end if
 
+!   Write dvs file if asked
+    
+    if (write_dvs_file) then
+      call pso_write_dvs(step, dv, x0, xopt)
+    end if
+    
 !   Check for commands in run_control file
 
     call read_run_control(commands, ncommands)
@@ -607,4 +613,75 @@ subroutine pso_read_step(step)
 
 end subroutine pso_read_step
                             
+!=============================================================================80
+!
+! Particle swarm dvs write routine
+!
+!=============================================================================80
+subroutine pso_write_dvs(step, dv,  x0, xopt)
+
+  use vardef, only : output_prefix
+
+  integer, intent(in) :: step
+  double precision, dimension(:), intent(in) ::  x0, xopt
+  double precision, dimension(:,:), intent(in) :: dv
+
+  integer :: i,j
+  
+  character(100) :: dvsfile, text
+  integer :: iunit
+  
+  ! Status notification
+
+  dvsfile = 'dvs_pso_'//trim(output_prefix)//'.dat'
+  write(*,*) '  Writing PSO dvs data to file '//trim(dvsfile)//' ...'
+  iunit = 13
+
+  ! Open files and write headers, if necessary
+
+  write(text,*) step
+  text = adjustl(text)
+  
+  if (step == 1) then
+
+    !   Header for dvs file
+
+    open(unit=iunit, file=dvsfile, status='replace')
+    write(iunit,'(A)') 'title="Design variables (dvs) and xopt"'
+    write(iunit,'(A)') 'variables="dvs vector"'
+    write(iunit,'(A)') 'step = 0: x0'
+    write(iunit,'(100000F12.8)') (x0(i), i=1,size(dv,1))
+
+  else
+
+    !   Open dvs file and write zone header
+
+    open(unit=iunit, file=dvsfile, status='old', position='append', err=900)
+
+  end if
+
+  ! Write coordinates to file
+  write(iunit,'(A)') 'step = '//trim(text)//': xopt '
+  write(iunit,'(100000F12.8)') (xopt(i), i=1,size(dv,1))
+  write(iunit,'(A)') 'step = '//trim(text)//': dv '
+  do i = 1, size(dv,2)
+    write(iunit,'(100000F12.8)') (dv(j,i), j=1,size(dv,1))
+  end do
+
+  ! Close output files
+
+  close(iunit)
+
+  ! Status notification
+
+  write(*,*) '  Successfully wrote PSO dvs file.'
+  return
+  
+  ! Warning if there was an error opening dvs file
+
+  900 write(*,*) "Warning: unable to open "//trim(dvsfile)//". Skipping ..."
+  return
+  
+end subroutine pso_write_dvs
+
 end module particle_swarm

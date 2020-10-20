@@ -280,51 +280,49 @@ end function
 ! Computes max radius of designs (used for evaluating convergence
 !
 !=============================================================================80
-function design_radius(dv)
+function design_radius(dv, xmax, xmin)
 
   use math_deps, only : norm_2
 
   double precision, dimension(:,:), intent(in) :: dv
+  double precision, dimension(:), intent(in) :: xmax, xmin
   double precision design_radius
 
   integer :: i, ndesigns
   double precision, dimension(size(dv,1)) :: design_centroid
-  double precision, dimension(size(dv,1)) :: standard_deviation
-  double precision, dimension(size(dv,1)) :: relative_standard_deviation
+  double precision, dimension(size(dv,1),size(dv,2)) :: dv_scaled
   double precision :: radius
  
-  ! Compute centroid of designs
   ndesigns = size(dv,2)
+  
+  ! Scale x to [-1,1]
+  do i = 1, ndesigns
+    dv_scaled(:,i)=-1+2*(dv(:,i)-xmin)/(xmax-xmin)
+  end do
+    
+  ! Compute centroid of designs
   design_centroid(:) = 0.d0
   do i = 1, ndesigns
-    design_centroid = design_centroid + dv(:,i)
+    design_centroid = design_centroid + dv_scaled(:,i)
   end do
   design_centroid = design_centroid / dble(ndesigns)
 
-  ! Compute max design radius
-
-  !design_radius = 0.d0
-  !do i = 1, ndesigns
-  !  radius = norm_2((dv(:,i) - design_centroid)/(abs(design_centroid)+1.0d-12))
-  !  !radius = norm_2(dv(:,i) - design_centroid)
-  !  if (radius > design_radius) design_radius = radius / dble(ndesigns)
-  !end do
+  !! Compute max design radius
   !
   !design_radius = 0.d0
   !do i = 1, ndesigns
-  !  radius = norm_2(dv(:,i) - design_centroid)
+  !  radius = norm_2(dv_scaled(:,i) - design_centroid)
   !  if (radius > design_radius) design_radius = radius
   !end do
   
-  standard_deviation = 0.d0
-  do i = 1, ndesigns
-    standard_deviation = standard_deviation +                                  &
-      (dv(:,i)-design_centroid)**2.0d0/(ndesigns-1)
-  end do
-  standard_deviation = standard_deviation**0.5d0
-  relative_standard_deviation = standard_deviation / design_centroid
+  ! Compute mean design radius
   
-  design_radius = sum(abs(relative_standard_deviation)) / (ndesigns)
+  design_radius = 0.d0
+  do i = 1, ndesigns
+    radius = norm_2(dv_scaled(:,i) - design_centroid)
+    design_radius = design_radius + radius
+  end do
+  design_radius = design_radius / size(dv,1)
 end function
 
 !=============================================================================80

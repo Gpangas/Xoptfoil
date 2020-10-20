@@ -331,6 +331,22 @@ subroutine check_seed()
     actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
   end do
   
+  ! Set trasition points according to flap_transition
+
+  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
+    if (trim(flap_transition) .EQ. 'sharp-top') then
+      xfoil_options%xtript=x_flap
+    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+      xfoil_options%xtripb=x_flap
+    elseif (trim(flap_transition) .EQ. 'sharp') then
+      xfoil_options%xtript=x_flap
+      xfoil_options%xtripb=x_flap
+    else
+      write(*,*) "Error in flap_transition, please report this bug"
+      stop
+    end if
+  end if
+  
 ! Analyze airfoil at requested operating conditions with Xfoil
   
   first_run_xfoil=.true.

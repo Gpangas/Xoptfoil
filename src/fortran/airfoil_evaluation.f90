@@ -383,6 +383,22 @@ function aero_objective_function(designvars, include_penalty)
     return
   end if
 
+  ! Set trasition points according to flap_transition
+
+  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
+    if (trim(flap_transition) .EQ. 'sharp-top') then
+      xfoil_options%xtript=actual_x_flap
+    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+      xfoil_options%xtripb=actual_x_flap
+    elseif (trim(flap_transition) .EQ. 'sharp') then
+      xfoil_options%xtript=actual_x_flap
+      xfoil_options%xtripb=actual_x_flap
+    else
+      write(*,*) "Error in flap_transition, please report this bug"
+      stop
+    end if
+  end if
+  
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
@@ -903,6 +919,22 @@ function write_airfoil_optimization_progress(designvars, designcounter)
     actual_x_flap=x_flap
   end if
 
+  ! Set trasition points according to flap_transition
+
+  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
+    if (trim(flap_transition) .EQ. 'sharp-top') then
+      xfoil_options%xtript=actual_x_flap
+    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+      xfoil_options%xtripb=actual_x_flap
+    elseif (trim(flap_transition) .EQ. 'sharp') then
+      xfoil_options%xtript=actual_x_flap
+      xfoil_options%xtripb=actual_x_flap
+    else
+      write(*,*) "Error in flap_transition, please report this bug"
+      stop
+    end if
+  end if
+  
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
