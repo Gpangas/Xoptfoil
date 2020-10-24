@@ -269,6 +269,11 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
       call PANGEN(.not. SILENT_MODE)
       call xfoil_apply_flap_deflection(x_flap, y_flap, y_flap_spec,            &
                                        flap_degrees(i))
+      
+      do j = 1, NB
+        write(*,*) XB(j), YB(j)
+      end do
+      stop
     end if
 
     REINF1 = reynolds_numbers(i)
@@ -309,6 +314,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
           write(*,*) "Error in xfoil_driver: op_mode must be 'spec-al' or "//    &
             &        "'spec-cl'"
           write(*,*)
+          stop
 
         end if
 
