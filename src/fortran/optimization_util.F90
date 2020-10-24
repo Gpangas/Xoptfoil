@@ -140,7 +140,7 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
 
   write(*,*) 'Generating and evaluating initial designs ...'
   write(*,*)
-
+  
 !$omp end master
 !$omp barrier
 
@@ -319,10 +319,10 @@ function design_radius(dv, xmax, xmin)
   
   design_radius = 0.d0
   do i = 1, ndesigns
-    radius = norm_2(dv_scaled(:,i) - design_centroid)
+    radius = norm_2(dv_scaled(:,i) - design_centroid) / size(dv,1)
     design_radius = design_radius + radius
   end do
-  design_radius = design_radius / size(dv,1)
+  design_radius = design_radius / ndesigns
 end function
 
 !=============================================================================80

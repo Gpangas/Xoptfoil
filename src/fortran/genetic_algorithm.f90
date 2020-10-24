@@ -414,7 +414,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 !   Write dvs file if asked
     
     if (write_dvs_file) then
-      call ga_write_dvs(step, dv, x0, xopt))
+      call ga_write_dvs(step, dv, x0, xopt)
     end if
     
 !   Check for commands in run_control file

@@ -62,8 +62,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   type(ga_options_type), intent(out) :: ga_options
   type(ds_options_type), intent(out) :: ds_options
 
-  logical :: viscous_mode, silent_mode, fix_unconverged, feasible_init,        &
+  logical :: viscous_mode, silent_mode, feasible_init,                         &
              reinitialize, restart, write_designs, reflexed
+  integer :: init_number_points
+  double precision :: init_al0, init_cl0, init_initial_position
+  character(30) :: init_type, init_dist
+  
   integer :: restart_write_freq, pso_pop, pso_maxit, simplex_maxit, bl_maxit,  &
              npan, feasible_init_attempts
   integer :: ga_pop, ga_maxit
@@ -115,7 +119,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             chromosome_mutation_rate, mutation_range_factor
   namelist /simplex_options/ simplex_tol, simplex_maxit
   namelist /xfoil_run_options/ ncrit, xtript, xtripb, viscous_mode,            &
-            silent_mode, bl_maxit, vaccel, fix_unconverged, reinitialize
+            silent_mode, bl_maxit, vaccel, reinitialize, init_type,            &
+            init_number_points, init_al0, init_cl0, init_initial_position,     &
+            init_dist
   namelist /xfoil_paneling_options/ npan, cvpar, cterat, ctrrat, xsref1,       &
             xsref2, xpref1, xpref2
   namelist /matchfoil_options/ match_foils, matchfoil_file
@@ -454,9 +460,14 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   silent_mode = .true.
   bl_maxit = 100
   vaccel = 0.01d0
-  fix_unconverged = .true.
   reinitialize = .true.
-
+  init_type = 'unconverged'
+  init_number_points = 5
+  init_al0 = 0.0
+  init_cl0 = 0.5
+  init_initial_position = 0.5
+  init_dist = 'linear'
+  
   npan = 160
   cvpar = 1.d0
   cterat = 0.15d0
@@ -513,8 +524,14 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   xfoil_options%silent_mode = silent_mode
   xfoil_options%maxit = bl_maxit
   xfoil_options%vaccel = vaccel
-  xfoil_options%fix_unconverged = fix_unconverged
   xfoil_options%reinitialize = reinitialize
+  xfoil_options%init_type = init_type
+  xfoil_options%init_number_points = init_number_points
+  xfoil_options%init_al0 = init_al0
+  xfoil_options%init_cl0 = init_cl0
+  xfoil_options%init_initial_position = init_initial_position
+  xfoil_options%init_dist = init_dist
+  
 
   xfoil_geom_options%npan = npan
   xfoil_geom_options%cvpar = cvpar
@@ -791,8 +808,13 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " silent_mode = ", xfoil_options%silent_mode
   write(*,*) " bl_maxit = ", xfoil_options%maxit
   write(*,*) " vaccel = ", xfoil_options%vaccel
-  write(*,*) " fix_unconverged = ", xfoil_options%fix_unconverged
   write(*,*) " reinitialize = ", xfoil_options%reinitialize
+  write(*,*) " init_type = ", xfoil_options%init_type
+  write(*,*) " init_number_points = ", xfoil_options%init_number_points
+  write(*,*) " init_al0 = ", xfoil_options%init_al0
+  write(*,*) " init_cl0 = ", xfoil_options%init_cl0
+  write(*,*) " init_initial_position = ", xfoil_options%init_initial_position
+  write(*,*) " init_dist = ", xfoil_options%init_dist
   write(*,'(A)') " /"
   write(*,*)
 
@@ -1099,6 +1121,14 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("xtripb must be >= 0. and <= 1.")
   if (bl_maxit < 1) call my_stop("bl_maxit must be > 0.")
   if (vaccel < 0.d0) call my_stop("vaccel must be >= 0.")
+  if (trim(init_type) /= 'always' .and. trim(init_type) /= 'never' .and.       &
+    trim(init_type) /= 'unconverged')                                          &
+    call my_stop("init_type must be 'always', 'unconverged' or 'never'")
+  if (init_number_points < 1) call my_stop("init_number_points must be > 0.")
+  if (init_initial_position < 0.d0 .or. init_initial_position > 1.d0)                                        &
+    call my_stop("init_initial_position must be >= 0. and <= 1.")
+  if (trim(init_dist) /= 'linear' .and. trim(init_dist) /= 'sine')             &
+      call my_stop("init_dist must be 'linear' or 'sine'")
   
 ! XFoil paneling options
 
