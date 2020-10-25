@@ -296,30 +296,15 @@ end subroutine parametrization_dvs
 !
 !=============================================================================80
 subroutine parametrization_constrained_dvs(parametrization_type,               &
-    constrained_dvs, nflap_optimize, int_x_flap_spec, int_tcTE_spec, nfunctions_top,          &
-    nfunctions_bot, nbot_actual, symmetrical)
+    constrained_dvs, nflap_optimize, int_x_flap_spec, int_tcTE_spec, ndvs_top, &
+    ndvs_bot)
 
   character(*), intent(in) :: parametrization_type
   integer, intent(in) :: nflap_optimize
   integer, intent(in) :: int_x_flap_spec, int_tcTE_spec
-  logical, intent(in) :: symmetrical
-  integer, intent(out) :: nfunctions_top, nfunctions_bot
+  integer, intent(in) :: ndvs_top, ndvs_bot
   integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
-  integer :: i, counter, idx, nbot_actual, ndvs_top, ndvs_bot, ndvs_bot_actual
-
-
-  !   The number of bottom shape functions actually used (0 for symmetrical)
-
-  call parametrization_dvs(nfunctions_top, nfunctions_bot,                     &
-                           parametrization_type, ndvs_top, ndvs_bot)
-  
-  if (symmetrical) then
-    nbot_actual = 0
-    ndvs_bot_actual = 0
-  else
-    nbot_actual = nfunctions_bot
-    ndvs_bot_actual = ndvs_bot
-  end if
+  integer :: i, counter, idx
   
   !   Set design variables with side constraints
 
@@ -329,8 +314,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
 
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = nfunctions_top + nbot_actual + 1,                                   &
-            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+    do i = ndvs_top + ndvs_bot + 1,                                            &
+            ndvs_top + ndvs_bot + nflap_optimize + int_x_flap_spec +           &
             int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
@@ -340,10 +325,10 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
 
     !     For Hicks-Henne, also constrain bump locations and width
 
-    allocate(constrained_dvs(2*nfunctions_top + 2*nbot_actual +                &
+    allocate(constrained_dvs(ndvs_top/3*2 + ndvs_bot/3*2 +                     &
                               nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = 1, nfunctions_top + nbot_actual
+    do i = 1, ndvs_top/3 + ndvs_bot/3
       counter = counter + 1
       idx = 3*(i-1) + 2      ! DV index of bump location, shape function i
       constrained_dvs(counter) = idx
@@ -352,8 +337,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
       constrained_dvs(counter) = idx
     end do
     
-    do i = 3*(nfunctions_top + nbot_actual) + 1,                               &
-            3*(nfunctions_top + nbot_actual) + nflap_optimize +                &
+    do i = 3*(ndvs_top/3 + ndvs_bot/3) + 1,                                    &
+            3*(ndvs_top/3 + ndvs_bot/3) + nflap_optimize +                     &
             int_x_flap_spec + int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
@@ -364,8 +349,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
 
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = nfunctions_top + nbot_actual + 1,                                   &
-            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+    do i = ndvs_top + ndvs_bot + 1,                                            &
+            ndvs_top + ndvs_bot + nflap_optimize + int_x_flap_spec +           &
             int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
@@ -376,8 +361,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
 
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = nfunctions_top + nbot_actual + 1,                                   &
-            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+    do i = ndvs_top + ndvs_bot + 1,                                            &
+            ndvs_top + ndvs_bot + nflap_optimize + int_x_flap_spec +           &
             int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i
@@ -388,8 +373,8 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
     
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
-    do i = nfunctions_top + nbot_actual + 1,                                   &
-            nfunctions_top + nbot_actual + nflap_optimize + int_x_flap_spec +  &
+    do i = ndvs_top + ndvs_bot + 1,                                            &
+            ndvs_top + ndvs_bot + nflap_optimize + int_x_flap_spec +           &
             int_tcTE_spec
       counter = counter + 1
       constrained_dvs(counter) = i

@@ -363,11 +363,6 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
       'global') then
 
-!   Set design variables with side constraints
-    call parametrization_constrained_dvs(shape_functions, constrained_dvs,       &
-         nflap_optimize, int_x_flap_spec, int_tcTE_spec, nparameters_top, nparameters_bot,        &
-         nbot_actual, symmetrical)
-
     if (trim(global_search) == 'particle_swarm') then
 
 !     Read PSO options and put them into derived type

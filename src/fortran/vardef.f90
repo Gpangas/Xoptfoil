@@ -43,6 +43,14 @@ module vardef
     
   end type op_search_type
   
+  type objfunction_type
+
+    double precision :: value
+    integer :: message_code
+    character(100) :: message
+    
+  end type objfunction_type
+  
 ! Global variables (mainly needed to preserve generality of optimization
 ! routines)
 
@@ -63,6 +71,7 @@ module vardef
   logical :: use_flap, flap_optimization_only
   character(20) :: flap_transition
   character(15), dimension(max_op_points) :: optimization_type
+  integer, dimension(6) :: dvs_for_type
   integer :: nflap_optimize, nflap_identical
                                      ! Number of operating points where flap 
                                      !   setting will be optimized or identical

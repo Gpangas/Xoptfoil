@@ -49,14 +49,15 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   use optimization_util, only : bubble_sort, design_radius_simplex, write_design,      &
                                 read_run_control
 
-  use vardef, only : output_prefix
+  use vardef, only : output_prefix, objfunction_type
 
   double precision, dimension(:), intent(inout) :: xopt
   double precision, intent(out) :: fmin
   integer, intent(out) :: step, fevals
 
   interface
-    double precision function objfunc(x)
+    type(objfunction_type) function objfunc(x)
+      import :: objfunction_type
       double precision, dimension(:), intent(in) :: x
     end function
   end interface
@@ -83,6 +84,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   double precision :: rho, xi, gam, sigma, fr, fe, fc, f0, mincurr, radius
   integer :: i, j, nvars, stat, designcounter, restartcounter, iunit, ioerr,   &
              prevsteps, k, ncommands
+  type(objfunction_type) :: objfunction_return
   logical :: converged, needshrink, signal_progress, new_history_file
   integer :: stepstart, steptime, restarttime
   character(14) :: timechar
@@ -112,7 +114,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     if (given_f0_ref) then
       f0 = f0_ref
     else
-      f0 = objfunc(x0)
+      objfunction_return = objfunc(x0)
+      f0 = objfunction_return%value
       f0_ref = f0
     end if
 
@@ -131,12 +134,14 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
           dv(i,j) = x0(i)
         end if
       end do
-      objvals(j) = objfunc(dv(:,j))
+      objfunction_return = objfunc(dv(:,j))
+      objvals(j) = objfunction_return%value
       fevals = fevals + 1
     end do
 
     dv(:,nvars+1) = x0
-    objvals(nvars+1) = objfunc(x0)
+    objfunction_return = objfunc(x0)
+    objvals(nvars+1) = objfunction_return%value
     fevals = fevals + 1
 
 !   Counters
@@ -321,7 +326,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !   Compute the reflection point and evaluate its objective function value
 
     xr = (1.d0 + rho)*xcen - rho*dv(:,nvars+1)
-    fr = objfunc(xr)
+    objfunction_return = objfunc(xr)
+    fr = objfunction_return%value
     fevals = fevals + 1
 
     expand_or_contract: if (objvals(1) <= fr .and. fr < objvals(nvars)) then
@@ -337,7 +343,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !     Expand
 
       xe = (1.d0 + rho*xi)*xcen - rho*xi*dv(:,nvars+1)
-      fe = objfunc(xe)
+      objfunction_return = objfunc(xe)
+      fe = objfunction_return%value
       fevals = fevals + 1
       if (fe < fr) then
         dv(:,nvars+1) = xe
@@ -355,7 +362,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
         contraction: if (fr < objvals(nvars+1)) then
 
           xc = (1.d0 + rho*gam)*xcen - rho*gam*dv(:,nvars+1)
-          fc = objfunc(xc)
+          objfunction_return = objfunc(xc)
+          fc = objfunction_return%value
           fevals = fevals + 1
 
           if (fc < fr) then
@@ -371,7 +379,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
         else
 
           xc = (1.d0 - gam)*xcen + gam*dv(:,nvars+1)
-          fc = objfunc(xc)
+          objfunction_return = objfunc(xc)
+          fc = objfunction_return%value
           fevals = fevals + 1
 
           if (fc < objvals(nvars+1) ) then
@@ -390,7 +399,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
           do i = 2, nvars + 1
             dv(:,i) = dv(:,1) + sigma*(dv(:,i) - dv(:,1))
-            objvals(i) = objfunc(dv(:,i))
+            objfunction_return = objfunc(dv(:,i))
+            objvals(i) = objfunction_return%value
             fevals = fevals + 1
           end do
           cycle

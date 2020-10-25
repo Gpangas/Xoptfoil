@@ -267,6 +267,9 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
     if (use_flap) then
       call xfoil_set_airfoil(foil)
       call PANGEN(.not. SILENT_MODE)
+      !do j = 1, NB
+      !  write(*,*) XB(j), YB(j)
+      !end do
       call xfoil_apply_flap_deflection(x_flap, y_flap, y_flap_spec,            &
                                        flap_degrees(i))
     end if
@@ -291,7 +294,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
     if ((op_search%noppoint .EQ. 0) .OR. (i .ne. op_search%oppoints(current_search_point))) then
       
       ! Check if op point is analysed
-      if (trim(xfoil_options%init_type) .EQ. 'never') then
+      if (trim(xfoil_options%init_type) .EQ. 'never' .or. trim(xfoil_options%init_type) .EQ. 'unconverged') then
       
         if (op_modes(i) == 'spec-al') then
 
@@ -694,9 +697,9 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
       end if
   
       write(*,*) trim(message)
-  
     end do
   end if
+  !write(*,*) alpha, lift, drag, moment
 
 end subroutine run_xfoil
 

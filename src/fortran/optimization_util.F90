@@ -100,6 +100,171 @@ end subroutine init_random_seed
 !
 !=============================================================================80
 subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
+                           x0, feasible_init, feasible_limit, attempts,        &
+                           message_codes, messages)
+  use vardef, only : objfunction_type
+    
+  double precision, dimension(:,:), intent(inout) :: dv
+  double precision, dimension(:), intent(inout) :: objval
+  integer, intent(out) :: fevals
+  double precision, dimension(:), intent(in) :: xmin, xmax, x0
+  logical, intent(in) :: use_x0, feasible_init
+  double precision, intent(in) :: feasible_limit
+  integer, intent(in) :: attempts
+  integer, dimension(:), intent(inout) :: message_codes
+  character(100), dimension(:), intent(inout) :: messages
+
+  interface
+    type(objfunction_type) function objfunc(x)
+      import :: objfunction_type
+      double precision, dimension(:), intent(in) :: x
+    end function
+  end interface
+
+  integer :: i, pop, nvars, initcount
+  character(30) :: text1, text2, text3
+  double precision, dimension(:), allocatable :: randvec1, designstore
+  double precision :: minstore
+  type(objfunction_type) :: objfunction_return
+
+! Initial settings and memory allocation
+
+  nvars = size(dv,1)
+  pop = size(dv,2)
+  allocate(randvec1(nvars))
+  allocate(designstore(nvars))
+
+!$omp master
+
+  fevals = pop
+
+! Set up matrix of random numbers for initial designs
+  
+  call random_number(dv)
+
+! Initial population of designs set between xmin and xmax
+
+  write(*,*) 'Generating and evaluating initial designs ...'
+  write(*,*)
+  
+!$omp end master
+!$omp barrier
+
+  if (use_x0) then
+    dv(:,1) = x0
+    objfunction_return = objfunc(x0)
+    objval(1) = objfunction_return%value
+    message_codes(1) = objfunction_return%message_code
+    messages(1) = objfunction_return%message
+!$omp do
+    do i = 2, pop
+      dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
+      objfunction_return = objfunc(dv(:,i))
+      objval(i) = objfunction_return%value
+      message_codes(i) = objfunction_return%message_code
+      messages(i) = objfunction_return%message
+    end do
+!$omp end do
+  else
+!$omp do
+    do i = 1, pop
+      dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
+      objfunction_return = objfunc(dv(:,i))
+      objval(i) = objfunction_return%value
+      message_codes(i) = objfunction_return%message_code
+      messages(i) = objfunction_return%message
+    end do
+!$omp end do
+  end if
+
+! Enforce initially feasible designs
+
+  if (feasible_init) then
+
+    write(text1,*) attempts
+    text1 = adjustl(text1)
+!$omp master
+    write(*,*) 'Checking initial designs for feasibility ...'
+    write(*,*) '  (using a max of '//trim(text1)//' initialization attempts)'
+    write(*,*)
+!$omp end master
+
+
+!$omp do
+    do i = 1, pop
+
+      write(text2,*) i
+      text2 = adjustl(text2)
+      initcount = 0
+      minstore = objval(i)
+      designstore = dv(:,i)
+
+!     Take a number of tries to fix infeasible designs
+
+      do while ((initcount <= attempts) .and.                                  &
+               (objval(i) >= feasible_limit))
+        call random_number(randvec1)
+        dv(:,i) = (xmax - xmin)*randvec1 + xmin
+        objfunction_return = objfunc(dv(:,i))
+        objval(i) = objfunction_return%value
+        message_codes(i) = objfunction_return%message_code
+        messages(i) = objfunction_return%message
+        if (objval(i) < minstore) then
+          minstore = objval(i)
+          designstore = dv(:,i)
+        end if
+        initcount = initcount + 1
+!$omp critical
+        fevals = fevals + 1
+!$omp end critical
+      end do
+
+!     Pick the best design tested if a feasible design was not found
+
+      if ((initcount > attempts) .and. (objval(i) >= feasible_limit)) then
+        dv(:,i) = designstore
+        objval(i) = minstore
+      end if
+
+!     Write a message about the feasibility of initial designs
+
+      if ((initcount > attempts) .and. (objval(i) >= feasible_limit)) then
+        write(*,*) ' Design '//trim(text2)//' is infeasible and was not'//     &
+                   ' fixed within '//trim(text1)//' reinitialization attempts.'
+      elseif ((initcount <= attempts) .and. (initcount > 0) .and.              &
+              (objval(i) < feasible_limit)) then
+        write(text3,*) initcount
+        text3 = adjustl(text3)
+        write(*,*) ' Design '//trim(text2)//' was initially infeasible but'//  &
+                   ' was fixed after '//trim(text3)//                          &
+                   ' reinitialization attempts.'
+      else
+        write(*,*) ' Design '//trim(text2)//' is feasible.' 
+      end if
+
+    end do
+
+!$omp end do
+
+!$omp master
+    write(*,*)
+!$omp end master
+
+  end if
+
+! Memory deallocation
+
+  deallocate(randvec1)
+  deallocate(designstore)
+
+end subroutine initial_designs
+
+!=============================================================================80
+!
+! Creates initial designs and tries to make them feasible, if desired
+!
+!=============================================================================80
+subroutine initial_designs_original(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
                            x0, feasible_init, feasible_limit, attempts)
 
   double precision, dimension(:,:), intent(inout) :: dv
@@ -239,8 +404,8 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
   deallocate(randvec1)
   deallocate(designstore)
 
-end subroutine initial_designs
-
+end subroutine initial_designs_original
+                           
 !=============================================================================80
 !
 ! Computes max radius of designs (used for evaluating convergence

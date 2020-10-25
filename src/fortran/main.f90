@@ -32,7 +32,9 @@ program main
   use input_sanity,        only : check_seed
   use optimization_driver, only : matchfoils_preprocessing, optimize,          &
                                   write_final_design
-  use parametrization,     only : parametrization_dvs, parametrization_new_seed
+  use parametrization,     only : parametrization_dvs,                         &
+                                  parametrization_new_seed,                    &
+                                  parametrization_constrained_dvs
 
   implicit none
 
@@ -127,14 +129,19 @@ program main
   if (.not. flap_optimization_only) flap_optimization_only_int=1
   if (.not. symmetrical) symmetrical_int=1
   
-  write(*,*) "Number of Design Variables     = ", size(optdesign,1)
-  write(*,*) "  for top shape                = ", nshapedvtop *                &
-    flap_optimization_only_int
-  write(*,*) "  for bot shape                = ", nshapedvbot *                &
-    flap_optimization_only_int * symmetrical_int
-  write(*,*) "  for flap deflexion           = ", nflap_optimize
-  write(*,*) "  for flap hinge position      = ", int_x_flap_spec
-  write(*,*) "  for trailing edge thickness  = ", int_tcTE_spec
+  dvs_for_type(1) = size(optdesign,1)
+  dvs_for_type(2) = nshapedvtop * flap_optimization_only_int
+  dvs_for_type(3) = nshapedvbot * flap_optimization_only_int * symmetrical_int
+  dvs_for_type(4) = nflap_optimize
+  dvs_for_type(5) = int_x_flap_spec
+  dvs_for_type(6) = int_tcTE_spec
+  
+  write(*,*) "Number of Design Variables     = ", dvs_for_type(1)
+  write(*,*) "  for top shape                = ", dvs_for_type(2)
+  write(*,*) "  for bot shape                = ", dvs_for_type(3)
+  write(*,*) "  for flap deflexion           = ", dvs_for_type(4)
+  write(*,*) "  for flap hinge position      = ", dvs_for_type(5)
+  write(*,*) "  for trailing edge thickness  = ", dvs_for_type(6)
   write(*,*)
   
   ! Allocate memory for airfoil analysis
@@ -164,10 +171,21 @@ program main
   ! operating points
   call check_seed()
   
+  if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
+      'global') then
+
+    !   Set design variables with side constraints
+    call parametrization_constrained_dvs(shape_functions, constrained_dvs,     &
+         dvs_for_type(4), dvs_for_type(5), dvs_for_type(6), dvs_for_type(2),      &
+         dvs_for_type(3))
+    write(*,*) 'nconstrained', size(constrained_dvs, 1)
+    write(*,*) 'constrained_dvs', constrained_dvs
+  end if
+      
   write(*,*)
   write(*,*) 'Press Enter to continue'
   read(*,*) 
-  
+      
   ! Optimize
   call optimize(search_type, global_search, local_search, constrained_dvs,     &
                 pso_options, ga_options, ds_options, restart,                  &

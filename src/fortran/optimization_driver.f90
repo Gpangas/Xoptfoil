@@ -172,7 +172,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
                     restart_write_freq, optdesign, f0_ref, fmin, steps, fevals)
 
   use vardef,             only : output_prefix, global_search_stat,            &
-                                 local_search_stat, restart_stat
+                                 local_search_stat, restart_stat, objfunction_type
   use particle_swarm,     only : pso_options_type, particleswarm, pso_read_step
   use genetic_algorithm,  only : ga_options_type, geneticalgorithm, ga_read_step
   use simplex_search,     only : ds_options_type, simplexsearch
@@ -191,6 +191,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   integer, dimension(:), intent(in) :: constrained_dvs
   integer, intent(out) :: steps, fevals
   logical, intent(in) :: restart
+  type(objfunction_type) :: objfunction_return
 
   double precision, dimension(size(optdesign,1)) :: xmin, xmax, x0
   logical :: restart_temp, write_designs
@@ -228,8 +229,10 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   call parametrization_init(optdesign, x0)
 
 ! Compute f0_ref, ignoring penalties for violated constraints
-
-  f0_ref = objective_function_nopenalty(x0) 
+  objfunction_return = objective_function_nopenalty(x0) 
+  f0_ref = objfunction_return%value
+  !write(*,*) f0_ref
+  !stop
 
 ! Set default restart status (global or local optimization) from user input
 

@@ -64,18 +64,19 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   use math_deps,         only : norm_2
   use optimization_util, only : init_random_seed, initial_designs,             &
                                 design_radius, write_design, read_run_control
-  use vardef, only : output_prefix, write_dvs_file
+  use vardef, only : output_prefix, write_dvs_file, objfunction_type
 
   double precision, dimension(:), intent(inout) :: xopt
   double precision, intent(out) :: fmin
   integer, intent(out) :: step, fevals
 
   interface
-    double precision function objfunc(x)
+    type(objfunction_type) function objfunc(x)
+      import :: objfunction_type
       double precision, dimension(:), intent(in) :: x
     end function
   end interface
-  
+                         
   double precision, dimension(:), intent(in) :: x0, xmin, xmax
   double precision, intent(inout) :: f0_ref
   integer, dimension(:), intent(in) :: constrained_dvs
@@ -101,6 +102,9 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   double precision, dimension(size(xmin,1)) :: randvec1, randvec2
   double precision, dimension(size(xmin,1),pso_options%pop) :: dv, vel,        &
                                                                bestdesigns
+  integer, dimension(pso_options%pop) :: message_codes
+  character(100), dimension(pso_options%pop) :: messages
+  type(objfunction_type) :: objfunction_return
   logical :: use_x0, converged, signal_progress, new_history_file
   integer :: stepstart, steptime, restarttime
   character(14) :: timechar
@@ -151,7 +155,8 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   if (given_f0_ref) then
     f0 = f0_ref
   else 
-    f0 = objfunc(x0)
+    objfunction_return = objfunc(x0)
+    f0 = objfunction_return%value
     f0_ref = f0
   end if
 
@@ -167,7 +172,8 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
     use_x0 = .true.
     call initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0, x0,  &
                          pso_options%feasible_init, pso_options%feasible_limit,&
-                         pso_options%feasible_init_attempts)
+                         pso_options%feasible_init_attempts, message_codes,    &
+                         messages)
   end if
 
 !$omp master
@@ -188,14 +194,14 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
 !   Global and local best so far
 
-    fmin = f0
+    fmin = minval(minvals,1)
+    fminloc = minloc(minvals,1)
+    xopt = bestdesigns(:,fminloc)
     mincurr = minval(objval,1)
-    fminloc = minloc(objval,1)
-    xopt = dv(:,fminloc)
-  
+    
 !   Counters
   
-    step = 0
+    step = 1
     designcounter = 0
 
 !   Inertial parameter
@@ -225,7 +231,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   histfile = trim(output_prefix)//'_optimization_history.dat'
   iunit = 17
   new_history_file = .false.
-  if (step == 0) then
+  if (step == 1) then
     new_history_file = .true.
   else
     open(unit=iunit, file=histfile, status='old',            &
@@ -255,10 +261,65 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   stepstart=time()
   ! Begin optimization
 
-  restartcounter = 1
+  restartcounter = 2
   converged = .false.
   write(*,*) 'Particle swarm optimization progress:'
 
+  ! Display initial value
+  write(*,'(A12,I5)')   ' Iteration: ', step-1
+  write(*,'(A27,F9.6)') '   Objective function:    ', f0
+  if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                      '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
+  
+  !   Display progress 
+
+  radius = design_radius(dv,xmax,xmin)
+  write(*,'(A12,I5)')   ' Iteration: ', step
+  write(*,'(A27,F9.6)') '   Objective function:    ', fmin
+  if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                      '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
+  write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+
+
+  if (pso_options%write_designs) then
+    designcounter = designcounter + 1
+    if (present(converterfunc)) then
+      stat = converterfunc(xopt, designcounter)
+    else
+      call write_design('particleswarm_designs.dat', 'old', xopt,            &
+                        designcounter)
+    end if
+  end if
+    
+  !   Write iteration history
+
+  write(stepchar,'(I11)') step
+  write(fminchar,'(F14.10)') fmin
+  write(radchar,'(ES14.6)') radius
+  write(timechar,'(I14)') (steptime-stepstart)+restarttime
+  if (pso_options%relative_fmin_report) then
+    write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
+    write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                          adjustl(relfminchar), adjustl(radchar), &
+                                          adjustl(timechar)
+  else
+    write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                              adjustl(radchar), adjustl(timechar)
+  end if
+  flush(iunit)
+    
+  !   Write restart file if appropriate and update restart counter
+
+  call pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
+                          bestdesigns, minvals, wcurr, (steptime-stepstart)+restarttime)
+
+  !   Write dvs file if asked
+    
+  if (write_dvs_file) then
+    call pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0, xopt,&
+                      fmin)
+  end if
+  
 !$omp end master
 !$omp barrier
 
@@ -290,6 +351,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
       dv(:,i) = dv(:,i) + vel(:,i)
       do j = 1, nconstrained
         var = constrained_dvs(j)
+        !write(*,*) var, xmin(var),  dv(var,i), xmax(var)
         if (dv(var,i) < xmin(var)) then
           dv(var,i) = xmin(var)
           call random_number(speed(i))
@@ -302,8 +364,10 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
       end do
 
 !     Evaluate objective function and update local best design if appropriate
-
-      objval(i) = objfunc(dv(:,i))
+      objfunction_return = objfunc(dv(:,i))
+      objval(i) = objfunction_return%value
+      message_codes(i) = objfunction_return%message_code
+      messages(i) = objfunction_return%message
       if (objval(i) < minvals(i)) then
         minvals(i) = objval(i)
         bestdesigns(:,i) = dv(:,i)
@@ -420,8 +484,10 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 !   Write dvs file if asked
     
     if (write_dvs_file) then
-      call pso_write_dvs(step, dv, x0, xopt)
+      call pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
+                         xopt, fmin)
     end if
+    !stop
     
 !   Check for commands in run_control file
 
@@ -618,17 +684,21 @@ end subroutine pso_read_step
 ! Particle swarm dvs write routine
 !
 !=============================================================================80
-subroutine pso_write_dvs(step, dv,  x0, xopt)
+subroutine pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
+                         xopt, fmin)
 
-  use vardef, only : output_prefix
+  use vardef, only : output_prefix, dvs_for_type
 
   integer, intent(in) :: step
-  double precision, dimension(:), intent(in) ::  x0, xopt
+  double precision, intent(in) :: fmin, f0
+  double precision, dimension(:), intent(in) ::  x0, xopt, objval
   double precision, dimension(:,:), intent(in) :: dv
+  integer, dimension(:), intent(in) :: message_codes
+  character(100), dimension(:), intent(in) :: messages
 
   integer :: i,j
   
-  character(100) :: dvsfile, text
+  character(100) :: dvsfile, text, textdv
   integer :: iunit
   
   ! Status notification
@@ -647,11 +717,41 @@ subroutine pso_write_dvs(step, dv,  x0, xopt)
     !   Header for dvs file
 
     open(unit=iunit, file=dvsfile, status='replace')
-    write(iunit,'(A)') 'title="Design variables (dvs) and xopt"'
-    write(iunit,'(A)') 'variables="dvs vector"'
+    write(iunit,'(A)') 'title="Log file"'
+    write(iunit,'(A)') 'variables="dvs vector", "objval", "message_code", "message"'
     write(iunit,'(A)') 'step = 0: x0'
-    write(iunit,'(100000F12.8)') (x0(i), i=1,size(dv,1))
-
+    if (dvs_for_type(2) .NE. 0) then
+      do i=1, dvs_for_type(2)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(3) .NE. 0) then
+      do i=1, dvs_for_type(3)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(4) .NE. 0) then
+      do i=1, dvs_for_type(4)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+    if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+    write(iunit,'(A24)', advance='no') 'f0'
+    write(iunit,'(A)') ' '
+  
+    do i = 1, size(dv,1)
+      write(iunit,'(F12.8)', advance='no') x0(i)
+    end do
+    write(iunit,'(F24.8)', advance='no') f0
+    write(iunit,'(A)') ' '
+    
   else
 
     !   Open dvs file and write zone header
@@ -662,10 +762,75 @@ subroutine pso_write_dvs(step, dv,  x0, xopt)
 
   ! Write coordinates to file
   write(iunit,'(A)') 'step = '//trim(text)//': xopt '
-  write(iunit,'(100000F12.8)') (xopt(i), i=1,size(dv,1))
+  if (dvs_for_type(2) .NE. 0) then
+    do i=1, dvs_for_type(2)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(3) .NE. 0) then
+    do i=1, dvs_for_type(3)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(4) .NE. 0) then
+    do i=1, dvs_for_type(4)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+  if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+  write(iunit,'(A24)', advance='no') 'fmin'
+  write(iunit,'(A)') ' '
+
+  do i =1, size(dv,1)
+    write(iunit,'(F12.8)', advance='no') xopt(i)
+  end do
+  write(iunit,'(F24.8)', advance='no') fmin
+  write(iunit,'(A)') ' '
+  
   write(iunit,'(A)') 'step = '//trim(text)//': dv '
+  if (dvs_for_type(2) .NE. 0) then
+    do i=1, dvs_for_type(2)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(3) .NE. 0) then
+    do i=1, dvs_for_type(3)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(4) .NE. 0) then
+    do i=1, dvs_for_type(4)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+  if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+  write(iunit,'(A24)', advance='no') 'objval'
+  write(iunit,'(A14)', advance='no') 'message_code'
+  write(iunit,'(A)', advance='no') ' message'
+  write(iunit,'(A)') ' '
+  
   do i = 1, size(dv,2)
-    write(iunit,'(100000F12.8)') (dv(j,i), j=1,size(dv,1))
+    do j =1, size(dv,1)
+      write(iunit,'(F12.8)', advance='no') dv(j,i)
+    end do
+    write(iunit,'(F24.8)', advance='no') objval(i)
+    write(iunit,'(I14)', advance='no') message_codes(i)
+    write(iunit,'(A)', advance='no') messages(i)
+    write(iunit,'(A)') ' '
   end do
 
   ! Close output files
@@ -673,7 +838,7 @@ subroutine pso_write_dvs(step, dv,  x0, xopt)
   close(iunit)
 
   ! Status notification
-
+  
   write(*,*) '  Successfully wrote PSO dvs file.'
   return
   

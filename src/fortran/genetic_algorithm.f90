@@ -86,14 +86,15 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   use optimization_util, only : init_random_seed, initial_designs,             &
                                 design_radius, write_design, bubble_sort,      &
                                 read_run_control
-  use vardef, only : output_prefix, write_dvs_file
+  use vardef, only : output_prefix, write_dvs_file, objfunction_type
 
   double precision, dimension(:), intent(inout) :: xopt
   double precision, intent(out) :: fmin
   integer, intent(out) :: step, fevals
 
   interface
-    double precision function objfunc(x)
+    type(objfunction_type) function objfunc(x)
+      import :: objfunction_type
       double precision, dimension(:), intent(in) :: x
     end function
   end interface
@@ -126,6 +127,9 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   double precision, dimension(size(xmin,1),ga_options%pop) :: dv
   double precision, dimension(:,:), allocatable :: stackdv
   double precision, dimension(:), allocatable :: stackobjval
+  integer, dimension(size(x0,1)) :: message_codes
+  character(100), dimension(size(x0,1)) :: messages
+  type(objfunction_type) :: objfunction_return
   logical :: use_x0, converged, signal_progress, new_history_file
   integer :: stepstart, steptime, restarttime
   character(14) :: timechar
@@ -155,7 +159,8 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   if (given_f0_ref) then
     f0 = f0_ref
   else
-    f0 = objfunc(x0)
+    objfunction_return = objfunc(x0)
+    f0 = objfunction_return%value
     f0_ref = f0
   end if
 
@@ -171,7 +176,8 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   if (.not. restart) then
     call initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0, x0,  &
                          ga_options%feasible_init, ga_options%feasible_limit,  &
-                         ga_options%feasible_init_attempts)
+                         ga_options%feasible_init_attempts, message_codes,     &
+                         messages)
   end if
 
 !$omp master
@@ -306,9 +312,10 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
       end do
 
 !     Evaluate objective function for offspring
-
-      objchild1 = objfunc(child1)
-      objchild2 = objfunc(child2)
+      objfunction_return = objfunc(child1)
+      objchild1 = objfunction_return%value
+      objfunction_return = objfunc(child2)
+      objchild2 = objfunction_return%value
 
 !     Add children at back of stacked arrays
 
