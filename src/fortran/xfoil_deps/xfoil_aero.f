@@ -1550,3 +1550,162 @@ C....................................................................
      &     1X,3X,'  Cm =', F8.4, '     CD =',F9.5,
      &           '   =>   CDf =',F9.5,'    CDp =',F9.5)
       END ! VISCAL
+!      
+!      SUBROUTINE BLDUMP(FNAME1)
+!      INCLUDE 'XFOIL.INC'
+!      CHARACTER*(*) FNAME1
+!C
+!      CHARACTER*80 FILDEF
+!C
+! 1000 FORMAT(A,A)
+!C
+!      IF(FNAME1(1:1).NE.' ') THEN
+!       FNAME = FNAME1
+!      ELSE
+!C----- no argument... get it somehow
+!       IF(NPREFIX.GT.0) THEN
+!C------ offer default using existing prefix
+!        FILDEF = PREFIX(1:NPREFIX) // '.bl'
+!        WRITE(*,1100) FILDEF
+! 1100   FORMAT(/' Enter filename:  ', A)
+!        READ(*,1000) FNAME
+!        CALL STRIP(FNAME,NFN)
+!        IF(NFN.EQ.0) FNAME = FILDEF
+!       ELSE
+!C------ nothing available... just ask for filename
+!        CALL ASKS('Enter filename^',FNAME)
+!       ENDIF
+!      ENDIF
+!C
+!      LU = 19
+!      OPEN(LU,FILE=FNAME,STATUS='UNKNOWN')
+!      REWIND(LU)
+!C
+!      WRITE(LU,1000)
+!     & '#    s        x        y     Ue/Vinf    Dstar     Theta ',
+!     & '     Cf       H        CD       CT'
+!c     & '#    s        x        y     Ue/Vinf    Dstar     Theta ',
+!c     & '     Cf       H'
+!C         1.23456  0.23451  0.23451  0.23451  0.012345  0.001234  0.004123  10.512
+!C
+!      CALL COMSET
+!      DO 10 I=1, N
+!        IS = 1
+!        IF(GAM(I) .LT. 0.0) IS = 2
+!C
+!        IF(LIPAN .AND. LVISC) THEN
+!          IF(IS.EQ.1) THEN
+!            IBL = IBLTE(IS) - I + 1
+!          ELSE
+!            IBL = IBLTE(IS) + I - N
+!          ENDIF
+!          DS = DSTR(IBL,IS)
+!          TH = THET(IBL,IS)
+!          CF =  TAU(IBL,IS)/(0.5*QINF**2)
+!          IF(TH.EQ.0.0) THEN
+!           H = 1.0
+!          ELSE
+!           H = DS/TH
+!          ENDIF
+!        ELSE
+!          DS = 0.
+!          TH = 0.
+!          CF = 0.
+!          H = 1.0
+!        ENDIF
+!        UE = (GAM(I)/QINF)*(1.0-TKLAM) / (1.0 - TKLAM*(GAM(I)/QINF)**2)
+!        AMSQ = UE*UE*HSTINV / (GAMM1*(1.0 - 0.5*UE*UE*HSTINV))
+!        CALL HKIN( H, AMSQ, HK, DUMMY, DUMMY)
+!C
+!ccc        WRITE(LU,8500) S(I), X(I), Y(I), UE, DS, TH, CF, HK
+!        CDIS = DIS(IBL,IS)/QINF**3
+!        CT = CTAU(IBL,IS)
+!        WRITE(LU,8500) S(I), X(I), Y(I), UE, DS, TH, CF, HK, CDIS, CT
+!  10  CONTINUE
+!C
+! 8500   FORMAT(1X,4F9.5,3F10.6,F10.3,2F10.6)
+!C
+!      IF(LWAKE) THEN
+!        IS = 2
+!        DO 20 I=N+1, N+NW
+!          IBL = IBLTE(IS) + I - N
+!          DS = DSTR(IBL,IS)
+!          TH = THET(IBL,IS)
+!          H = DS/TH
+!          CF = 0.
+!          UI = UEDG(IBL,IS)
+!          UE = (UI/QINF)*(1.0-TKLAM) / (1.0 - TKLAM*(UI/QINF)**2)
+!          AMSQ = UE*UE*HSTINV / (GAMM1*(1.0 - 0.5*UE*UE*HSTINV))
+!          CALL HKIN( H, AMSQ, HK, DUMMY, DUMMY)
+!C
+!ccc          WRITE(LU,8500) S(I), X(I), Y(I), UE, DS, TH, CF, HK
+!          CDIS = DIS(IBL,IS)/QINF**3
+!          CT = CTAU(IBL,IS)
+!          WRITE(LU,8500) S(I), X(I), Y(I), UE, DS, TH, CF, HK, CDIS, CT
+! 20     CONTINUE
+!      ENDIF
+!C
+!      CLOSE(LU)
+!      RETURN
+!      END ! BLDUMP
+!
+!
+!
+!      SUBROUTINE CPDUMP(FNAME1)
+!      INCLUDE 'XFOIL.INC'
+!      CHARACTER*(*) FNAME1
+!C
+!      CHARACTER*80 FILDEF
+!C
+! 1000 FORMAT(A)
+!C
+!      IF(FNAME1(1:1).NE.' ') THEN
+!       FNAME = FNAME1
+!      ELSE
+!C----- no argument... get it somehow
+!       IF(NPREFIX.GT.0) THEN
+!C------ offer default using existing prefix
+!        FILDEF = PREFIX(1:NPREFIX) // '.cp'
+!        WRITE(*,1100) FILDEF
+! 1100   FORMAT(/' Enter filename:  ', A)
+!        READ(*,1000) FNAME
+!        CALL STRIP(FNAME,NFN)
+!        IF(NFN.EQ.0) FNAME = FILDEF
+!       ELSE
+!C------ nothing available... just ask for filename
+!        CALL ASKS('Enter filename^',FNAME)
+!       ENDIF
+!      ENDIF
+!C
+!C
+!      LU = 19
+!      OPEN(LU,FILE=FNAME,STATUS='UNKNOWN')
+!      REWIND(LU)
+!C
+!      WRITE(LU,1000) NAME
+!      WRITE(LU,1200) ADEG,REINF1,XBF,YBF
+! 1200 FORMAT(1X,'Alfa = ',F9.5,' Re = ',F12.3,' Xflap,Yflap = ',2F12.6)
+!C
+!      WRITE(LU,1000)
+!     & '#    x        y        Cp  '
+!ccc     & '#    x        Cp  '
+!C         0.23451  0.23451
+!C
+!      CALL COMSET
+!C
+!      BETA = SQRT(1.0 - MINF**2)
+!      BFAC = 0.5*MINF**2 / (1.0 + BETA)
+!C
+!      DO 10 I=1, N
+!        CPINC = 1.0 - (GAM(I)/QINF)**2
+!        DEN = BETA + BFAC*CPINC
+!        CPCOM = CPINC / DEN
+!C
+!ccc        WRITE(LU,8500) X(I), CPCOM
+!        WRITE(LU,8500) X(I), Y(I), CPCOM
+! 8500   FORMAT(1X,3F9.5)
+!  10  CONTINUE
+!C
+!      CLOSE(LU)
+!      RETURN
+!      END ! CPDUMP

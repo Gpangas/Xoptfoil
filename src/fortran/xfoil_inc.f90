@@ -37,7 +37,7 @@ module xfoil_inc
 
 ! All non-constant variables are declared as threadprivate for OpenMP
 
-  INTEGER, PARAMETER :: IQX=360
+  INTEGER, PARAMETER :: IQX=1440
   INTEGER, PARAMETER :: ISX=2
   INTEGER, PARAMETER :: IBX=4*IQX
   INTEGER, PARAMETER :: IWX=IQX/8+2

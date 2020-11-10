@@ -40,7 +40,7 @@ program main
 
   type(airfoil_type) :: buffer_foil
   character(80) :: search_type, global_search, local_search, seed_airfoil,     &
-                   airfoil_file, matchfoil_file
+                   matchfoil_file
   character(80) :: input_file
   type(naca_options_type) :: naca_options
   type(pso_options_type) :: pso_options
@@ -71,7 +71,7 @@ program main
   ! Read inputs from namelist file
 
   call read_inputs(input_file, search_type, global_search, local_search,       &
-                   seed_airfoil, airfoil_file, nparams_top, nparams_bot,       &
+                   seed_airfoil, nparams_top, nparams_bot,       &
                    restart, restart_write_freq, constrained_dvs, naca_options, &
                    pso_options, ga_options, ds_options, matchfoil_file)
   

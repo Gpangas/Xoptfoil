@@ -33,7 +33,7 @@ module input_output
 !
 !=============================================================================80
 subroutine read_inputs(input_file, search_type, global_search, local_search,   &
-                       seed_airfoil, airfoil_file, nparameters_top,             &
+                       seed_airfoil, nparameters_top,             &
                        nparameters_bot, restart, restart_write_freq,            &
                        constrained_dvs, naca_options, pso_options, ga_options, &
                        ds_options, matchfoil_file)
@@ -50,7 +50,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
  
   character(*), intent(in) :: input_file
   character(80), intent(out) :: search_type, global_search, local_search,      &
-                                seed_airfoil, airfoil_file, matchfoil_file
+                                seed_airfoil, matchfoil_file
   integer, intent(out) :: nparameters_top, nparameters_bot
   integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
   integer, dimension(max_addthickconst) :: sort_idxs
@@ -91,12 +91,14 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             nparameters_bot, flap_optimization_only, initial_perturb,          &
             min_bump_width, kulfan_bussoletti_LEM, b_spline_degree,            &
             b_spline_xtype, b_spline_distribution, restart, restart_write_freq,&
-            write_designs, write_dvs_file, number_threads
+            write_designs, write_cp_file, write_bl_file, write_dvs_file,       &
+            number_threads
   namelist /operating_conditions/ noppoint, op_mode, op_point, op_point_start, &
             op_point_end, op_point_step, reynolds, mach, use_flap,  x_flap,    &
-            flap_transition, x_flap_spec, y_flap, y_flap_spec, TE_spec, tcTE,  &
-            xltTE, flap_selection, flap_identical_op, flap_degrees, weighting, &
-            optimization_type, target_value, ncrit_pt
+            flap_connection, connection_apply, connection_radius, x_flap_spec, &
+            y_flap, y_flap_spec, TE_spec, tcTE, xltTE, flap_selection,         &
+            flap_identical_op, flap_degrees, weighting, optimization_type,     &
+            target_value, ncrit_pt
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
                          min_moment, lift_constraint_type,                     &
                          min_lift, drag_constraint_type,                       &
@@ -152,6 +154,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   restart = .false.
   restart_write_freq = 20
   write_designs = .true.
+  write_cp_file = .false.
+  write_bl_file = .false.
   write_dvs_file = .false.
   number_threads = 0
 
@@ -172,7 +176,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
   noppoint = 1
   use_flap = .false.
-  flap_transition = 'smooth'
+  flap_connection = 'sharp'
+  connection_apply = 'none' 
   x_flap = 0.75d0
   x_flap_spec = 'specify' ! specify, optimize 
   y_flap = 0.d0
@@ -481,13 +486,15 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   read(iunit, iostat=iostat1, nml=xfoil_paneling_options)
   call namelist_check('xfoil_paneling_options', iostat1, 'warn')
 
-  ! Set trasition points according to flap_transition
+  ! Set trasition points according to flap_connection 
 
-  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
-    if (trim(flap_transition) .EQ. 'sharp-top') then
-      xtript=x_flap
-    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+  if (use_flap .and. (trim(flap_connection) .NE. 'smooth') .and.     &
+      ( (trim(connection_apply) .EQ. 'trip_wire') .OR.               &
+        (trim(connection_apply) .EQ. 'both'     ) )      ) then
+    if (trim(flap_connection) .EQ. 'smooth-top') then
       xtripb=x_flap
+    elseif (trim(flap_connection) .EQ. 'smooth-bot') then
+      xtript=x_flap
     else
       xtript=x_flap
       xtripb=x_flap
@@ -497,8 +504,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   ! Ask about removing turbulent trips for max-xtr optimization
   
   nxtr_opt = 0
-  if ( ((xtript < 1.d0) .or. (xtripb < 1.d0)) .or.                             &
-       (trim(flap_transition) .NE. 'smooth')  ) then
+  if ( (xtript < 1.d0) .or. (xtripb < 1.d0) )then
     do i = 1, noppoint
       if (trim(optimization_type(i)) == "max-xtr") nxtr_opt = nxtr_opt + 1
     end do
@@ -622,6 +628,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " restart = ", restart
   write(*,*) " restart_write_freq = ", restart_write_freq
   write(*,*) " write_designs = ", write_designs
+  write(*,*) " write_cp_file = ", write_cp_file
+  write(*,*) " write_bl_file = ", write_bl_file
   write(*,*) " write_dvs_file = ", write_dvs_file
   write(*,*) " number_threads = ", number_threads
   write(*,'(A)') " /"
@@ -632,7 +640,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,'(A)') " &operating_conditions"
   write(*,*) " noppoint = ", noppoint
   write(*,*) " use_flap = ", use_flap
-  write(*,*) " flap_transition = ", flap_transition
+  write(*,*) " flap_connection = ", flap_connection
+  write(*,*) " connection_apply = ", connection_apply
   write(*,*) " x_flap = ", x_flap
   write(*,*) " x_flap_spec = "//trim(x_flap_spec)
   write(*,*) " y_flap = ", y_flap
@@ -879,15 +888,28 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
      call my_stop("noppoints must be <= "//trim(text)//".")
   end if
   if (use_flap .and.                                                           &
-      trim(flap_transition) /= 'sharp' .and.                                   &
-      trim(flap_transition) /= 'sharp-top' .and.                               &
-      trim(flap_transition) /= 'sharp-bot' .and.                               &
-      trim(flap_transition) /= 'smooth')                                       &
-    call my_stop("flap_transition must be 'sharp', 'sharp-top', "//            &
-    &            "'sharp-bot' or 'smooth'.")
-  if ((nxtr_opt .NE. 0) .AND. trim(flap_transition) /= 'smooth')               &
-    call my_stop("flap_transition must be 'smooth' if using max-xtr "//        &
-    &            "optimization type.")
+      trim(flap_connection) /= 'sharp' .and.                                   &
+      trim(flap_connection) /= 'smooth-top' .and.                              &
+      trim(flap_connection) /= 'smooth-bot' .and.                              &
+      trim(flap_connection) /= 'smooth')                                       &
+    call my_stop("flap_connection must be 'sharp', 'smooth-top', "//           &
+    &            "'smooth-bot' or 'smooth'.")
+  if (use_flap .and.                                                           &
+      trim(connection_apply) /= 'both' .and.                                   &
+      trim(connection_apply) /= 'geometric' .and.                              &
+      trim(connection_apply) /= 'trip_wire' .and.                              &
+      trim(connection_apply) /= 'none')                                        &
+    call my_stop("connection_apply must be 'none', 'geometric', 'trip_wire'"// &
+    &            " or 'both'")
+  if (use_flap .and.                                                           &
+      trim(connection_apply) /= 'trip_wire' .and.                              &
+      trim(connection_apply) /= 'none'  .and.                                  &
+      connection_radius .LE. 0.0d0)                                            &
+    call my_stop("connection_radius must be > 0.")
+  if ((nxtr_opt .NE. 0) .AND. (trim(connection_apply) /= 'none' .OR.           &
+                               trim(connection_apply) /= 'geometric'))         &
+    call my_stop("connection_apply must be 'none' or 'geometric' if using "//  &
+    &            "max-xtr optimization type.")
   if ((use_flap) .and. (x_flap <= 0.0)) call my_stop("x_flap must be > 0.")
   if ((use_flap) .and. (x_flap >= 1.0)) call my_stop("x_flap must be < 1.")
   if ((use_flap) .and. (x_flap_spec /= 'specify')                              &

@@ -55,7 +55,7 @@ module vardef
 ! routines)
 
   integer :: noppoint
-  integer, parameter :: max_op_points = 30
+  integer, parameter :: max_op_points = 100
   double precision, dimension(:), allocatable :: xseedt, xseedb, zseedt, zseedb
   character(7), dimension(max_op_points) :: op_mode
   character(9), dimension(max_op_points) :: flap_selection
@@ -64,12 +64,12 @@ module vardef
                                  ncrit_pt, target_value
   type(op_search_type) :: op_search
   integer, dimension(max_op_points) :: flap_identical_op
-  double precision :: x_flap, y_flap, tcTE, xltTE
+  double precision :: x_flap, y_flap, tcTE, xltTE, connection_radius 
   character(3) :: y_flap_spec
   character(8) :: x_flap_spec, TE_spec ! added x_flap_spec and TE_spec
   integer :: int_x_flap_spec, int_tcTE_spec           ! added int_x_flap_spec
   logical :: use_flap, flap_optimization_only
-  character(20) :: flap_transition
+  character(20) :: flap_connection, connection_apply 
   character(15), dimension(max_op_points) :: optimization_type
   integer, dimension(6) :: dvs_for_type
   integer :: nflap_optimize, nflap_identical
@@ -91,6 +91,7 @@ module vardef
   character(8), dimension(max_op_points) :: moment_constraint_type,            &
                                           lift_constraint_type,                &
                                           drag_constraint_type
+  character(80) :: airfoil_file
   double precision, dimension(max_op_points) :: min_moment, min_lift, max_drag
   character(17) :: shape_functions
   double precision, dimension(:), allocatable :: xmatcht, xmatchb, zmatcht,    &
@@ -98,7 +99,7 @@ module vardef
   logical :: match_foils
   logical :: check_curvature
   logical :: symmetrical
-  logical :: write_dvs_file
+  logical :: write_dvs_file, write_cp_file, write_bl_file
   integer :: number_threads
 
   integer :: nparams_top, nparams_bot, nshapedvtop, nshapedvbot

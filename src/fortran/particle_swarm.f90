@@ -743,13 +743,13 @@ subroutine pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
     end if
     if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
     if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
-    write(iunit,'(A24)', advance='no') 'f0'
+    write(iunit,'(A30)', advance='no') 'f0'
     write(iunit,'(A)') ' '
   
     do i = 1, size(dv,1)
       write(iunit,'(F12.8)', advance='no') x0(i)
     end do
-    write(iunit,'(F24.8)', advance='no') f0
+    write(iunit,'(F30.8)', advance='no') f0
     write(iunit,'(A)') ' '
     
   else
@@ -785,13 +785,13 @@ subroutine pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
   end if
   if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
   if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
-  write(iunit,'(A24)', advance='no') 'fmin'
+  write(iunit,'(A30)', advance='no') 'fmin'
   write(iunit,'(A)') ' '
 
   do i =1, size(dv,1)
     write(iunit,'(F12.8)', advance='no') xopt(i)
   end do
-  write(iunit,'(F24.8)', advance='no') fmin
+  write(iunit,'(F30.8)', advance='no') fmin
   write(iunit,'(A)') ' '
   
   write(iunit,'(A)') 'step = '//trim(text)//': dv '
@@ -818,7 +818,7 @@ subroutine pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
   end if
   if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
   if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
-  write(iunit,'(A24)', advance='no') 'objval'
+  write(iunit,'(A30)', advance='no') 'objval'
   write(iunit,'(A14)', advance='no') 'message_code'
   write(iunit,'(A)', advance='no') ' message'
   write(iunit,'(A)') ' '
@@ -827,7 +827,7 @@ subroutine pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
     do j =1, size(dv,1)
       write(iunit,'(F12.8)', advance='no') dv(j,i)
     end do
-    write(iunit,'(F24.8)', advance='no') objval(i)
+    write(iunit,'(F30.8)', advance='no') objval(i)
     write(iunit,'(I14)', advance='no') message_codes(i)
     write(iunit,'(A)', advance='no') messages(i)
     write(iunit,'(A)') ' '

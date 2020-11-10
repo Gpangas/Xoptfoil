@@ -34,7 +34,7 @@ subroutine check_seed()
   use math_deps,          only : interp_vector, curvature, derv1f1, derv1b1
   use xfoil_driver,       only : run_xfoil
   use xfoil_inc,          only : AMAX, CAMBR
-  use airfoil_evaluation, only : xfoil_options, xfoil_geom_options
+  use airfoil_evaluation, only : xfoil_options, xfoil_geom_options, file_options
 
   double precision, dimension(:), allocatable :: x_interp, thickness
   double precision, dimension(:), allocatable :: zt_interp, zb_interp
@@ -330,20 +330,19 @@ subroutine check_seed()
     flap_idi = flap_identical_points(i)
     actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
   end do
-  
-  ! Set trasition points according to flap_transition
 
-  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
-    if (trim(flap_transition) .EQ. 'sharp-top') then
-      xfoil_options%xtript=x_flap
-    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+  ! Set trasition points according to flap_connection 
+
+  if (use_flap .and. (trim(flap_connection) .NE. 'smooth') .and.     &
+      ( (trim(connection_apply) .EQ. 'trip_wire') .OR.               &
+        (trim(connection_apply) .EQ. 'both'     ) )      ) then
+    if (trim(flap_connection) .EQ. 'smooth-top') then
       xfoil_options%xtripb=x_flap
-    elseif (trim(flap_transition) .EQ. 'sharp') then
+    elseif (trim(flap_connection) .EQ. 'smooth-bot') then
       xfoil_options%xtript=x_flap
-      xfoil_options%xtripb=x_flap
     else
-      write(*,*) "Error in flap_transition, please report this bug"
-      stop
+      xfoil_options%xtript=x_flap
+      xfoil_options%xtripb=x_flap
     end if
   end if
   
@@ -353,8 +352,8 @@ subroutine check_seed()
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
                  op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
                  mach(1:noppoint), use_flap, x_flap, y_flap, y_flap_spec,      &
-                 actual_flap_degrees(1:noppoint), xfoil_options, lift, drag,   &
-                 moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
+                 actual_flap_degrees(1:noppoint), xfoil_options, file_options, &
+                 lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
   first_run_xfoil=.false.
   
 ! Penalty for too large panel angles

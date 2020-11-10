@@ -25,7 +25,7 @@ program xfoil_only
   use particle_swarm,     only : pso_options_type
   use genetic_algorithm,  only : ga_options_type
   use simplex_search,     only : ds_options_type
-  use airfoil_evaluation, only : xfoil_options, xfoil_geom_options
+  use airfoil_evaluation, only : xfoil_options, xfoil_geom_options, file_options
   use memory_util,        only : deallocate_airfoil
   use airfoil_operations, only : load_airfoil
   use naca,               only : naca_options_type, naca_456
@@ -36,7 +36,7 @@ program xfoil_only
 
   type(airfoil_type) :: foil
   character(80) :: search_type, global_search, local_search, seed_airfoil,     &
-                   airfoil_file, matchfoil_file
+                   matchfoil_file
   character(80) :: input_file
   type(naca_options_type) :: naca_options
   type(pso_options_type) :: pso_options
@@ -48,7 +48,7 @@ program xfoil_only
   double precision, dimension(:), allocatable :: alpha, lift, drag, moment,    &
                                                  viscrms, xtrt, xtrb
   double precision :: maxt, xmaxt, maxc, xmaxc
-  character(30) :: text
+  character(100) :: text, text1, text2, text3
 
 ! Set default names and read command line arguments
 
@@ -59,7 +59,7 @@ program xfoil_only
 ! Read inputs from namelist file
 
   call read_inputs(input_file, search_type, global_search, local_search,       &
-                   seed_airfoil, airfoil_file, nparams_top, nparams_bot,       &
+                   seed_airfoil, nparams_top, nparams_bot,       &
                    restart, restart_write_freq, constrained_dvs, naca_options, &
                    pso_options, ga_options, ds_options, matchfoil_file)
 
@@ -87,11 +87,15 @@ program xfoil_only
 
 ! Run xfoil
 
+  file_options%polar = .true.
+  file_options%cp = write_cp_file
+  file_options%bl = write_bl_file
+  
   call run_xfoil(foil, xfoil_geom_options, op_point(1:noppoint),               &
                  op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
                  mach(1:noppoint), use_flap, x_flap, y_flap, y_flap_spec,      &
-                 flap_degrees(1:noppoint), xfoil_options, lift, drag, moment,  &
-                 viscrms, alpha, xtrt, xtrb, ncrit_pt(1:noppoint))
+                 flap_degrees(1:noppoint), xfoil_options, file_options, lift,  &
+                 drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt(1:noppoint))
 
 ! Get geometry info from xfoil
 
@@ -99,6 +103,9 @@ program xfoil_only
 
 ! Display a summary of geometry results
 
+  open(unit=122, file=trim(output_prefix)//'_xfoil_only.dat', status='replace')
+  open(unit=321, file=trim(output_prefix)//'_xfoil_only.log', status='replace')
+  
   write(*,*)
   write(*,*) 'Airfoil geometry information from Xfoil: '
   write(*,*)
@@ -106,29 +113,66 @@ program xfoil_only
   write(*,*) 'Location of max thickness: ', xmaxt
   write(*,*) 'Max camber: ', maxc
   write(*,*) 'Location of max camber: ', xmaxc
+  
+  write(122,*)
+  write(122,*) 'Airfoil geometry information from Xfoil: '
+  write(122,*)
+  write(122,*) 'Max thickness: ', maxt
+  write(122,*) 'Location of max thickness: ', xmaxt
+  write(122,*) 'Max camber: ', maxc
+  write(122,*) 'Location of max camber: ', xmaxc
+  
+  write(321,'(A)') '  '
+  write(321,'(A)') '       XFOIL         Version 6.99'
+  write(321,'(A)') '  '
+  write(text1,*) airfoil_file
+  text1 = adjustl(text1)
+  i=len_trim(text1)
+  write(321,'(A)') ' Calculated polar for: '//text1(1:i-4)
+  write(321,'(A)') '  '
+  write(321,'(A)') ' 1 1 Reynolds number fixed          Mach number fixed         '
+  write(321,'(A)') '  '
+  write(321,'(A9,F7.3,A13,F7.3,A11)') ' xtrf =  ',xfoil_options%xtript,' (top)       ',xfoil_options%xtripb,' (bottom)  '
+  write(321,'(A9,F7.3,A13,F7.3,A17,F7.3)') ' Mach =  ',mach(1),'     Re =    ',reynolds(1)/10.0**6,' e 6     Ncrit = ',ncrit_pt(1)
+  write(321,'(A)') '  '
+  write(321,'(A)') '   alpha    CL        CD       CDp       CM     Top_Xtr  Bot_Xtr'
+  write(321,'(A)') '  ------ -------- --------- --------- -------- -------- --------'
+
 
 ! Display a summary of aero results
 
   write(*,*) 
   write(*,*) 'Aerodynamic information from Xfoil: '
-
+  
+  write(122,*) 
+  write(122,*) 'Aerodynamic information from Xfoil: '
+  
+  write(*,*)
+  write(*,'(6A14)') 'alpha(i)', 'lift(i)', 'drag(i)', 'moment(i)', 'xtrt(i)', 'xtrb(i)'
+  
+  write(122,*)
+  write(122,'(6A14)') 'alpha(i)', 'lift(i)', 'drag(i)', 'moment(i)', 'xtrt(i)', 'xtrb(i)'
   do i = 1, noppoint
 
     write(text,*) i
     text = adjustl(text)
 
-    write(*,*)
-    if (viscrms(i) > 1.D-04) write(*,'(A)')                                    &
+    if (viscrms(i) > 1.D-04) write(*,'(A)')                                  &
       ' Warning: operating point '//trim(text)//' did not converge.'
-    write(*,'(A8,F8.4)') ' alpha: ', alpha(i)
-    write(*,'(A5,F8.4)') ' Cl: ', lift(i)
-    write(*,'(A5,F8.4)') ' Cd: ', drag(i)
-    write(*,'(A5,F8.4)') ' Cm: ', moment(i)
-    write(*,'(A21,F8.4)') ' Top transition x/c: ', xtrt(i)
-    write(*,'(A24,F8.4)') ' Bottom transition x/c: ', xtrb(i)
+    write(*,'(6F14.8)')  alpha(i), lift(i), drag(i), moment(i), xtrt(i), xtrb(i)
+    
+    if (viscrms(i) > 1.D-04) write(122,'(A)')                                  &
+      ' Warning: operating point '//trim(text)//' did not converge.'
+    write(122,'(6F14.8)')  alpha(i), lift(i), drag(i), moment(i), xtrt(i), xtrb(i)
+    
+    if (viscrms(i) < 1.D-04) write(321,'(F8.3,F9.4,F10.5,F10.5,F9.4,F9.4,F9.4)') &
+      alpha(i), lift(i), drag(i), drag(i), moment(i), xtrt(i), xtrb(i)
 
   end do
 
+  close(122)
+  close(321)
+  
 ! Deallocate xfoil variables
 
   call xfoil_cleanup()

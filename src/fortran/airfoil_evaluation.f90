@@ -20,7 +20,8 @@ module airfoil_evaluation
 ! Sets up and evaluates the objective function for an airfoil design
 
   use vardef
-  use xfoil_driver, only : xfoil_options_type, xfoil_geom_options_type
+  use xfoil_driver, only : xfoil_options_type, xfoil_geom_options_type,        &
+                           xfoil_file_options_type
 
   implicit none
 
@@ -28,8 +29,9 @@ module airfoil_evaluation
   private :: aero_objective_function, matchfoil_objective_function
 
   type(xfoil_options_type) :: xfoil_options
+  type(xfoil_file_options_type) :: file_options
   type(xfoil_geom_options_type) :: xfoil_geom_options
-
+  
 ! Variables used to check that XFoil results are repeatable when needed
 
   double precision :: checktol = 0.2d0
@@ -130,6 +132,7 @@ function aero_objective_function(designvars, include_penalty)
   double precision, parameter :: epsupdate = 1.0D-08
   double precision :: pi
   logical :: penalize
+  character(100) :: text
 
   pi = acos(-1.d0)
   nmodest = nparams_top
@@ -487,21 +490,18 @@ function aero_objective_function(designvars, include_penalty)
     return
   end if
 
-  
-  
-  ! Set trasition points according to flap_transition
+  ! Set trasition points according to flap_connection 
 
-  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
-    if (trim(flap_transition) .EQ. 'sharp-top') then
-      xfoil_options%xtript=actual_x_flap
-    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+  if (use_flap .and. (trim(flap_connection) .NE. 'smooth') .and.     &
+      ( (trim(connection_apply) .EQ. 'trip_wire') .OR.               &
+        (trim(connection_apply) .EQ. 'both'     ) )      ) then
+    if (trim(flap_connection) .EQ. 'smooth-top') then
       xfoil_options%xtripb=actual_x_flap
-    elseif (trim(flap_transition) .EQ. 'sharp') then
+    elseif (trim(flap_connection) .EQ. 'smooth-bot') then
       xfoil_options%xtript=actual_x_flap
-      xfoil_options%xtripb=actual_x_flap
     else
-      write(*,*) "Error in flap_transition, please report this bug"
-      stop
+      xfoil_options%xtript=actual_x_flap
+      xfoil_options%xtripb=actual_x_flap
     end if
   end if
   
@@ -511,7 +511,8 @@ function aero_objective_function(designvars, include_penalty)
                  op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
                  mach(1:noppoint), use_flap, actual_x_flap, y_flap,            &
                  y_flap_spec, actual_flap_degrees(1:noppoint), xfoil_options,  &
-                 lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
+                 file_options, lift, drag, moment, viscrms, alpha, xtrt, xtrb, &
+                 ncrit_pt)
   !do i=1,size(lift,1)
   !  write(*,*) lift(i), drag(i), moment(i), viscrms(i), alpha(i), xtrt(i), xtrb(i), ncrit_pt(i)
   !end do
@@ -603,9 +604,9 @@ function aero_objective_function(designvars, include_penalty)
     call run_xfoil(curr_foil, xfoil_geom_options, opp_check(1:ncheckpt),       & 
                    opm_check(1:ncheckpt), op_search, re_check(1:ncheckpt),     &
                    ma_check(1:ncheckpt), use_flap, actual_x_flap, y_flap,      &
-                   y_flap_spec, fd_check(1:ncheckpt), xfoil_options, clcheck,  &
-                   cdcheck, cmcheck, rmscheck, alcheck, xtrtcheck, xtrbcheck,  &
-                   ncrit_check(1:ncheckpt))
+                   y_flap_spec, fd_check(1:ncheckpt), xfoil_options,           &
+                   file_options, clcheck, cdcheck, cmcheck, rmscheck, alcheck, &
+                   xtrtcheck, xtrbcheck, ncrit_check(1:ncheckpt))
 
 !   Keep the more conservative of the two runs
 
@@ -862,7 +863,8 @@ function aero_objective_function(designvars, include_penalty)
   if (penalize) aero_objective_function%value =                                      &
                 aero_objective_function%value + penaltyvaltotal*1.0D+06
   aero_objective_function%message_code = 0
-  aero_objective_function%message = ' passed' 
+  write(text,'(5F12.6)') penaltyvaltotal
+  aero_objective_function%message = ' passed, penaltyvaltotal:'//trim(text)
 ! Update maxlift and mindrag only if it is a good design
 
   if (penaltyvaltotal <= epsupdate) then
@@ -1089,30 +1091,42 @@ function write_airfoil_optimization_progress(designvars, designcounter)
     actual_x_flap=x_flap
   end if
 
-  ! Set trasition points according to flap_transition
 
-  if (use_flap .and. (trim(flap_transition) .NE. 'smooth')) then
-    if (trim(flap_transition) .EQ. 'sharp-top') then
-      xfoil_options%xtript=actual_x_flap
-    elseif (trim(flap_transition) .EQ. 'sharp-bot') then
+  ! Set trasition points according to flap_connection 
+
+  if (use_flap .and. (trim(flap_connection) .NE. 'smooth') .and.     &
+      ( (trim(connection_apply) .EQ. 'trip_wire') .OR.               &
+        (trim(connection_apply) .EQ. 'both'     ) )      ) then
+    if (trim(flap_connection) .EQ. 'smooth-top') then
       xfoil_options%xtripb=actual_x_flap
-    elseif (trim(flap_transition) .EQ. 'sharp') then
+    elseif (trim(flap_connection) .EQ. 'smooth-bot') then
       xfoil_options%xtript=actual_x_flap
-      xfoil_options%xtripb=actual_x_flap
     else
-      write(*,*) "Error in flap_transition, please report this bug"
-      stop
+      xfoil_options%xtript=actual_x_flap
+      xfoil_options%xtripb=actual_x_flap
     end if
   end if
-  
+        
+! File saving options        
+  file_options%design_number = designcounter
+  file_options%polar = .true.
+  file_options%cp = write_cp_file
+  file_options%bl = write_bl_file
+        
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
                  op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
                  mach(1:noppoint), use_flap, actual_x_flap, y_flap,            &
                  y_flap_spec, actual_flap_degrees(1:noppoint), xfoil_options,  &
-                 lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
-
+                 file_options, lift, drag, moment, viscrms, alpha, xtrt, xtrb, &
+                 ncrit_pt)
+  
+! Set file saving options to false
+  file_options%polar = .false.
+  file_options%cp = .false.
+  file_options%bl = .false.
+  
 ! Get geometry info
 
   call xfoil_geometry_info(maxt, xmaxt, maxc, xmaxc)
@@ -1131,7 +1145,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   polarfile = trim(output_prefix)//'_design_polars.dat'
 
   foilunit = 13
-  polarunit = 14
+  !polarunit = 14
 
 ! Open files and write headers, if necessary
 
@@ -1139,7 +1153,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
 !   Header for coordinate file
 
-    write(*,*) "Writing coordinates for seed airfoil to file "//               &
+    write(*,*) "  Writing coordinates for seed airfoil to file "//             &
                trim(foilfile)//" ..."
     open(unit=foilunit, file=foilfile, status='replace')
     write(foilunit,'(A)') 'title="Airfoil coordinates"'
@@ -1148,14 +1162,14 @@ function write_airfoil_optimization_progress(designvars, designcounter)
                           ', xmaxt='//trim(xmaxtchar)//', maxc='//&
                           trim(maxcchar)//', xmaxc='//trim(xmaxcchar)//'"'
 
-!   Header for polar file
-
-    write(*,*) "Writing polars for seed airfoil to file "//                    &
-               trim(polarfile)//" ..."
-    open(unit=polarunit, file=polarfile, status='replace')
-    write(polarunit,'(A)') 'title="Airfoil polars"'
-    write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb" "flap deflexion" "flap hinge position"'
-    write(polarunit,'(A)') 'zone t="Seed airfoil polar"'
+!!   Header for polar file
+!
+!    write(*,*) "Writing polars for seed airfoil to file "//                    &
+!               trim(polarfile)//" ..."
+!    open(unit=polarunit, file=polarfile, status='replace')
+!    write(polarunit,'(A)') 'title="Airfoil polars"'
+!    write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb" "flap deflexion" "flap hinge position"'
+!    write(polarunit,'(A)') 'zone t="Seed airfoil polar"'
 
   else
 
@@ -1175,13 +1189,13 @@ function write_airfoil_optimization_progress(designvars, designcounter)
                           trim(maxcchar)//', xmaxc='//trim(xmaxcchar)//'", '//&
                           'SOLUTIONTIME='//trim(text)
 
-    ! Open polar file and write zone header
-    
-    write(*,*) "  Writing polars for design number "//trim(text)//             &
-               " to file "//trim(polarfile)//" ..."
-    open(unit=polarunit, file=polarfile, status='old', position='append',      &
-         err=901)
-    write(polarunit,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
+    !! Open polar file and write zone header
+    !
+    !write(*,*) "  Writing polars for design number "//trim(text)//             &
+    !           " to file "//trim(polarfile)//" ..."
+    !open(unit=polarunit, file=polarfile, status='old', position='append',      &
+    !     err=901)
+    !write(polarunit,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
 
   end if
 
@@ -1191,18 +1205,18 @@ function write_airfoil_optimization_progress(designvars, designcounter)
     write(foilunit,'(2F12.6)') curr_foil%x(i), curr_foil%z(i)
   end do
 
-! Write polars to file
-
-  do i = 1, noppoint
-    write(polarunit,'(8ES14.6)') alpha(i), lift(i), drag(i), moment(i),        &
-                                 xtrt(i), xtrb(i), actual_flap_degrees(i),     &
-                                 actual_x_flap
-  end do
+!! Write polars to file
+!
+!  do i = 1, noppoint
+!    write(polarunit,'(8ES14.6)') alpha(i), lift(i), drag(i), moment(i),        &
+!                                 xtrt(i), xtrb(i), actual_flap_degrees(i),     &
+!                                 actual_x_flap
+!  end do
 
 ! Close output files
 
   close(foilunit)
-  close(polarunit)
+  !close(polarunit)
 
 ! Set return value (needed for compiler)
 

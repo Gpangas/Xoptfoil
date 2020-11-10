@@ -51,6 +51,16 @@ module xfoil_driver
 
   end type xfoil_geom_options_type
 
+  type xfoil_file_options_type
+    
+    integer :: design_number = 0      !Design number
+    logical :: polar = .false.        !Save polar file ?
+    logical :: cp = .false.           !Save cp file ?
+    logical :: bl = .false.           !Save bl file ?
+  
+  end type xfoil_file_options_type
+  
+  
   contains
 
 !=============================================================================80
@@ -143,10 +153,13 @@ end subroutine smooth_paneling
 subroutine xfoil_apply_flap_deflection(xflap, yflap, y_flap_spec, degrees)
 
   use xfoil_inc
- 
+  use vardef, only : flap_connection, connection_apply, connection_radius
+  
   double precision, intent(in) :: xflap, yflap, degrees
   character(3), intent(in) :: y_flap_spec
   
+  double precision :: xradius
+  integer :: int_option
   integer y_flap_spec_int
 
   if (y_flap_spec == 'y/c') then
@@ -156,8 +169,33 @@ subroutine xfoil_apply_flap_deflection(xflap, yflap, y_flap_spec, degrees)
   end if
 
 ! Apply flap deflection
-
-  call FLAP(xflap, yflap, y_flap_spec_int, degrees)
+  
+  !  Set radius 
+  xradius = connection_radius
+  
+  !  Find the function to use
+  if (trim(flap_connection) .EQ. 'sharp') int_option = 1
+  if (trim(flap_connection) .EQ. 'smooth-top') int_option = 3
+  if (trim(flap_connection) .EQ. 'smooth-bot') int_option = 2
+  if (trim(flap_connection) .EQ. 'smooth') int_option = 4
+  
+  if (trim(connection_apply) .EQ. 'none') int_option = 1
+  if (trim(connection_apply) .EQ. 'trip_wire') int_option = 1
+  
+  !  Apply the function
+  select case (int_option)
+    case (1)
+      call FLAP(xflap, yflap, y_flap_spec_int, degrees)
+    case (2)
+      call FLAP_L(xflap, yflap, y_flap_spec_int, degrees, xradius)
+    case (3)
+      call FLAP_U(xflap, yflap, y_flap_spec_int, degrees, xradius)
+    case (4)
+      call FLAP_LU(xflap, yflap, y_flap_spec_int, degrees, xradius)
+    case default
+      write(*,*) 'Error in flap selection.'
+      stop
+  end select
 
 end subroutine xfoil_apply_flap_deflection
 
@@ -176,11 +214,12 @@ end subroutine xfoil_apply_flap_deflection
 !=============================================================================80
 subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
                      reynolds_numbers, mach_numbers, use_flap, x_flap, y_flap, &
-                     y_flap_spec, flap_degrees, xfoil_options, lift, drag,     &
-                     moment, viscrms, alpha, xtrt, xtrb, ncrit_per_point)
+                     y_flap_spec, flap_degrees, xfoil_options, file_options,   &
+                     lift, drag, moment, viscrms, alpha, xtrt, xtrb,           &
+                     ncrit_per_point)
 
   use xfoil_inc
-  use vardef,    only : airfoil_type, first_run_xfoil, op_search_type
+  use vardef,    only : airfoil_type, first_run_xfoil, op_search_type, output_prefix
 
   type(airfoil_type), intent(in) :: foil
   type(xfoil_geom_options_type), intent(in) :: geom_options
@@ -193,6 +232,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
   character(7), dimension(:), intent(in) :: op_modes
   type(op_search_type), intent(in) :: op_search
   type(xfoil_options_type), intent(in) :: xfoil_options
+  type(xfoil_file_options_type), intent(in) :: file_options
   double precision, dimension(size(operating_points,1)), intent(out) :: lift,  &
                                                            drag, moment, viscrms
   double precision, dimension(size(operating_points,1)), intent(out),          &
@@ -267,11 +307,19 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
     if (use_flap) then
       call xfoil_set_airfoil(foil)
       call PANGEN(.not. SILENT_MODE)
-      !do j = 1, NB
-      !  write(*,*) XB(j), YB(j)
+      !open(unit=1200, file=trim(output_prefix)//'_Airfoil_Before_flap.dat', status='replace')
+      !do j = 1, N
+      !  write(1200,*) X(j), Y(j)
       !end do
+      !close(1200)
       call xfoil_apply_flap_deflection(x_flap, y_flap, y_flap_spec,            &
                                        flap_degrees(i))
+      !open(unit=1300, file=trim(output_prefix)//'_Airfoil_After_flap.dat', status='replace')
+      !do j = 1, N
+      !  write(1300,*) X(j), Y(j)
+      !end do
+      !close(1300)
+      !stop
     end if
 
     REINF1 = reynolds_numbers(i)
@@ -652,7 +700,13 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
                  addxtrb, addviscrms, addconverged)
     
     end if
-  
+
+    if (file_options%polar) call write_polar(i, file_options%design_number,    &
+      x_flap, flap_degrees(i))
+    if (file_options%cp) call write_polar_cp(i, file_options%design_number,    &
+      x_flap, flap_degrees(i))
+    if (file_options%bl) call write_polar_bl(i, file_options%design_number,    &
+      x_flap, flap_degrees(i))
   end do run_oppoints
 
   ! Final check for NaNs
@@ -744,6 +798,351 @@ subroutine xfoil_specal(angle_of_attack, viscous_mode, maxit, lift, drag,      &
   end if
 
 end subroutine xfoil_specal
+                        
+!=============================================================================80
+!
+! Writes XFOIL polars using xfoil format
+!
+!=============================================================================80
+subroutine write_polar_xfoil(point_number)
+
+  use xfoil_inc
+  use vardef, only : output_prefix, airfoil_file
+
+  integer, intent(inout) :: point_number
+  
+  double precision :: alpha, lift, moment,drag, drag_pressure, xtrt, xtrb
+  integer :: i
+  character(100) :: text1
+
+! Get values to create polar
+  alpha = ALFA/DTOR
+  lift = CL
+  moment = CM
+  drag = CD
+  drag_pressure = CDP
+  xtrt = XOCTR(1)
+  xtrb = XOCTR(2)
+  
+! Replace file if point_number is 1
+
+  if (point_number .EQ. 1) then
+    open(unit=321, file=trim(output_prefix)//'_polar_file.log',                &
+      status='replace')
+
+    write(321,'(A)') '  '
+    write(321,'(A)') '       XFOIL_ONLY as part of XOPTFOIL'
+    write(321,'(A)') '  '
+    write(text1,*) airfoil_file
+    text1 = adjustl(text1)
+    i=len_trim(text1)
+    write(321,'(A)') ' Calculated polar for: '//text1(1:i-4)
+    write(321,'(A)') '  '
+    write(321,'(A)') ' 1 1 Reynolds number fixed          Mach number fixed         '
+    write(321,'(A)') '  '
+    write(321,'(A9,F7.3,A13,F7.3,A11)') ' xtrf =  ',XSTRIP(1),' (top)       ', &
+      XSTRIP(2),' (bottom)  '
+    write(321,'(A9,F7.3,A13,F7.3,A17,F7.3)') ' Mach =  ',MINF1,'     Re =    ',&
+      REINF1/10.0**6,' e 6     Ncrit = ',ACRIT
+    write(321,'(A)') '  '
+    write(321,'(A)') '   alpha    CL        CD       CDp       CM    '//       &
+      & ' Top_Xtr  Bot_Xtr'
+    write(321,'(A)') '  ------ -------- --------- --------- -------- '//       &
+      & '-------- --------'
+
+    close(321)
+  end if
+  
+! Write values to polar file
+  open(unit=300, file=trim(output_prefix)//'_polar_file.log', status='old',    &
+    position='append')
+  write(300,1000) alpha, lift, drag, drag_pressure, moment, xtrt, xtrb
+1000 format(F8.3,F9.4,F10.5,F10.5,F9.4,F9.4,F9.4)
+  close(300)  
+  
+end subroutine write_polar_xfoil
+
+
+!=============================================================================80
+!
+! Writes XFOIL polars
+!
+!=============================================================================80
+subroutine write_polar(point_number, design_number, x_flap, flap_degrees)
+
+  use xfoil_inc
+  use vardef, only : output_prefix, airfoil_file
+
+  integer, intent(in) :: point_number
+  integer, intent(in) :: design_number
+  double precision, intent(in) :: x_flap, flap_degrees
+  
+  double precision :: alpha, lift, moment,drag, drag_pressure, xtrt, xtrb
+  integer :: i
+  character(100) :: text
+
+! Get values to create polar
+  alpha = ALFA/DTOR
+  lift = CL
+  moment = CM
+  drag = CD
+  drag_pressure = CDP
+  xtrt = XOCTR(1)
+  xtrb = XOCTR(2)
+  
+  write(text,*) design_number
+  text = adjustl(text)
+  
+  if (point_number .EQ. 1) then
+    write(*,*) "  Writing polars for design number "//trim(text)//             &
+               " to file "//trim(output_prefix)//"_design_polars.dat"//" ..."
+  end if
+  
+! Replace file if point_number is 1
+
+  if (design_number .EQ. 0 .AND. point_number .EQ. 1) then
+    open(unit=321, file=trim(output_prefix)//'_design_polars.dat',             &
+      status='replace')
+    write(321,'(A)') ' Polar file '
+    write(321,'(A)') '   alpha    CL        CD       CDp       CM    '//       &
+      & ' Top_Xtr  Bot_Xtr Number     Re/10^6    Mach   Top_Xtrip Bot_Xtrip'// &
+      & ' Ncrit FxHinge  Fdefl'
+    write(321,'(A)') 'zone t="Seed airfoil polar"'
+
+    close(321)
+  elseif (point_number .EQ. 1) then
+    open(unit=310, file=trim(output_prefix)//'_design_polars.dat',             &
+      status='old', position='append')
+    write(310,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
+    close(310)
+  end if
+  
+! Write values to polar file
+  open(unit=300, file=trim(output_prefix)//'_design_polars.dat', status='old', &
+    position='append')
+  write(300,1000) alpha, lift, drag, drag_pressure, moment, xtrt, xtrb,        &
+    point_number, REINF1/10**6, MINF1, XSTRIP(1), XSTRIP(2), ACRIT, x_flap,    &
+    flap_degrees
+    1000 format(F8.3,F9.4,F10.5,F10.5,F9.4,F9.4,F9.4,I7,F13.6,F9.4,F10.4,F10.4,&
+         &      F6.2, F7.3, F8.2)
+  close(300)  
+  
+end subroutine write_polar          
+
+!=============================================================================80
+!
+! Writes XFOIL polars and cp distribution
+! Based on CPDUMP subroutine from XFOIL V6.99
+!
+!=============================================================================80
+subroutine write_polar_cp(point_number, design_number, x_flap, flap_degrees)
+
+  use xfoil_inc
+  use vardef, only : output_prefix
+
+  integer, intent(in) :: point_number
+  integer, intent(in) :: design_number
+  double precision, intent(in) :: x_flap, flap_degrees
+  
+  double precision :: alpha, lift, moment,drag, drag_pressure, xtrt, xtrb
+  !double precision :: BETA, BFAC, CPINC, DEN, CPCOM
+  integer :: i
+  character(100) :: text
+
+! Get values to create polar
+  alpha = ALFA/DTOR
+  lift = CL
+  moment = CM
+  drag = CD
+  drag_pressure = CDP
+  xtrt = XOCTR(1)
+  xtrb = XOCTR(2)
+  
+! Replace file if point_number is 1
+
+if (design_number .EQ. 0 .AND. point_number .EQ. 1) then
+    open(unit=321, file=trim(output_prefix)//'_design_cp.dat',                 &
+      status='replace')
+    write(321,'(A)') ' Polar file and Cp distributions'
+    write(321,'(A)') 'zone t="Seed airfoil polar"'
+
+    close(321)
+  elseif (point_number .EQ. 1) then
+    open(unit=310, file=trim(output_prefix)//'_design_cp.dat', status='old',   &
+      position='append')
+    write(text,*) design_number
+    text = adjustl(text)
+    write(310,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
+    close(310)
+  end if
+  
+  
+! Write values to polar file
+  open(unit=300, file=trim(output_prefix)//'_design_cp.dat', status='old',     &
+    position='append')
+  
+  WRITE(300,'(A)')
+  write(300,'(A)') '   alpha    CL        CD       CDp       CM    '//         &
+    & ' Top_Xtr  Bot_Xtr Number     Re/10^6    Mach   Top_Xtrip Bot_Xtrip'//   &
+    & ' Ncrit FxHinge  Fdefl NPanel'
+    
+  write(300,1000) alpha, lift, drag, drag_pressure, moment, xtrt, xtrb,        &
+    point_number, REINF1/10**6, MINF1, XSTRIP(1), XSTRIP(2), ACRIT, x_flap,    &
+    flap_degrees, N
+    1000 format(F8.3,F9.4,F10.5,F10.5,F9.4,F9.4,F9.4,I7,F13.6,F9.4,F10.4,F10.4,&
+         &      F6.2, F7.3, F8.2, I7)
+  
+  ! Write Cp distribution
+  WRITE(300,'(A)')
+  WRITE(300,'(A)') '     x        y        Cpi      Cpv  '
+
+  !CALL COMSET
+  !
+  !BETA = SQRT(1.0 - MINF**2)
+  !BFAC = 0.5*MINF**2 / (1.0 + BETA)
+
+  DO I=1, N
+    !CPINC = 1.0 - (GAM(I)/QINF)**2
+    !DEN = BETA + BFAC*CPINC
+    !CPCOM = CPINC / DEN
+        
+    WRITE(300,8500) X(I), Y(I), CPI(I), CPV(I)
+8500   FORMAT(1X,4F9.5)
+  end do
+  WRITE(300,'(A)')
+
+  close(300)  
+  
+end subroutine write_polar_cp          
+
+!=============================================================================80
+!
+! Writes XFOIL polars and bl distributions
+! Based on BLDUMP subroutine from XFOIL V6.99
+!
+!=============================================================================80
+subroutine write_polar_bl(point_number, design_number, x_flap, flap_degrees)
+
+  use xfoil_inc
+  use xbl_inc
+  
+  use vardef, only : output_prefix
+
+  integer, intent(in) :: point_number
+  integer, intent(in) :: design_number
+  double precision, intent(in) :: x_flap, flap_degrees
+  
+  double precision :: alpha, lift, moment,drag, drag_pressure, xtrt, xtrb
+  double precision :: AMSQ, CDIS, CF, CT, DS, dummy, H, HK, TH, UE, UI
+  integer :: i, IBL, IS
+  character(100) :: text
+
+! Get values to create polar
+  alpha = ALFA/DTOR
+  lift = CL
+  moment = CM
+  drag = CD
+  drag_pressure = CDP
+  xtrt = XOCTR(1)
+  xtrb = XOCTR(2)
+  
+! Replace file if point_number is 1
+
+if (design_number .EQ. 0 .AND. point_number .EQ. 1) then
+    open(unit=321, file=trim(output_prefix)//'_design_bl.dat',                 &
+      status='replace')
+    write(321,'(A)') ' Polar file and BL distributions'
+    write(321,'(A)') 'zone t="Seed airfoil polar"'
+
+    close(321)
+  elseif (point_number .EQ. 1) then
+    open(unit=310, file=trim(output_prefix)//'_design_bl.dat', status='old',   &
+      position='append')
+    write(text,*) design_number
+    text = adjustl(text)
+    write(310,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
+    close(310)
+  end if
+  
+! Write values to polar file
+  open(unit=300, file=trim(output_prefix)//'_design_bl.dat', status='old',     &
+    position='append')
+  
+  WRITE(300,'(A)')
+  write(300,'(A)') '   alpha    CL        CD       CDp       CM    '//         &
+    & ' Top_Xtr  Bot_Xtr Number     Re/10^6    Mach   Top_Xtrip Bot_Xtrip'//   &
+    & ' Ncrit FxHinge  Fdefl  NP+NW'
+    
+  write(300,1000) alpha, lift, drag, drag_pressure, moment, xtrt, xtrb,        &
+    point_number, REINF1/10**6, MINF1, XSTRIP(1), XSTRIP(2), ACRIT, x_flap,    &
+    flap_degrees, N+NW
+    1000 format(F8.3,F9.4,F10.5,F10.5,F9.4,F9.4,F9.4,I7,F13.6,F9.4,F10.4,F10.4,&
+         &      F6.2, F7.3, F8.2, I7)
+  
+  ! Write BL distribution
+  write(300,'(A)')
+  WRITE(300,'(A)') '     s        x        y        Nx       Ny     Ue/Vinf'// &
+  & '    Dstar     Theta      Cf         H        CD       CT'
+
+  CALL COMSET
+  DO I=1, N
+    IS = 1
+    IF(GAM(I) .LT. 0.0) IS = 2
+
+    IF(LIPAN .AND. LVISC) THEN
+      IF(IS.EQ.1) THEN
+        IBL = IBLTE(IS) - I + 1
+      ELSE
+        IBL = IBLTE(IS) + I - N
+      ENDIF
+      DS = DSTR(IBL,IS)
+      TH = THET(IBL,IS)
+      CF =  TAU(IBL,IS)/(0.5*QINF**2)
+      IF(TH.EQ.0.0) THEN
+        H = 1.0
+      ELSE
+        H = DS/TH
+      ENDIF
+    ELSE
+      DS = 0.
+      TH = 0.
+      CF = 0.
+      H = 1.0
+    ENDIF
+    UE = (GAM(I)/QINF)*(1.0-TKLAM) / (1.0 - TKLAM*(GAM(I)/QINF)**2)
+    AMSQ = UE*UE*HSTINV / (GAMM1*(1.0 - 0.5*UE*UE*HSTINV))
+    CALL HKIN( H, AMSQ, HK, DUMMY, DUMMY)
+
+    CDIS = DIS(IBL,IS)/QINF**3
+    CT = CTAU(IBL,IS)
+    WRITE(300,8500) S(I), X(I), Y(I), NX(I), NY(I), UE, DS, TH, CF, HK, CDIS, CT
+  end do
+
+
+8500   FORMAT(1X,6F9.5,3F10.6,F10.3,2F10.6)
+
+  IF(LWAKE) THEN
+    IS = 2
+    DO I=N+1, N+NW
+      IBL = IBLTE(IS) + I - N
+      DS = DSTR(IBL,IS)
+      TH = THET(IBL,IS)
+      H = DS/TH
+      CF = 0.
+      UI = UEDG(IBL,IS)
+      UE = (UI/QINF)*(1.0-TKLAM) / (1.0 - TKLAM*(UI/QINF)**2)
+      AMSQ = UE*UE*HSTINV / (GAMM1*(1.0 - 0.5*UE*UE*HSTINV))
+      CALL HKIN( H, AMSQ, HK, DUMMY, DUMMY)
+
+      CDIS = DIS(IBL,IS)/QINF**3
+      CT = CTAU(IBL,IS)
+      WRITE(300,8500) S(I), X(I), Y(I), UE, DS, TH, CF, HK, CDIS, CT
+    end do
+  ENDIF
+  write(300,'(A)')
+  close(300)  
+  
+end subroutine write_polar_bl          
 
 !=============================================================================80
 !

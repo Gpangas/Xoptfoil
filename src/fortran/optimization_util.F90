@@ -551,7 +551,79 @@ subroutine bubble_sort(dv, objvals)
   end do
   dv = tempdv
 
-end subroutine bubble_sort
+  end subroutine bubble_sort
+  
+!=============================================================================80
+!
+! Sorts a set of designs according to their objective function value
+! while keeping the message and code
+!
+!=============================================================================80
+subroutine bubble_sort_plus(dv, objvals, message_codes, messages)
+
+  double precision, dimension(:,:), intent(inout) :: dv
+  double precision, dimension(:), intent(inout) :: objvals
+  integer, dimension(:), intent(inout) :: message_codes
+  character(100), dimension(:), intent(inout) :: messages
+
+  double precision, dimension(size(dv,1),size(dv,2)) :: tempdv
+  double precision, dimension(size(dv,2)) :: tempvals
+  integer, dimension(size(dv,2)) :: tempmessage_codes
+  character(100), dimension(size(dv,2)) :: tempmessages
+  integer, dimension(size(dv,2)) :: finalorder, temporder
+  integer :: nvars, ndesigns, i, sortcounter
+  logical :: sorted
+
+  nvars = size(dv,1)
+  ndesigns = size(dv,2)
+
+! Set up indexing array
+
+  do i = 1, ndesigns
+    finalorder(i) = i
+  end do
+  temporder = finalorder
+
+! Bubble sorting algorithm
+
+  sorted = .false.
+  tempvals = objvals
+  do while (.not. sorted)
+
+    sortcounter = 0
+    do i = 1, ndesigns - 1
+      if (objvals(i+1) < objvals(i)) then
+
+!       Flip the order of these elements. temp arrays are to preserve values.
+
+        tempvals(i) = objvals(i+1)
+        tempvals(i+1) = objvals(i)
+        temporder(i) = finalorder(i+1)
+        temporder(i+1) = finalorder(i)
+        finalorder(i) = temporder(i)
+        finalorder(i+1) = temporder(i+1)
+        objvals(i) = tempvals(i)
+        objvals(i+1) = tempvals(i+1)
+        sortcounter = sortcounter + 1
+
+      end if
+    end do
+    if (sortcounter == 0) sorted = .true.
+    
+  end do
+
+! Use indexing array to rearrange order of designs
+
+  do i = 1, ndesigns
+    tempdv(:,i) = dv(:,finalorder(i))
+    tempmessage_codes(i) = message_codes(finalorder(i))
+    tempmessages(i) = messages(finalorder(i))
+  end do
+  dv = tempdv
+  message_codes = tempmessage_codes
+  messages = tempmessages
+
+end subroutine bubble_sort_plus  
 
 !=============================================================================80
 !
