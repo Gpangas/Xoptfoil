@@ -47,9 +47,9 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
                          indesigncounter, instep, converterfunc)
 
   use optimization_util, only : bubble_sort, design_radius_simplex, write_design,      &
-                                read_run_control
+                                read_run_control, bubble_sort_plus
 
-  use vardef, only : output_prefix, objfunction_type
+  use vardef, only : output_prefix, objfunction_type, write_dvs_file
 
   double precision, dimension(:), intent(inout) :: xopt
   double precision, intent(out) :: fmin
@@ -80,6 +80,9 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   double precision, dimension(size(x0,1),size(x0,1)+1) :: dv
   double precision, dimension(size(x0,1)+1) :: objvals
   double precision, dimension(size(x0,1)) :: xcen, xr, xe, xc
+  
+  character(100), dimension(size(x0,1)+1) :: messages
+  integer, dimension(size(x0,1)+1) :: message_codes
 
   double precision :: rho, xi, gam, sigma, fr, fe, fc, f0, mincurr, radius
   integer :: i, j, nvars, stat, designcounter, restartcounter, iunit, ioerr,   &
@@ -136,12 +139,16 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
       end do
       objfunction_return = objfunc(dv(:,j))
       objvals(j) = objfunction_return%value
+      messages(j) = objfunction_return%message
+      message_codes(j) = objfunction_return%message_code
       fevals = fevals + 1
     end do
 
     dv(:,nvars+1) = x0
     objfunction_return = objfunc(x0)
     objvals(nvars+1) = objfunction_return%value
+    messages(nvars+1) = objfunction_return%message
+    message_codes(nvars+1) = objfunction_return%message_code
     fevals = fevals + 1
 
 !   Counters
@@ -170,7 +177,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     end if
     
     call simplex_read_restart(step, designcounter, dv, objvals, f0, fevals,    &
-                              restarttime)
+                              restarttime, message_codes, messages)
 
   end if
 
@@ -209,6 +216,14 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     flush(iunit)
   end if
 
+  if (step + prevsteps .EQ. 0 ) then
+    ! Display initial value
+    write(*,'(A12,I5)')   ' Iteration: ', 0
+    write(*,'(A27,F9.6)') '   Objective function:    ', f0
+    if (ds_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                        '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
+  end if
+  
   ! Begin time
   stepstart=time()
 
@@ -228,7 +243,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
 !   Sort according to ascending objective function value
 
-    call bubble_sort(dv, objvals)
+    call bubble_sort_plus(dv, objvals, message_codes, messages)
     mincurr = objvals(1)
 
 !   Update fmin if appropriate
@@ -294,12 +309,21 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
                                 adjustl(radchar), adjustl(timechar)
     end if
     flush(iunit)
+    
+!   Write dvs file if asked
+    
+    if (write_dvs_file) then
+      call simplex_write_dvs(step, dv, objvals, message_codes,        &
+                             messages, x0, f0, dv(:,1), fmin)
+    end if
+    
 !   Write restart file if appropriate and update restart counter
 
     if (restartcounter == restart_write_freq) then
       ! 'step' to correct the number on simplex restart
       call simplex_write_restart(step, designcounter, dv, objvals,   &
-        f0,fevals, (steptime-stepstart)+restarttime)
+        f0,fevals, (steptime-stepstart)+restarttime, message_codes,  &
+        messages)
       restartcounter = 1
     else
       restartcounter = restartcounter + 1
@@ -336,6 +360,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
        dv(:,nvars+1) = xr
        objvals(nvars+1) = fr
+       messages(nvars+1) = objfunction_return%message
+       message_codes(nvars+1) = objfunction_return%message_code
        cycle
 
     elseif (fr < objvals(1)) then
@@ -349,6 +375,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
       if (fe < fr) then
         dv(:,nvars+1) = xe
         objvals(nvars+1) = fe
+        messages(nvars+1) = objfunction_return%message
+        message_codes(nvars+1) = objfunction_return%message_code
       else
         dv(:,nvars+1) = xr
         objvals(nvars+1) = fr
@@ -369,6 +397,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
           if (fc < fr) then
             dv(:,nvars+1) = xc
             objvals(nvars+1) = fc
+            messages(nvars+1) = objfunction_return%message
+            message_codes(nvars+1) = objfunction_return%message_code
             needshrink = .false.
           else
             needshrink = .true.
@@ -386,6 +416,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
           if (fc < objvals(nvars+1) ) then
             dv(:,nvars+1) = xc
             objvals(nvars+1) = fc
+            messages(nvars+1) = objfunction_return%message
+            message_codes(nvars+1) = objfunction_return%message_code
             needshrink = .false.
           else
             needshrink = .true.
@@ -401,6 +433,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
             dv(:,i) = dv(:,1) + sigma*(dv(:,i) - dv(:,1))
             objfunction_return = objfunc(dv(:,i))
             objvals(i) = objfunction_return%value
+            messages(i) = objfunction_return%message
+            message_codes(i) = objfunction_return%message_code
             fevals = fevals + 1
           end do
           cycle
@@ -439,8 +473,9 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 ! Write restart at end of optimization
 
   if (restartcounter /= 1)                                                     &
-    call simplex_write_restart(step, designcounter, dv, objvals, f0, &
-                               fevals, (steptime-stepstart)+restarttime)
+    call simplex_write_restart(step, designcounter, dv, objvals, f0,           &
+                               fevals, (steptime-stepstart)+restarttime,       &
+                               message_codes, messages)
 
 end subroutine simplexsearch
 
@@ -449,7 +484,8 @@ end subroutine simplexsearch
 ! Simplex restart write routine
 !
 !=============================================================================80
-subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, time)
+subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, &
+                                 time, message_codes, messages)
 
   use vardef, only : output_prefix
 
@@ -458,6 +494,8 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, t
   double precision, dimension(:), intent(in) :: objvals
   double precision, intent(in) :: f0
   integer, intent(in) :: time
+  integer, dimension(:), intent(in) :: message_codes
+  character(100), dimension(:), intent(in) :: messages
 
   character(100) :: restfile
   integer :: iunit
@@ -481,6 +519,8 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, t
   write(iunit) f0
   write(iunit) fevals
   write(iunit) time
+  write(iunit) message_codes
+  write(iunit) messages
 
 ! Close restart file
 
@@ -497,8 +537,8 @@ end subroutine simplex_write_restart
 ! Particle swarm restart read routine
 !
 !=============================================================================80
-subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals, time)
-
+subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals,  &
+                                 time, message_codes, messages)
   use vardef, only : output_prefix
 
   integer, intent(out) :: step, designcounter, fevals
@@ -506,6 +546,8 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals, ti
   double precision, dimension(:), intent(inout) :: objvals
   double precision, intent(out) :: f0
   integer, intent(out) :: time
+  integer, dimension(:), intent(inout) :: message_codes
+  character(100), dimension(:), intent(inout) :: messages
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -535,6 +577,8 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals, ti
   read(iunit) f0
   read(iunit) fevals
   read(iunit) time
+  read(iunit) message_codes
+  read(iunit) messages
 
 ! Close restart file
 
@@ -547,4 +591,173 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals, ti
 
 end subroutine simplex_read_restart
 
+!=============================================================================80
+!
+! Genetic algorithm dvs write routine
+!
+!=============================================================================80
+subroutine simplex_write_dvs(step, dv, objval, message_codes, messages, x0, f0,&
+                         xopt, fmin)
+
+  use vardef, only : output_prefix, dvs_for_type
+
+  integer, intent(in) :: step
+  double precision, intent(in) :: fmin, f0
+  double precision, dimension(:), intent(in) ::  x0, xopt, objval
+  double precision, dimension(:,:), intent(in) :: dv
+  integer, dimension(:), intent(in) :: message_codes
+  character(100), dimension(:), intent(in) :: messages
+
+  integer :: i,j
+  
+  character(100) :: dvsfile, text, textdv
+  integer :: iunit
+  
+  ! Status notification
+
+  dvsfile = 'dvs_simplex_'//trim(output_prefix)//'.dat'
+  write(*,*) '  Writing Simplex dvs data to file '//trim(dvsfile)//' ...'
+  iunit = 13
+
+  ! Open files and write headers, if necessary
+
+  write(text,*) step
+  text = adjustl(text)
+  
+  if (step == 1) then
+
+    !   Header for dvs file
+
+    open(unit=iunit, file=dvsfile, status='replace')
+    write(iunit,'(A)') 'title="Log file"'
+    write(iunit,'(A)') 'variables="dvs vector", "objval", "message_code", "message"'
+    write(iunit,'(A)') 'step = 0: x0'
+    if (dvs_for_type(2) .NE. 0) then
+      do i=1, dvs_for_type(2)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(3) .NE. 0) then
+      do i=1, dvs_for_type(3)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(4) .NE. 0) then
+      do i=1, dvs_for_type(4)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+    if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+    write(iunit,'(A30)', advance='no') 'f0'
+    write(iunit,'(A)') ' '
+  
+    do i = 1, size(dv,1)
+      write(iunit,'(F12.8)', advance='no') x0(i)
+    end do
+    write(iunit,'(F30.8)', advance='no') f0
+    write(iunit,'(A)') ' '
+    
+  else
+
+    !   Open dvs file and write zone header
+
+    open(unit=iunit, file=dvsfile, status='old', position='append', err=900)
+
+  end if
+
+  ! Write coordinates to file
+  write(iunit,'(A)') 'step = '//trim(text)//': xopt '
+  if (dvs_for_type(2) .NE. 0) then
+    do i=1, dvs_for_type(2)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(3) .NE. 0) then
+    do i=1, dvs_for_type(3)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(4) .NE. 0) then
+    do i=1, dvs_for_type(4)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+  if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+  write(iunit,'(A30)', advance='no') 'fmin'
+  write(iunit,'(A)') ' '
+
+  do i =1, size(dv,1)
+    write(iunit,'(F12.8)', advance='no') xopt(i)
+  end do
+  write(iunit,'(F30.8)', advance='no') fmin
+  write(iunit,'(A)') ' '
+  
+  write(iunit,'(A)') 'step = '//trim(text)//': dv '
+  if (dvs_for_type(2) .NE. 0) then
+    do i=1, dvs_for_type(2)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(3) .NE. 0) then
+    do i=1, dvs_for_type(3)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(4) .NE. 0) then
+    do i=1, dvs_for_type(4)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+  if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+  write(iunit,'(A30)', advance='no') 'objval'
+  write(iunit,'(A14)', advance='no') 'message_code'
+  write(iunit,'(A)', advance='no') ' message'
+  write(iunit,'(A)') ' '
+  
+  do i = 1, size(dv,2)
+    do j =1, size(dv,1)
+      write(iunit,'(F12.8)', advance='no') dv(j,i)
+    end do
+    write(iunit,'(F30.8)', advance='no') objval(i)
+    write(iunit,'(I14)', advance='no') message_codes(i)
+    write(iunit,'(A)', advance='no') messages(i)
+    write(iunit,'(A)') ' '
+  end do
+
+  ! Close output files
+
+  close(iunit)
+
+  ! Status notification
+  
+  return
+  
+  ! Warning if there was an error opening dvs file
+
+  900 write(*,*) "Warning: unable to open "//trim(dvsfile)//". Skipping ..."
+  return
+  
+end subroutine simplex_write_dvs  
+  
 end module simplex_search
