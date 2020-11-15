@@ -216,7 +216,8 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 !   Read restart data from file
 
     call pso_read_restart(step, designcounter, dv, objval, vel, speed,         &
-                          bestdesigns, minvals, wcurr, restarttime)
+                          bestdesigns, minvals, wcurr, restarttime,            &
+                          message_codes, messages)
 
 !   Global and local best so far
 
@@ -261,65 +262,97 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   stepstart=time()
   ! Begin optimization
 
-  restartcounter = 2
+  restartcounter = 1
   converged = .false.
   write(*,*) 'Particle swarm optimization progress:'
 
-  ! Display initial value
-  write(*,'(A12,I5)')   ' Iteration: ', step-1
-  write(*,'(A27,F9.6)') '   Objective function:    ', f0
-  if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
-                      '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
+  if (.not. restart) then
   
-  !   Display progress 
+    ! Display initial value
+    write(*,'(A12,I5)')   ' Iteration: ', 0
+    write(*,'(A27,F9.6)') '   Objective function:    ', f0
+    if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                        '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
+  
+    !   Display progress 
 
-  radius = design_radius(dv,xmax,xmin)
-  write(*,'(A12,I5)')   ' Iteration: ', step
-  write(*,'(A27,F9.6)') '   Objective function:    ', fmin
-  if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
-                      '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
-  write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+    radius = design_radius(dv,xmax,xmin)
+    write(*,'(A12,I5)')   ' Iteration: ', step
+    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
+    if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                        '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
+    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
 
 
-  if (pso_options%write_designs) then
-    designcounter = designcounter + 1
-    if (present(converterfunc)) then
-      stat = converterfunc(xopt, designcounter)
-    else
-      call write_design('particleswarm_designs.dat', 'old', xopt,            &
-                        designcounter)
+    if (pso_options%write_designs) then
+      designcounter = designcounter + 1
+      if (present(converterfunc)) then
+        stat = converterfunc(xopt, designcounter)
+      else
+        call write_design('particleswarm_designs.dat', 'old', xopt,            &
+                          designcounter)
+      end if
     end if
-  end if
     
-  !   Write iteration history
-
-  write(stepchar,'(I11)') step
-  write(fminchar,'(F14.10)') fmin
-  write(radchar,'(ES14.6)') radius
-  write(timechar,'(I14)') (steptime-stepstart)+restarttime
-  if (pso_options%relative_fmin_report) then
-    write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
-    write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
-                                          adjustl(relfminchar), adjustl(radchar), &
-                                          adjustl(timechar)
-  else
-    write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
-                              adjustl(radchar), adjustl(timechar)
-  end if
-  flush(iunit)
-    
-  !   Write restart file if appropriate and update restart counter
-
-  call pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
-                          bestdesigns, minvals, wcurr, (steptime-stepstart)+restarttime)
-
-  !   Write dvs file if asked
-    
-  if (write_dvs_file) then
-    call pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0, xopt,&
-                      fmin)
-  end if
+    !  Get step time
+    steptime=time()
   
+    !   Write iteration history
+
+    write(stepchar,'(I11)') 0
+    write(fminchar,'(F14.10)') f0
+    write(radchar,'(ES14.6)') 0.0d0
+    write(timechar,'(I14)') 0
+    if (pso_options%relative_fmin_report) then
+      write(relfminchar,'(F14.10)') (f0 - f0)/f0*100.d0
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                            adjustl(relfminchar), adjustl(radchar), &
+                                            adjustl(timechar)
+    else
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                                adjustl(radchar), adjustl(timechar)
+    end if
+    flush(iunit)
+    
+    write(stepchar,'(I11)') step
+    write(fminchar,'(F14.10)') fmin
+    write(radchar,'(ES14.6)') radius
+    write(timechar,'(I14)') (steptime-stepstart)+restarttime
+    if (pso_options%relative_fmin_report) then
+      write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                            adjustl(relfminchar), adjustl(radchar), &
+                                            adjustl(timechar)
+    else
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                                adjustl(radchar), adjustl(timechar)
+    end if
+    flush(iunit)
+    
+    !   Write dvs file if asked
+    
+    if (write_dvs_file) then
+      call pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0, xopt,&
+                        fmin)
+    end if
+  
+    !   Write restart file if appropriate and update restart counter
+
+    call pso_write_restart(step, designcounter, dv, objval, vel, speed,        &
+                           bestdesigns, minvals, wcurr,                        &
+                           (steptime-stepstart)+restarttime, message_codes,    &
+                           messages)
+    restartcounter = restartcounter + 1
+  else
+    !   Display last step
+
+    radius = design_radius(dv,xmax,xmin)
+    write(*,'(A17,I5)')   ' Last Iteration: ', step
+    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
+    if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                        '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
+    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+  end if
 !$omp end master
 !$omp barrier
 
@@ -471,16 +504,6 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
       end if
     end if 
 
-!   Write restart file if appropriate and update restart counter
-
-    if (restartcounter == restart_write_freq) then
-      call pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
-                             bestdesigns, minvals, wcurr, (steptime-stepstart)+restarttime)
-      restartcounter = 1
-    else
-      restartcounter = restartcounter + 1
-    end if
-
 !   Write dvs file if asked
     
     if (write_dvs_file) then
@@ -488,6 +511,19 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
                          xopt, fmin)
     end if
     !stop
+    
+!   Write restart file if appropriate and update restart counter
+
+    if (restartcounter == restart_write_freq) then
+      call pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
+                             bestdesigns, minvals, wcurr,                      &
+                             (steptime-stepstart)+restarttime, message_codes,  &
+                             messages)
+      restartcounter = 1
+    else
+      restartcounter = restartcounter + 1
+    end if
+
     
 !   Check for commands in run_control file
 
@@ -519,7 +555,9 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
   if (restartcounter /= 1)                                                     &
     call pso_write_restart(step, designcounter, dv, objval, vel, speed,        &
-                           bestdesigns, minvals, wcurr, (steptime-stepstart)+restarttime)
+                           bestdesigns, minvals, wcurr,                        &
+                           (steptime-stepstart)+restarttime, message_codes,    &
+                           messages)
 
 end subroutine particleswarm
 
@@ -529,7 +567,8 @@ end subroutine particleswarm
 !
 !=============================================================================80
 subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
-                             bestdesigns, minvals, wcurr, time)
+                             bestdesigns, minvals, wcurr, time, message_codes, &
+                             messages)
 
   use vardef, only : output_prefix
 
@@ -538,6 +577,8 @@ subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
   double precision, dimension(:), intent(in) :: objval, speed, minvals
   double precision, intent(in) :: wcurr
   integer, intent(in) :: time
+  integer, dimension(:), intent(in) :: message_codes
+  character(100), dimension(:), intent(in) :: messages
 
   character(100) :: restfile
   integer :: iunit
@@ -564,6 +605,8 @@ subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
   write(iunit) minvals
   write(iunit) wcurr
   write(iunit) time
+  write(iunit) message_codes
+  write(iunit) messages
 
 ! Close restart file
 
@@ -581,7 +624,8 @@ end subroutine pso_write_restart
 !
 !=============================================================================80
 subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
-                            bestdesigns, minvals, wcurr, time)
+                            bestdesigns, minvals, wcurr, time, message_codes,  &
+                            messages)
 
   use vardef, only : output_prefix
 
@@ -590,6 +634,8 @@ subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
   double precision, dimension(:), intent(inout) :: objval, speed, minvals
   double precision, intent(out) :: wcurr
   integer, intent(out) :: time
+  integer, dimension(:), intent(inout) :: message_codes
+  character(100), dimension(:), intent(inout) :: messages
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -622,6 +668,8 @@ subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
   read(iunit) minvals
   read(iunit) wcurr
   read(iunit) time
+  read(iunit) message_codes
+  read(iunit) messages
 
 ! Close restart file
 
@@ -838,8 +886,7 @@ subroutine pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
   close(iunit)
 
   ! Status notification
-  
-  write(*,*) '  Successfully wrote PSO dvs file.'
+
   return
   
   ! Warning if there was an error opening dvs file

@@ -231,6 +231,13 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   !do i = 1,size(zb_new,1)
   !  write(*,*) zb_new(i), zb_seed(i), zb_new(i)-zb_seed(i)
   !end do
+  !write(*,*) 'thick_TE', thick_TE
+  !do i=1,size(zt_new,1)
+  !  write(*,*) xt_seed(size(xt_seed,1)-i+1), zt_new(size(zt_new,1)-i+1)
+  !end do
+  !do i=2,size(zb_new,1)
+  !  write(*,*) xb_seed(i), zb_new(i)
+  !end do
 end subroutine create_airfoil
 
 
@@ -442,7 +449,7 @@ subroutine parametrization_init(optdesign, x0)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - min_tcTE) * tefact
     
   elseif (trim(shape_functions) == 'hicks-henne') then
     
@@ -465,7 +472,7 @@ subroutine parametrization_init(optdesign, x0)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - min_tcTE) * tefact
     
   elseif (trim(shape_functions) == 'kulfan-bussoletti') then
     
@@ -484,7 +491,7 @@ subroutine parametrization_init(optdesign, x0)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - min_tcTE) * tefact
   
   elseif (trim(shape_functions) == 'b-spline') then
     if (.not. flap_optimization_only) then
@@ -503,7 +510,7 @@ subroutine parametrization_init(optdesign, x0)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - min_tcTE) * tefact
   
   elseif (trim(shape_functions) == 'bezier-parsec') then
     if (.not. flap_optimization_only) then
@@ -522,7 +529,7 @@ subroutine parametrization_init(optdesign, x0)
       x0(i) = flap_degrees(oppoint)*ffact
     end do
     if (int_x_flap_spec == 1) x0(ndv) = (x_flap - min_flap_x) * fxfact
-    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - max_tcTE) * tefact
+    if (int_tcTE_spec == 1) x0(ndv) = (tcTE - min_tcTE) * tefact
     
   else
     
@@ -831,13 +838,14 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   zseedt=zseedt_new
   zseedb=zseedb_new
   
-  !write(*,*) 'zseedt'
+  !write(*,*) 'tcTE', tcTE
+  !!write(*,*) 'zseedt'
   !do i=1,size(zseedt,1)
-  !  write(*,*) zseedt(i)
+  !  write(*,*) xseedt(size(zseedt,1)-i+1), zseedt(size(zseedt,1)-i+1)
   !end do
-  !write(*,*) 'zseedb'
-  !do i=1,size(zseedb,1)
-  !  write(*,*) zseedb(i)
+  !!write(*,*) 'zseedb'
+  !do i=2,size(zseedb,1)
+  !  write(*,*) xseedb(i), zseedb(i)
   !end do
   
 end subroutine parametrization_new_seed

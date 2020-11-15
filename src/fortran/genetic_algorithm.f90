@@ -207,7 +207,8 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 
 !   Read restart data from file
 
-    call ga_read_restart(step, designcounter, dv, objval, fmin, xopt, restarttime)
+    call ga_read_restart(step, designcounter, dv, objval, fmin, xopt,          &
+                         restarttime, message_codes, messages)
     mincurr = minval(objval,1)
 
   end if
@@ -247,62 +248,95 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 
 ! Begin optimization
 
-  restartcounter = 2
+  restartcounter = 1
   converged = .false.
   write(*,*) 'Genetic algorithm optimization progress:'
 
-! Display initial value
-  write(*,'(A12,I5)')   ' Iteration: ', step-1
-  write(*,'(A27,F9.6)') '   Objective function:    ', f0
-  if (ga_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')                &
-                      '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
+  if (.not. restart) then
   
-  !   Display progress 
+    ! Display initial value
+    write(*,'(A12,I5)')   ' Iteration: ', 0
+    write(*,'(A27,F9.6)') '   Objective function:    ', f0
+    if (ga_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                        '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
+  
+    !   Display progress 
 
-  radius = design_radius(dv,xmax,xmin)
-  write(*,'(A12,I5)')   ' Iteration: ', step
-  write(*,'(A27,F9.6)') '   Objective function:    ', fmin
-  if (ga_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')                &
-                      '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
-  write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+    radius = design_radius(dv,xmax,xmin)
+    write(*,'(A12,I5)')   ' Iteration: ', step
+    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
+    if (ga_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                        '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
+    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
 
 
-  if (ga_options%write_designs) then
-    designcounter = designcounter + 1
-    if (present(converterfunc)) then
-      stat = converterfunc(xopt, designcounter)
-    else
-      call write_design('particleswarm_designs.dat', 'old', xopt,            &
-                        designcounter)
+    if (ga_options%write_designs) then
+      designcounter = designcounter + 1
+      if (present(converterfunc)) then
+        stat = converterfunc(xopt, designcounter)
+      else
+        call write_design('particleswarm_designs.dat', 'old', xopt,            &
+                          designcounter)
+      end if
     end if
-  end if
     
-  !   Write iteration history
+    !  Get step time
+    steptime=time()
+  
+    !   Write iteration history
 
-  write(stepchar,'(I11)') step
-  write(fminchar,'(F14.10)') fmin
-  write(radchar,'(ES14.6)') radius
-  write(timechar,'(I14)') (steptime-stepstart)+restarttime
-  if (ga_options%relative_fmin_report) then
-    write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
-    write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
-                                          adjustl(relfminchar), adjustl(radchar), &
-                                          adjustl(timechar)
+    write(stepchar,'(I11)') 0
+    write(fminchar,'(F14.10)') f0
+    write(radchar,'(ES14.6)') 0.0d0
+    write(timechar,'(I14)') 0
+    if (ga_options%relative_fmin_report) then
+      write(relfminchar,'(F14.10)') (f0 - f0)/f0*100.d0
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                            adjustl(relfminchar), adjustl(radchar), &
+                                            adjustl(timechar)
+    else
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                                adjustl(radchar), adjustl(timechar)
+    end if
+    flush(iunit)
+    
+    write(stepchar,'(I11)') step
+    write(fminchar,'(F14.10)') fmin
+    write(radchar,'(ES14.6)') radius
+    write(timechar,'(I14)') (steptime-stepstart)+restarttime
+    if (ga_options%relative_fmin_report) then
+      write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+                                            adjustl(relfminchar), adjustl(radchar), &
+                                            adjustl(timechar)
+    else
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
+                                adjustl(radchar), adjustl(timechar)
+    end if
+    flush(iunit)
+    
+    !   Write dvs file if asked
+    
+    if (write_dvs_file) then
+      call ga_write_dvs(step, dv, objval, message_codes(1:ga_options%pop),     &
+                        messages(1:ga_options%pop), x0, f0, xopt, fmin)
+    end if
+  
+    !   Write restart file if appropriate and update restart counter
+
+    call ga_write_restart(step, designcounter, dv, objval, fmin, xopt,         &
+      (steptime-stepstart)+restarttime, message_codes, messages)
+  
+    restartcounter = restartcounter + 1
   else
-    write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),          &
-                              adjustl(radchar), adjustl(timechar)
-  end if
-  flush(iunit)
-    
-  !   Write restart file if appropriate and update restart counter
+    !   Display last step
 
-  call ga_write_restart(step, designcounter, dv, objval, fmin, xopt, (steptime-stepstart)+restarttime)
-
-  !   Write dvs file if asked
-    
-  if (write_dvs_file) then
-    call ga_write_dvs(step, dv, objval, message_codes(1:ga_options%pop),       &
-                      messages(1:ga_options%pop), x0, f0, xopt, fmin)
+    radius = design_radius(dv,xmax,xmin)
+    write(*,'(A17,I5)')   ' Last Iteration: ', step
+    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
+    if (ga_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+                        '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
+    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
   end if
   
 !$omp end master
@@ -470,20 +504,21 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
       end if
     end if 
 
-!   Write restart file if appropriate and update restart counter
-
-    if (restartcounter == restart_write_freq) then
-      call ga_write_restart(step, designcounter, dv, objval, fmin, xopt, (steptime-stepstart)+restarttime)
-      restartcounter = 1
-    else
-      restartcounter = restartcounter + 1
-    end if
-    
 !   Write dvs file if asked
     
     if (write_dvs_file) then
       call ga_write_dvs(step, stackdv, stackobjval, message_codes, messages,   &
                         x0, f0, xopt, fmin)
+    end if
+    
+!   Write restart file if appropriate and update restart counter
+
+    if (restartcounter == restart_write_freq) then
+      call ga_write_restart(step, designcounter, dv, objval, fmin, xopt,       &
+        (steptime-stepstart)+restarttime, message_codes, messages)
+      restartcounter = 1
+    else
+      restartcounter = restartcounter + 1
     end if
     
 !   Check for commands in run_control file
@@ -521,7 +556,8 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 ! Write restart at end of optimization
 
   if (restartcounter /= 1)                                                     &
-    call ga_write_restart(step, designcounter, dv, objval, fmin, xopt, (steptime-stepstart)+restarttime)
+    call ga_write_restart(step, designcounter, dv, objval, fmin, xopt,         &
+    (steptime-stepstart)+restarttime, message_codes, messages)
 
 end subroutine geneticalgorithm
 
@@ -812,7 +848,8 @@ end subroutine mutate
 ! Genetic algorithm restart write routine
 !
 !=============================================================================80
-subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time)
+subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time, &
+                            message_codes, messages)
 
   use vardef, only : output_prefix
 
@@ -821,6 +858,8 @@ subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time)
   double precision, dimension(:), intent(in) :: objval, xopt
   double precision, intent(in) :: fmin
   integer, intent(in) :: time
+  integer, dimension(:), intent(in) :: message_codes
+  character(100), dimension(:), intent(in) :: messages
 
   character(100) :: restfile
   integer :: iunit
@@ -845,6 +884,9 @@ subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time)
   write(iunit) fmin
   write(iunit) xopt
   write(iunit) time
+  write(iunit) message_codes
+  write(iunit) messages
+  
 
 ! Close restart file
 
@@ -861,7 +903,8 @@ end subroutine ga_write_restart
 ! Genetic algorithm restart read routine
 !
 !=============================================================================80
-subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time)
+subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time,  &
+                           message_codes, messages)
 
   use vardef, only : output_prefix
 
@@ -870,6 +913,8 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time)
   double precision, dimension(:), intent(inout) :: objval, xopt
   double precision, intent(out) :: fmin
   integer, intent(out) :: time
+  integer, dimension(:), intent(inout) :: message_codes
+  character(100), dimension(:), intent(inout) :: messages
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -900,6 +945,8 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time)
   read(iunit) fmin
   read(iunit) xopt
   read(iunit) time
+  read(iunit) message_codes
+  read(iunit) messages
 
 ! Close restart file
 
@@ -1117,7 +1164,6 @@ subroutine ga_write_dvs(step, dv, objval, message_codes, messages, x0, f0,     &
 
   ! Status notification
   
-  write(*,*) '  Successfully wrote GA dvs file.'
   return
   
   ! Warning if there was an error opening dvs file

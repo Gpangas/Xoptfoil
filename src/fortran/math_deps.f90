@@ -964,6 +964,99 @@ END SUBROUTINE foil_interp
 
 !=============================================================================80
 !
+! interpolation subroutine to get zo at xi from spline defined by X, Y
+!
+!=============================================================================80
+SUBROUTINE spline_interp_z(N,X,Y,xi,zo,INDICATOR)
+  
+  integer, intent(in) :: N
+  real*8, dimension(N), intent(in) :: X, Y
+  real*8, dimension(:), intent(in) :: xi
+  real*8, dimension(size(xi,1)), intent(out) :: zo
+  logical, intent(inout) :: INDICATOR
+  
+  interface
+    double precision function SEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function SEVAL
+  end interface 
+  
+  real*8, dimension(N) :: XP,YP,S
+  real*8 :: SLE, SINTERP
+  logical :: SILENT_MODE
+  integer :: i
+    
+  ! create the spline 
+  SILENT_MODE=.true.
+
+  ! get spline parameters
+  
+  CALL SCALC(X,Y,S,N)
+  CALL SEGSPL(X,XP,S,N)
+  CALL SEGSPL(Y,YP,S,N)
+  CALL LEFIND(SLE,X,XP,Y,YP,S,N,SILENT_MODE)
+  
+  ! interpolate
+  do i = 1, size(xi,1)
+    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    zo(i) = SEVAL(SINTERP,Y,YP,S,N)
+  end do
+  
+END SUBROUTINE spline_interp_z
+
+!=============================================================================80
+!
+! interpolation subroutine to get thicko at xi from spline defined by X, Y
+!
+!=============================================================================80
+SUBROUTINE spline_interp_t(N,X,Y,xi,thicko)
+  
+  integer, intent(in) :: N
+  real*8, dimension(N), intent(in) :: X, Y
+  real*8, dimension(:), intent(in) :: xi
+  real*8, dimension(size(xi,1)), intent(out) :: thicko
+  
+  interface
+    double precision function SEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function SEVAL
+  end interface 
+  
+  real*8, dimension(N) :: XP,YP,S
+  real*8 :: SLE, SINTERP
+  logical :: SILENT_MODE, INDICATOR
+  real*8 :: zt, zb
+  integer :: i
+    
+  ! create the spline 
+  SILENT_MODE=.true.
+
+  ! get spline parameters
+  
+  CALL SCALC(X,Y,S,N)
+  CALL SEGSPL(X,XP,S,N)
+  CALL SEGSPL(Y,YP,S,N)
+  CALL LEFIND(SLE,X,XP,Y,YP,S,N,SILENT_MODE)
+  
+  ! interpolate
+  do i = 1, size(xi,1)
+    INDICATOR = .TRUE.
+    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    zt = SEVAL(SINTERP,Y,YP,S,N)
+    INDICATOR = .FALSE.
+    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    zb = SEVAL(SINTERP,Y,YP,S,N)
+    thicko(i) = zt - zb
+  end do
+  
+END SUBROUTINE spline_interp_t
+
+!=============================================================================80
+!
 ! interpolation subroutine to get zo at xi from spline defined by xt,zt,xb.zb
 !
 !=============================================================================80
@@ -1113,6 +1206,219 @@ SUBROUTINE XINTERPS(SINTERP, XI, INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
   305  CONTINUE
   RETURN
 END SUBROUTINE XINTERPS
+
+!=============================================================================80
+!
+! Computes curvature for a function gam(s) = x(s) + y(s)
+!
+!=============================================================================80
+function nu_curvature(npt, x, y)
+
+  integer, intent(in) :: npt
+  double precision, dimension(npt), intent(in) :: x, y
+  double precision, dimension(npt) :: nu_curvature
+
+  integer :: i
+  double precision, dimension(npt) :: svec
+  double precision :: xs, ys, xs2, ys2
+
+! Airfoil length vector s 
+
+  svec(1) = 0.d0
+  do i = 2, npt
+    svec(i) = svec(i-1) + sqrt((x(i)-x(i-1))**2.d0 + (y(i)-y(i-1))**2.d0)
+  end do
+
+! Compute first and second derivatives and curvature vector
+
+  do i = 1, npt
+
+    if (i == 1) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = nu_derv1f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys = nu_derv1f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      xs2 = nu_derv2f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys2 = nu_derv2f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+
+    elseif (i == npt) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = nu_derv1b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys = nu_derv1b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      xs2 = nu_derv2b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys2 = nu_derv2b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      
+    else
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = nu_derv1c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys = nu_derv1c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      xs2 = nu_derv2c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys2 = nu_derv2c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+
+    end if
+
+!   Curvature
+
+    nu_curvature(i) = (xs*ys2 - ys*xs2) / (xs**2.d0 + ys**2.d0)**1.5d0
+
+  end do
+
+end function nu_curvature
+
+!=============================================================================80
+!
+! Computes first derivative for a function gam(s) = x(s) + y(s)
+!
+!=============================================================================80
+function nu_first_derivative(npt, x, y)
+
+  integer, intent(in) :: npt
+  double precision, dimension(npt), intent(in) :: x, y
+  double precision, dimension(npt) :: nu_first_derivative
+
+  integer :: i
+  double precision, dimension(npt) :: svec
+  double precision :: xs, ys, xs2, ys2
+
+! Airfoil length vector s 
+
+  svec(1) = 0.d0
+  do i = 2, npt
+    svec(i) = svec(i-1) + sqrt((x(i)-x(i-1))**2.d0 + (y(i)-y(i-1))**2.d0)
+  end do
+
+! Compute first and second derivatives and first_derivative vector
+
+  do i = 1, npt
+
+    if (i == 1) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = nu_derv1f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys = nu_derv1f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      xs2 = nu_derv2f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+      ys2 = nu_derv2f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
+
+    elseif (i == npt) then
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = nu_derv1b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys = nu_derv1b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      xs2 = nu_derv2b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      ys2 = nu_derv2b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
+      
+    else
+
+!     Derivatives of x and y with respect to the length s
+
+      xs = nu_derv1c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys = nu_derv1c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      xs2 = nu_derv2c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+      ys2 = nu_derv2c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
+
+    end if
+
+!   first_derivative
+
+    nu_first_derivative(i) = ys/xs
+
+  end do
+
+end function nu_first_derivative
+
+
+!=============================================================================80
+!
+! Forward difference approximation for first derivative (2nd order),non uniform
+!
+!=============================================================================80
+function nu_derv1f(u_plus2, u_plus1, u, h1 ,h2)
+
+  double precision, intent(in) :: u_plus2, u_plus1, u, h1, h2
+  double precision :: nu_derv1f
+
+  nu_derv1f = (h1+h2)/(h1*h2)*(u_plus1-u)-(h1)/(h1*h2+h2**2.d0)*(u_plus2-u)
+
+end function nu_derv1f
+
+
+!=============================================================================80
+!
+! Backward difference approximation for first derivative (2nd order),non uniform
+!
+!=============================================================================80
+function nu_derv1b(u_minus2, u_minus1, u, h1, h2)
+
+  double precision, intent(in) :: u_minus2, u_minus1, u, h1, h2
+  double precision :: nu_derv1b
+
+  nu_derv1b = (h2)/(h1*h2+h1**2.d0)*(u_minus2-u)-(h1+h2)/(h1*h2)*(u_minus1-u)
+
+end function nu_derv1b
+
+!=============================================================================80
+!
+! Central difference approximation for first derivative (2nd order),non uniform
+!
+!=============================================================================80
+function nu_derv1c(u_plus, u, u_minus, h1, h2)
+
+  double precision, intent(in) :: u_plus, u, u_minus, h1, h2
+  double precision :: nu_derv1c
+
+  nu_derv1c = -(h2)/(h1**2.d0+h1*h2)*(u_minus-u)+(h1)/(h2**2.d0+h1*h2)*(u_plus-u)
+
+end function nu_derv1c
+
+!=============================================================================80
+!
+! Forward difference approximation for second-order derivative,non uniform
+!
+!=============================================================================80
+function nu_derv2f(u_plus2, u_plus, u, h1, h2)
+
+  double precision, intent(in) :: u_plus2, u_plus, u, h1, h2
+  double precision :: nu_derv2f
+
+  nu_derv2f = 2.d0/(h2*(h1+h2))*(u_plus2-u)-2.d0/(h1*h2)*(u_plus-u)
+
+end function nu_derv2f
+
+!=============================================================================80
+!
+! Backward difference approximation for second-order derivative,non uniform
+!
+!=============================================================================80
+function nu_derv2b(u_minus2, u_minus, u, h1, h2)
+
+  double precision, intent(in) :: u_minus2, u_minus, u, h1, h2
+  double precision :: nu_derv2b
+
+  nu_derv2b = 2.d0/(h2*(h1+h2))*(u_minus2-u)-2.d0/(h1*h2)*(u_minus-u)
+
+end function nu_derv2b
+
+!=============================================================================80
+!
+! Central difference approximation for second-order derivative,non uniform
+!
+!=============================================================================80
+function nu_derv2c(u_plus, u, u_minus, h1, h2)
+
+  double precision, intent(in) :: u_plus, u, u_minus, h1, h2
+  double precision :: nu_derv2c
+
+  nu_derv2c = 2.d0/(h1*(h1+h2))*(u_minus-u)+2.d0/(h2*(h1+h2))*(u_plus-u)
+
+end function nu_derv2c
+
 
 end module math_deps
 

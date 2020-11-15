@@ -102,7 +102,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
                          min_moment, lift_constraint_type,                     &
                          min_lift, drag_constraint_type,                       &
-                         max_drag, min_te_angle, check_curvature,              &
+                         max_drag, max_growth_seed_mult,                       &
+                         min_leading_edge_angle, max_leading_edge_angle,       &
+                         dif_leading_edge_angle, min_te_angle,                 &
+                         te_angle_x_apply, lift_check_tol, drag_check_tol,     &
+                         max_panel_angle, check_curvature,                     &
                          max_curv_reverse_top, max_curv_reverse_bot,           &
                          curv_threshold, symmetrical, min_flap_degrees,        &
                          max_flap_degrees, min_flap_x, max_flap_x, max_tcTE,   &
@@ -178,6 +182,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   use_flap = .false.
   flap_connection = 'sharp'
   connection_apply = 'none' 
+  connection_radius = 0.02
   x_flap = 0.75d0
   x_flap_spec = 'specify' ! specify, optimize 
   y_flap = 0.d0
@@ -211,7 +216,15 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   min_lift(:) = 0.d0
   drag_constraint_type(:) = 'none'
   max_drag(:) = 1.d0
-  min_te_angle = 5.d0
+  max_growth_seed_mult = 2.0 
+  min_leading_edge_angle = 60.00
+  max_leading_edge_angle = 89.99
+  dif_leading_edge_angle = 20.00
+  min_te_angle = 5.00
+  te_angle_x_apply = 0.5
+  max_panel_angle = 25.0
+  lift_check_tol = 0.2
+  drag_check_tol = 0.2
   check_curvature = .false.
   max_curv_reverse_top = 1
   max_curv_reverse_bot = 1
@@ -642,6 +655,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " use_flap = ", use_flap
   write(*,*) " flap_connection = ", flap_connection
   write(*,*) " connection_apply = ", connection_apply
+  write(*,*) " connection_radius = ", connection_radius
   write(*,*) " x_flap = ", x_flap
   write(*,*) " x_flap_spec = "//trim(x_flap_spec)
   write(*,*) " y_flap = ", y_flap
@@ -680,20 +694,15 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,'(A)') " &constraints"
   write(*,*) " min_thickness = ", min_thickness
   write(*,*) " max_thickness = ", max_thickness
-  do i = 1, noppoint
-    write(text,*) i
-    text = adjustl(text)
-    write(*,*) " moment_constraint_type("//trim(text)//") = "//                &
-               trim(moment_constraint_type(i))
-    write(*,*) " min_moment("//trim(text)//") = ", min_moment(i)
-  write(*,*) " lift_constraint_type("//trim(text)//") = "//                &
-               trim(lift_constraint_type(i))
-    write(*,*) " min_lift("//trim(text)//") = ", min_lift(i)
-  write(*,*) " drag_constraint_type("//trim(text)//") = "//                &
-               trim(drag_constraint_type(i))
-    write(*,*) " max_drag("//trim(text)//") = ", max_drag(i)
-  end do
+  write(*,*) " max_growth_seed_mult = ", max_growth_seed_mult
+  write(*,*) " min_leading_edge_angle = ", min_leading_edge_angle
+  write(*,*) " max_leading_edge_angle = ", max_leading_edge_angle
+  write(*,*) " dif_leading_edge_angle = ", dif_leading_edge_angle
   write(*,*) " min_te_angle = ", min_te_angle
+  write(*,*) " te_angle_x_apply = ", te_angle_x_apply
+  write(*,*) " max_panel_angle = ", max_panel_angle
+  write(*,*) " lift_check_tol = ", lift_check_tol
+  write(*,*) " drag_check_tol = ", drag_check_tol
   write(*,*) " check_curvature = ", check_curvature
   write(*,*) " max_curv_reverse_top = ", max_curv_reverse_top
   write(*,*) " max_curv_reverse_bot = ", max_curv_reverse_bot
@@ -707,6 +716,21 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " max_tcTE = ", max_tcTE
   write(*,*) " min_camber = ", min_camber
   write(*,*) " max_camber = ", max_camber
+  write(*,*)
+  do i = 1, noppoint
+    write(text,*) i
+    text = adjustl(text)
+    write(*,*) " moment_constraint_type("//trim(text)//") = "//                &
+               trim(moment_constraint_type(i))
+    write(*,*) " min_moment("//trim(text)//") = ", min_moment(i)
+  write(*,*) " lift_constraint_type("//trim(text)//") = "//                &
+               trim(lift_constraint_type(i))
+    write(*,*) " min_lift("//trim(text)//") = ", min_lift(i)
+  write(*,*) " drag_constraint_type("//trim(text)//") = "//                &
+               trim(drag_constraint_type(i))
+    write(*,*) " max_drag("//trim(text)//") = ", max_drag(i)
+  end do
+  write(*,*)
   write(*,*) " naddthickconst = ", naddthickconst
   do i = 1, naddthickconst
     write(text,*) i
@@ -718,9 +742,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,'(A)') " /"
   write(*,*)
 
-! NACA namelist
+! naca_airfoil namelist
 
-  write(*,'(A)') " &naca"
+  write(*,'(A)') " &naca_airfoil"
   write(*,*) " family = "//trim(adjustl(family))
   write(*,*) " maxt = ", maxt
   write(*,*) " xmaxt = ", xmaxt
@@ -844,8 +868,266 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,'(A)') " /"
   write(*,*)
 
-! Check that inputs are reasonable
+! Echo namelist options for checking purposes
+  open(unit=100, file='echo_'//trim(output_prefix)//".txt", status='replace') 
+  
+  write(100,*) '! Echoing program options:'
+  write(100,*)
 
+! Optimization options namelist
+
+  write(100,'(A)') "&optimization_options"
+  write(100,*) " search_type = '"//trim(search_type)//"'"
+  write(100,*) " global_search = '"//trim(global_search)//"'"
+  write(100,*) " local_search = '"//trim(local_search)//"'"
+  write(100,*) " seed_airfoil = '"//trim(seed_airfoil)//"'"
+  write(100,*) " airfoil_file = '"//trim(airfoil_file)//"'"
+  write(100,*) " shape_functions = '"//trim(shape_functions)//"'"
+  write(100,*) " min_bump_width = ", min_bump_width
+  write(100,*) " kulfan_bussoletti_LEM = ", kulfan_bussoletti_LEM
+  write(100,*) " b_spline_degree = ", b_spline_degree
+  write(100,*) " b_spline_xtype = ", b_spline_xtype
+  write(100,*) " b_spline_distribution = ", b_spline_distribution
+  write(100,*) " nparameters_top = ", nparameters_top
+  write(100,*) " nparameters_bot = ", nparameters_bot
+  write(100,*) " flap_optimization_only = ", flap_optimization_only  
+  write(100,*) " initial_perturb = ", initial_perturb
+  write(100,*) " restart = ", restart
+  write(100,*) " restart_write_freq = ", restart_write_freq
+  write(100,*) " write_designs = ", write_designs
+  write(100,*) " write_cp_file = ", write_cp_file
+  write(100,*) " write_bl_file = ", write_bl_file
+  write(100,*) " write_dvs_file = ", write_dvs_file
+  write(100,*) " number_threads = ", number_threads
+  write(100,'(A)') "/"
+  write(100,*)
+
+! Operating conditions namelist
+
+  write(100,'(A)') "&operating_conditions"
+  write(100,*) " noppoint = ", noppoint
+  write(100,*) " use_flap = ", use_flap
+  write(100,*) " flap_connection = '"//trim(flap_connection)//"'"
+  write(100,*) " connection_apply = '"//trim(connection_apply)//"'"
+  write(100,*) " connection_radius = ", connection_radius
+  write(100,*) " x_flap = ", x_flap
+  write(100,*) " x_flap_spec = '"//trim(x_flap_spec)//"'"
+  write(100,*) " y_flap = ", y_flap
+  write(100,*) " y_flap_spec = '"//trim(y_flap_spec)//"'"
+  write(100,*) " TE_spec = '"//trim(TE_spec)//"'"
+  write(100,*) " tcTE = ", tcTE
+  write(100,*) " xltTE = ", xltTE
+  write(100,*)
+  do i = 1, noppoint
+    write(text,*) i
+    text = adjustl(text)
+    write(100,*) " optimization_type("//trim(text)//") = '"//                    &
+               trim(optimization_type(i))//"'"
+    write(100,*) " op_mode("//trim(text)//") = '"//trim(op_mode(i))//"'"
+    write(100,*) " op_point("//trim(text)//") = ", op_point(i)
+    write(100,*) " op_point_start("//trim(text)//") = ", op_point_start(i)
+    write(100,*) " op_point_end("//trim(text)//") = ", op_point_end(i)
+    write(100,*) " op_point_step("//trim(text)//") = ", op_point_step(i)
+    write(100,*) " target_value("//trim(text)//") = ", target_value(i)
+    write(100,'(A,es17.8)') "  reynolds("//trim(text)//") = ", reynolds(i)
+    write(100,*) " mach("//trim(text)//") = ", mach(i)
+    write(100,*) " flap_selection("//trim(text)//") = '"//                       &
+               trim(flap_selection(i))//"'"
+    write(100,*) " flap_identical_op("//trim(text)//") = ", flap_identical_op(i)
+    write(100,*) " flap_degrees("//trim(text)//") = ", flap_degrees(i)
+    write(100,*) " weighting("//trim(text)//") = ", weighting(i)
+    if (ncrit_pt(i) /= -1.d0)                                                  &
+      write(100,*) " ncrit_pt("//trim(text)//") = ", ncrit_pt(i)
+    if (i < noppoint) write(100,*)
+  end do
+  write(100,'(A)') "/"
+  write(100,*)
+
+! Constraints namelist
+
+  write(100,'(A)') "&constraints"
+  write(100,*) " min_thickness = ", min_thickness
+  write(100,*) " max_thickness = ", max_thickness
+  write(100,*) " max_growth_seed_mult = ", max_growth_seed_mult
+  write(100,*) " min_leading_edge_angle = ", min_leading_edge_angle
+  write(100,*) " max_leading_edge_angle = ", max_leading_edge_angle
+  write(100,*) " dif_leading_edge_angle = ", dif_leading_edge_angle
+  write(100,*) " min_te_angle = ", min_te_angle
+  write(100,*) " te_angle_x_apply = ", te_angle_x_apply
+  write(100,*) " max_panel_angle = ", max_panel_angle
+  write(100,*) " lift_check_tol = ", lift_check_tol
+  write(100,*) " drag_check_tol = ", drag_check_tol
+  write(100,*) " check_curvature = ", check_curvature
+  write(100,*) " max_curv_reverse_top = ", max_curv_reverse_top
+  write(100,*) " max_curv_reverse_bot = ", max_curv_reverse_bot
+  write(100,*) " curv_threshold = ", curv_threshold
+  write(100,*) " symmetrical = ", symmetrical
+  write(100,*) " min_flap_degrees = ", min_flap_degrees
+  write(100,*) " max_flap_degrees = ", max_flap_degrees
+  write(100,*) " min_flap_x = ", min_flap_x
+  write(100,*) " max_flap_x = ", max_flap_x
+  write(100,*) " min_tcTE = ", min_tcTE
+  write(100,*) " max_tcTE = ", max_tcTE
+  write(100,*) " min_camber = ", min_camber
+  write(100,*) " max_camber = ", max_camber
+  write(100,*)
+  do i = 1, noppoint
+    write(text,*) i
+    text = adjustl(text)
+    write(100,*) " moment_constraint_type("//trim(text)//") = '"//                &
+               trim(moment_constraint_type(i))//"'"
+    write(100,*) " min_moment("//trim(text)//") = ", min_moment(i)
+  write(100,*) " lift_constraint_type("//trim(text)//") = '"//                &
+               trim(lift_constraint_type(i))//"'"
+    write(100,*) " min_lift("//trim(text)//") = ", min_lift(i)
+  write(100,*) " drag_constraint_type("//trim(text)//") = '"//                &
+               trim(drag_constraint_type(i))//"'"
+    write(100,*) " max_drag("//trim(text)//") = ", max_drag(i)
+  end do
+  write(100,*)
+  write(100,*) " naddthickconst = ", naddthickconst
+  do i = 1, naddthickconst
+    write(text,*) i
+    text = adjustl(text)
+    write(100,*) " addthick_x("//trim(text)//") = ", addthick_x(i)
+    write(100,*) " addthick_min("//trim(text)//") = ", addthick_min(i)
+    write(100,*) " addthick_max("//trim(text)//") = ", addthick_max(i)
+  end do
+  write(100,'(A)') "/"
+  write(100,*)
+
+! naca_airfoil namelist
+
+  write(100,'(A)') "&naca_airfoil"
+  write(100,*) " family = "//trim(adjustl(family))
+  write(100,*) " maxt = ", maxt
+  write(100,*) " xmaxt = ", xmaxt
+  write(100,*) " maxc = ", maxc
+  write(100,*) " xmaxc = ", xmaxc
+  write(100,*) " design_cl = ", design_cl
+  write(100,*) " a = ", a
+  write(100,*) " leidx = ", leidx
+  write(100,*) " reflexed = ", reflexed
+  write(100,'(A)') "/"
+  write(100,*)
+
+! Initialization namelist
+
+  write(100,'(A)') "&initialization"
+  write(100,*) " feasible_init = ", feasible_init
+  write(100,*) " feasible_limit = ", feasible_limit
+  write(100,*) " feasible_init_attempts = ", feasible_init_attempts
+  write(100,'(A)') "/"
+  write(100,*)
+
+! Optimizer namelists
+
+  if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
+      'global') then
+
+    if (trim(global_search) == 'particle_swarm') then
+
+!     Particle swarm namelist
+
+      write(100,'(A)') "&particle_swarm_options"
+      write(100,*) " pso_pop = ", pso_options%pop
+      write(100,*) " pso_tol = ", pso_options%tol
+      write(100,*) " pso_maxit = ", pso_options%maxit
+      write(100,*) " pso_convergence_profile = ", pso_options%convergence_profile
+      write(100,'(A)') "/"
+      write(100,*)
+
+    else if (trim(global_search) == 'genetic_algorithm') then
+
+!     Genetic algorithm options
+
+      write(100,'(A)') "&genetic_algorithm_options"
+      write(100,*) " ga_pop = ", ga_options%pop
+      write(100,*) " ga_tol = ", ga_options%tol
+      write(100,*) " ga_maxit = ", ga_options%maxit
+      write(100,*) " parents_selection_method = '"//                           &
+                 trim(ga_options%parents_selection_method)//"'"
+      write(100,*) " parent_fraction = ", ga_options%parent_fraction 
+      write(100,*) " roulette_selection_pressure = ",                            &
+                 ga_options%roulette_selection_pressure
+      write(100,*) " tournament_fraction = " , ga_options%tournament_fraction
+      write(100,*) " crossover_range_factor = ", ga_options%crossover_range_factor
+      write(100,*) " mutant_probability = ", ga_options%mutant_probability
+      write(100,*) " chromosome_mutation_rate = ",                               &
+                 ga_options%chromosome_mutation_rate
+      write(100,*) " mutation_range_factor = ", ga_options%mutation_range_factor
+      write(100,'(A)') "/"
+      write(100,*)
+
+    end if
+
+  end if
+
+  if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
+      'local') then
+
+    if(trim(local_search) == 'simplex') then
+
+!     Simplex search namelist
+
+      write(100,'(A)') "&simplex_options"
+      write(100,*) " simplex_tol = ", ds_options%tol
+      write(100,*) " simplex_maxit = ", ds_options%maxit
+      write(100,'(A)') "/"
+      write(100,*)
+
+    end if
+
+  end if
+
+! Xfoil run options namelist
+
+  write(100,'(A)') "&xfoil_run_options"
+  write(100,*) " ncrit = ", xfoil_options%ncrit
+  write(100,*) " xtript = ", xfoil_options%xtript
+  write(100,*) " xtripb = ", xfoil_options%xtripb
+  write(100,*) " viscous_mode = ", xfoil_options%viscous_mode
+  write(100,*) " silent_mode = ", xfoil_options%silent_mode
+  write(100,*) " bl_maxit = ", xfoil_options%maxit
+  write(100,*) " vaccel = ", xfoil_options%vaccel
+  write(100,*) " reinitialize = ", xfoil_options%reinitialize
+  write(100,*) " init_type = '"//trim(xfoil_options%init_type)//"'"
+  write(100,*) " init_number_points = ", xfoil_options%init_number_points
+  write(100,*) " init_al0 = ", xfoil_options%init_al0
+  write(100,*) " init_cl0 = ", xfoil_options%init_cl0
+  write(100,*) " init_initial_position = ", xfoil_options%init_initial_position
+  write(100,*) " init_dist = '"//trim(xfoil_options%init_dist)//"'"
+  write(100,'(A)') "/"
+  write(100,*)
+
+! Xfoil paneling options namelist
+
+  write(100,'(A)') "&xfoil_paneling_options"
+  write(100,*) " npan = ", xfoil_geom_options%npan
+  write(100,*) " cvpar = ", xfoil_geom_options%cvpar
+  write(100,*) " cterat = ", xfoil_geom_options%cterat
+  write(100,*) " ctrrat = ", xfoil_geom_options%ctrrat
+  write(100,*) " xsref1 = ", xfoil_geom_options%xsref1
+  write(100,*) " xsref2 = ", xfoil_geom_options%xsref2
+  write(100,*) " xpref1 = ", xfoil_geom_options%xpref1
+  write(100,*) " xpref2 = ", xfoil_geom_options%xpref2
+  write(100,'(A)') "/"
+  write(100,*)
+
+! Matchfoil options
+
+  write(100,'(A)') "&matchfoil_options"
+  write(100,*) " match_foils = ", match_foils
+  write(100,*) " matchfoil_file = '"//trim(matchfoil_file)//"'"
+  write(100,'(A)') "/"
+  write(100,*)
+  
+  close(100)
+  
+! Check that inputs are reasonable
+  write(*,'(A)') "| Checking if inputs are reasonable"
+  write(*,'(A)') "|"
+  
 ! Optimization settings
 
   if (trim(seed_airfoil) /= 'from_file' .and.                                  &
@@ -1005,7 +1287,20 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       call my_stop("drag_constraint_type must be 'use_seed', 'specify', "//  &
                  "or 'none'.")
   end do
+  
+  if (max_growth_seed_mult < 1.d0) call my_stop("max_growth_seed_mult"//       &
+    &" should be >= 1.", "warm")
+  if (min_leading_edge_angle < 0.d0) call my_stop("min_leading_edge_angle"//   &
+    &" must be >= 0.")
+  if (max_leading_edge_angle > 89.99d0) call my_stop("max_leading_edge_angle"//&
+    &" must be <= 89.99")
+  if (dif_leading_edge_angle < 10.d0) call my_stop("dif_leading_edge_angle"//  &
+    &" should be >= 10, 20 is recommended.", "warn")
   if (min_te_angle < 0.d0) call my_stop("min_te_angle must be >= 0.")
+  if (te_angle_x_apply < 0.5d0) call my_stop("te_angle_x_apply"//             &
+    &" should be after max thickness", "warn")
+  if (max_panel_angle /= 25.d0) call my_stop(" recommended value for"//        &
+    &" max_panel_angle is 25. degrees", "warn")
   if (check_curvature .and. (curv_threshold <= 0.d0))                          &
     call my_stop("curv_threshold must be > 0.")
   if (check_curvature .and. (max_curv_reverse_top < 0))                        &
@@ -1160,6 +1455,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   if (xpref2 < xpref1) call my_stop("xpref2 must be >= xpref1")
   if (xpref2 > 1.d0) call my_stop("xpref2 must be <= 1.")
 
+  write(*,'(A)') "|"
+  write(*,'(A)') "| End of Checking "
 end subroutine read_inputs
 
 !=============================================================================80

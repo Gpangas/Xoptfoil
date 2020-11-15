@@ -255,7 +255,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
 
   if (.not. xfoil_options%silent_mode .or. first_run_xfoil) then
     write(*,*) 
-    write(*,*) 'Analyzing aerodynamics using the XFOIL engine ...'
+    write(*,*) ' Analyzing aerodynamics using the XFOIL engine ...'
   end if 
 
   ! Check to make sure xfoil is initialized
@@ -465,10 +465,10 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
             write(text2,'(F8.6)') addlift(j)
             text = adjustl(text)
             if (addconverged(j) .AND. addviscrms(j) < 1.0D-04) then
-              message = 'Initialization point '//trim(text)//' converged at '  &
+              message = '   Initialization point '//trim(text)//' converged at '  &
                 &//trim(text1)//' degrees with Cl of '//trim(text2)
             elseif (.not. addconverged(j) .OR. addviscrms(j) > 1.0D-04) then
-              message = 'Initialization point '//trim(text)//' did not '//     &
+              message = '   Initialization point '//trim(text)//' did not '//     &
                 &'converge at '//trim(text1)//' degrees with Cl of '//trim(text2)
             end if
           write(*,*) trim(message)
@@ -573,10 +573,10 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
             write(text2,'(F8.6)') addlift(j)
             text = adjustl(text)
             if (addconverged(j) .AND. addviscrms(j) < 1.0D-04) then
-              message = 'Initialization point '//trim(text)//' converged at '  &
+              message = '   Initialization point '//trim(text)//' converged at '  &
                 &//trim(text1)//' degrees with Cl of '//trim(text2)
             elseif (.not. addconverged(j) .OR. addviscrms(j) > 1.0D-04) then
-              message = 'Initialization point '//trim(text)//' did not '//     &
+              message = '   Initialization point '//trim(text)//' did not '//     &
                 &'converge at '//trim(text1)//' degrees with Cl of '//trim(text2)
             end if
           write(*,*) trim(message)
@@ -685,10 +685,10 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
           write(text2,'(F8.6)') addlift(j)
           text = adjustl(text)
           if (addconverged(j)) then
-            message = 'Search point '//trim(text)//' converged at '            &
+            message = '   Search point '//trim(text)//' converged at '            &
               &//trim(text1)//' degrees with Cl of '//trim(text2)
           elseif (.not. addconverged(j)) then
-            message = 'Search point '//trim(text)//' did not converge at '     &
+            message = '   Search point '//trim(text)//' did not converge at '     &
               &//trim(text1)//' degrees.'
           end if
         write(*,*) trim(message)
@@ -741,12 +741,12 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
       text = adjustl(text)
   
       if (point_converged(i) .AND. viscrms(i) < 1.0D-04) then
-        message = 'Operating point '//trim(text)//' converged.'
+        message = '   Operating point '//trim(text)//' converged.'
       elseif (.not. point_converged(i) .and. point_fixed(i) .AND. viscrms(i) < 1.0D-04) then
-        message = 'Operating point '//trim(text)//' initially did not '//      &
+        message = '   Operating point '//trim(text)//' initially did not '//      &
                   'converge but was fixed.'
       elseif ((.not. point_converged(i) .and. .not. point_fixed(i)) .OR. viscrms(i) > 1.0D-04) then
-        message = 'Operating point '//trim(text)//' initially did not '//      &
+        message = '   Operating point '//trim(text)//' initially did not '//      &
                   'converge and was not fixed.'
       end if
   
@@ -897,7 +897,7 @@ subroutine write_polar(point_number, design_number, x_flap, flap_degrees)
     write(*,*) "  Writing polars for design number "//trim(text)//             &
                " to file "//trim(output_prefix)//"_design_polars.dat"//" ..."
   end if
-  
+
 ! Replace file if point_number is 1
 
   if (design_number .EQ. 0 .AND. point_number .EQ. 1) then

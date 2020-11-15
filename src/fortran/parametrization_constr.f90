@@ -1643,6 +1643,8 @@ end subroutine BPPCheckControlPoints
 ! Subroutine that implements the Bezier-PARSEC Parameterization, coordinates to weights.
 subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
 
+  use math_deps, only : nu_first_derivative, nu_curvature
+
   real*8, intent(in) :: xseedt(:), xseedb(:), zseedt(:), zseedb(:)
   
   real*8, intent(out) :: modest(6) ! Xt_max, Yt_max, Kt_max, Rle     , Beta_te
@@ -1679,11 +1681,11 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
     zspline(i-1+nPt)=zseedb(i)
   end do
     
-  curvaturethick=curvature(nPt, xseedt, zthick)
-  curvaturecamber=curvature(nPt, xseedt, zcamber)
+  curvaturethick=nu_curvature(nPt, xseedt, zthick)
+  curvaturecamber=nu_curvature(nPt, xseedt, zcamber)
   
-  first_derivative_thick=first_derivative(nPt, xseedt, zthick)
-  first_derivative_camber=first_derivative(nPt, xseedt, zcamber)
+  first_derivative_thick=nu_first_derivative(nPt, xseedt, zthick)
+  first_derivative_camber=nu_first_derivative(nPt, xseedt, zcamber)
   
   ! initialize xBPP
   xBPP=0.d0
@@ -1799,218 +1801,6 @@ subroutine d_SplineAirfoilInterpolation(ntop,xtop,ytop,nbot,xbot,ybot,ybot_at_xt
   return
   
 end subroutine d_SplineAirfoilInterpolation
-
-!=============================================================================80
-!
-! Computes curvature for a function gam(s) = x(s) + y(s)
-!
-!=============================================================================80
-function curvature(npt, x, y)
-
-  integer, intent(in) :: npt
-  double precision, dimension(npt), intent(in) :: x, y
-  double precision, dimension(npt) :: curvature
-
-  integer :: i
-  double precision, dimension(npt) :: svec
-  double precision :: xs, ys, xs2, ys2
-
-! Airfoil length vector s 
-
-  svec(1) = 0.d0
-  do i = 2, npt
-    svec(i) = svec(i-1) + sqrt((x(i)-x(i-1))**2.d0 + (y(i)-y(i-1))**2.d0)
-  end do
-
-! Compute first and second derivatives and curvature vector
-
-  do i = 1, npt
-
-    if (i == 1) then
-
-!     Derivatives of x and y with respect to the length s
-
-      xs = derv1f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-      ys = derv1f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-      xs2 = derv2f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-      ys2 = derv2f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-
-    elseif (i == npt) then
-
-!     Derivatives of x and y with respect to the length s
-
-      xs = derv1b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      ys = derv1b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      xs2 = derv2b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      ys2 = derv2b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      
-    else
-
-!     Derivatives of x and y with respect to the length s
-
-      xs = derv1c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-      ys = derv1c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-      xs2 = derv2c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-      ys2 = derv2c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-
-    end if
-
-!   Curvature
-
-    curvature(i) = (xs*ys2 - ys*xs2) / (xs**2.d0 + ys**2.d0)**1.5d0
-
-  end do
-
-end function curvature
-
-!=============================================================================80
-!
-! Computes first derivative for a function gam(s) = x(s) + y(s)
-!
-!=============================================================================80
-function first_derivative(npt, x, y)
-
-  integer, intent(in) :: npt
-  double precision, dimension(npt), intent(in) :: x, y
-  double precision, dimension(npt) :: first_derivative
-
-  integer :: i
-  double precision, dimension(npt) :: svec
-  double precision :: xs, ys, xs2, ys2
-
-! Airfoil length vector s 
-
-  svec(1) = 0.d0
-  do i = 2, npt
-    svec(i) = svec(i-1) + sqrt((x(i)-x(i-1))**2.d0 + (y(i)-y(i-1))**2.d0)
-  end do
-
-! Compute first and second derivatives and curvature vector
-
-  do i = 1, npt
-
-    if (i == 1) then
-
-!     Derivatives of x and y with respect to the length s
-
-      xs = derv1f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-      ys = derv1f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-      xs2 = derv2f(x(i+2), x(i+1), x(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-      ys2 = derv2f(y(i+2), y(i+1), y(i), svec(i+1)-svec(i), svec(i+2)-svec(i+1))
-
-    elseif (i == npt) then
-
-!     Derivatives of x and y with respect to the length s
-
-      xs = derv1b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      ys = derv1b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      xs2 = derv2b(x(i-2), x(i-1), x(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      ys2 = derv2b(y(i-2), y(i-1), y(i), svec(i)-svec(i-1), svec(i-1)-svec(i-2))
-      
-    else
-
-!     Derivatives of x and y with respect to the length s
-
-      xs = derv1c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-      ys = derv1c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-      xs2 = derv2c(x(i+1), x(i), x(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-      ys2 = derv2c(y(i+1), y(i), y(i-1), svec(i)-svec(i-1), svec(i+1)-svec(i))
-
-    end if
-
-!   Curvature
-
-    first_derivative(i) = ys/xs
-
-  end do
-
-end function first_derivative
-
-
-!=============================================================================80
-!
-! Forward difference approximation for first derivative (2nd order),non uniform
-!
-!=============================================================================80
-function derv1f(u_plus2, u_plus1, u, h1 ,h2)
-
-  double precision, intent(in) :: u_plus2, u_plus1, u, h1, h2
-  double precision :: derv1f
-
-  derv1f = (h1+h2)/(h1*h2)*(u_plus1-u)-(h1)/(h1*h2+h2**2.d0)*(u_plus2-u)
-
-end function derv1f
-
-
-!=============================================================================80
-!
-! Backward difference approximation for first derivative (2nd order),non uniform
-!
-!=============================================================================80
-function derv1b(u_minus2, u_minus1, u, h1, h2)
-
-  double precision, intent(in) :: u_minus2, u_minus1, u, h1, h2
-  double precision :: derv1b
-
-  derv1b = (h2)/(h1*h2+h1**2.d0)*(u_minus2-u)-(h1+h2)/(h1*h2)*(u_minus1-u)
-
-end function derv1b
-
-!=============================================================================80
-!
-! Central difference approximation for first derivative (2nd order),non uniform
-!
-!=============================================================================80
-function derv1c(u_plus, u, u_minus, h1, h2)
-
-  double precision, intent(in) :: u_plus, u, u_minus, h1, h2
-  double precision :: derv1c
-
-  derv1c = -(h2)/(h1**2.d0+h1*h2)*(u_minus-u)+(h1)/(h2**2.d0+h1*h2)*(u_plus-u)
-
-end function derv1c
-
-!=============================================================================80
-!
-! Forward difference approximation for second-order derivative,non uniform
-!
-!=============================================================================80
-function derv2f(u_plus2, u_plus, u, h1, h2)
-
-  double precision, intent(in) :: u_plus2, u_plus, u, h1, h2
-  double precision :: derv2f
-
-  derv2f = 2.d0/(h2*(h1+h2))*(u_plus2-u)-2.d0/(h1*h2)*(u_plus-u)
-
-end function derv2f
-
-!=============================================================================80
-!
-! Backward difference approximation for second-order derivative,non uniform
-!
-!=============================================================================80
-function derv2b(u_minus2, u_minus, u, h1, h2)
-
-  double precision, intent(in) :: u_minus2, u_minus, u, h1, h2
-  double precision :: derv2b
-
-  derv2b = 2.d0/(h2*(h1+h2))*(u_minus2-u)-2.d0/(h1*h2)*(u_minus-u)
-
-end function derv2b
-
-!=============================================================================80
-!
-! Central difference approximation for second-order derivative,non uniform
-!
-!=============================================================================80
-function derv2c(u_plus, u, u_minus, h1, h2)
-
-  double precision, intent(in) :: u_plus, u, u_minus, h1, h2
-  double precision :: derv2c
-
-  derv2c = 2.d0/(h1*(h1+h2))*(u_minus-u)+2.d0/(h2*(h1+h2))*(u_plus-u)
-
-end function derv2c
 
 end module parametrization_constr
   

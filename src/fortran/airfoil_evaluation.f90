@@ -34,7 +34,6 @@ module airfoil_evaluation
   
 ! Variables used to check that XFoil results are repeatable when needed
 
-  double precision :: checktol = 0.2d0
   double precision, dimension(max_op_points) :: maxlift = -100.d0
   double precision, dimension(max_op_points) :: mindrag = 100.d0
 
@@ -91,7 +90,8 @@ end function objective_function_nopenalty
 !=============================================================================80
 function aero_objective_function(designvars, include_penalty)
   use vardef,          only : nparams_top, nparams_bot!nshapedvtop, nshapedvbot
-  use math_deps,       only : interp_vector, curvature, derv1f1, derv1b1
+  use math_deps,       only : interp_vector, nu_curvature, derv1f1, derv1b1,   &
+                              spline_interp_z, spline_interp_t
   use parametrization, only : create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil
   use xfoil_inc,       only : AMAX, CAMBR
@@ -111,8 +111,8 @@ function aero_objective_function(designvars, include_penalty)
              dvbbnd2, ncheckpt, nptint, ndvs_top, ndvs_bot
   double precision :: penaltyval, penaltyvaltotal
   double precision :: tegap, growth1, growth2, maxgrowth, len1, len2
-  double precision :: panang1, panang2, maxpanang, heightfactor
-  integer, dimension(noppoint) :: checkpt_list
+  double precision :: panang1, panang2, maxpanang, minpanang, heightfactor
+  integer, dimension(noppoint) :: checkpt_list, checkop
   character(7), dimension(noppoint) :: opm_check
   double precision, dimension(noppoint) :: opp_check, re_check, ma_check 
   double precision, dimension(noppoint) :: fd_check, ncrit_check
@@ -131,8 +131,9 @@ function aero_objective_function(designvars, include_penalty)
   double precision, parameter :: epsexit = 1.0D-04
   double precision, parameter :: epsupdate = 1.0D-08
   double precision :: pi
-  logical :: penalize
-  character(100) :: text
+  logical :: penalize, side
+  character(100) :: text, text1
+  character(100) :: message
 
   pi = acos(-1.d0)
   nmodest = nparams_top
@@ -187,7 +188,7 @@ function aero_objective_function(designvars, include_penalty)
   else
     actual_tcTE=tcTE
   end if
-  
+
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 1
@@ -259,7 +260,8 @@ function aero_objective_function(designvars, include_penalty)
   panang2 = atan((zb_new(1)-zb_new(2))/(xseedb(2)-xseedb(1))) *                &
             180.d0/acos(-1.d0)
   maxpanang = max(panang2,panang1)
-  penaltyval = penaltyval + max(0.d0,maxpanang-89.99d0)/0.01d0
+  minpanang = min(panang2,panang1)
+  penaltyval = penaltyval + max(0.d0,maxpanang-max_leading_edge_angle)/0.01d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
@@ -273,7 +275,7 @@ function aero_objective_function(designvars, include_penalty)
   
 ! Penalty for too sharp leading edge
 
-  penaltyval = penaltyval + max(0.d0,abs(panang1-panang2)-20.d0)/5.d0
+  penaltyval = penaltyval + max(0.d0,min_leading_edge_angle-minpanang)/0.01d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
@@ -285,16 +287,35 @@ function aero_objective_function(designvars, include_penalty)
   penaltyvaltotal = penaltyvaltotal + penaltyval
   penaltyval = 0.d0
   
+! Penalty for too disparate leading edge
+
+  penaltyval = penaltyval + max(0.d0,abs(panang1-panang2)-                     &
+                                dif_leading_edge_angle)/5.d0
+
+  if ( (penaltyval > epsexit) .and. penalize ) then
+    aero_objective_function%value = penaltyval*1.0D+06
+    aero_objective_function%message_code = 5
+    aero_objective_function%message = ' failed, too disparate leading edge angle' 
+    return
+  end if
+
+  penaltyvaltotal = penaltyvaltotal + penaltyval
+  penaltyval = 0.d0
+  
 ! Interpolate bottom surface to xseedt points (to check thickness)
 
   if (xseedt(nptt) <= xseedb(nptb)) then
     nptint = nptt
-    call interp_vector(xseedb, zb_new, xseedt, zb_interp(1:nptt))
+    side=.false.
+    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedt,zb_interp(1:nptt),side)
+    !call interp_vector(xseedb, zb_new, xseedt, zb_interp(1:nptt))
     x_interp(1:nptt) = xseedt
     zt_interp(1:nptt) = zt_new  
   else
     nptint = nptb
-    call interp_vector(xseedt, zt_new, xseedb, zt_interp(1:nptb))
+    side=.true.
+    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedb,zt_interp(1:nptb),side)
+    !call interp_vector(xseedt, zt_new, xseedb, zt_interp(1:nptb))
     x_interp(1:nptb) = xseedb
     zb_interp(1:nptb) = zb_new
   end if
@@ -312,9 +333,9 @@ function aero_objective_function(designvars, include_penalty)
     thickness(i) = zt_interp(i) - zb_interp(i)
     if (thickness(i) > maxthick) maxthick = thickness(i)
 
-!   Check if thinner than specified wedge angle on back half of airfoil
+!   Check if thinner than specified wedge angle on specified back of airfoil
 
-    if (xseedt(i) > 0.5d0) then
+    if (xseedt(i) > te_angle_x_apply) then
       gapallow = tegap + 2.d0 * heightfactor * (x_interp(nptint) -             &
                                                 x_interp(i))
       penaltyval = penaltyval + max(0.d0,gapallow-thickness(i))/0.1d0
@@ -324,8 +345,8 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 5
-    aero_objective_function%message = ' failed, thinner than specified wedge angle on back half of airfoil' 
+    aero_objective_function%message_code = 6
+    aero_objective_function%message = ' failed, thinner than specified wedge angle on specified back of airfoil' 
     return
   end if
   
@@ -335,8 +356,10 @@ function aero_objective_function(designvars, include_penalty)
 ! Check additional thickness constraints
 
   if (naddthickconst > 0) then
-    call interp_vector(x_interp, thickness,                                    &
-                       addthick_x(1:naddthickconst), add_thickvec)
+    call spline_interp_t(curr_foil%npoint,curr_foil%x,curr_foil%z,             &
+                         addthick_x(1:naddthickconst),add_thickvec)
+    !call interp_vector(x_interp, thickness,                                    &
+    !                   addthick_x(1:naddthickconst), add_thickvec)
 
     do i = 1, naddthickconst
       penaltyval = penaltyval + max(0.d0,addthick_min(i)-add_thickvec(i))/0.1d0
@@ -346,7 +369,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 6
+    aero_objective_function%message_code = 7
     aero_objective_function%message = ' failed, additional thickness constraints out of bounds' 
     return
   end if
@@ -361,7 +384,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 7
+    aero_objective_function%message_code = 8
     aero_objective_function%message = ' failed, thickness constraints out of bounds' 
     return
   end if
@@ -375,8 +398,8 @@ function aero_objective_function(designvars, include_penalty)
 
 !   Compute curvature on top and bottom
 
-    curvt = curvature(nptt, xseedt, zt_new)
-    curvb = curvature(nptb, xseedb, zb_new)
+    curvt = nu_curvature(nptt, xseedt, zt_new)
+    curvb = nu_curvature(nptb, xseedb, zb_new)
 
 !   Check number of reversals that exceed the threshold
 
@@ -407,7 +430,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 8
+    aero_objective_function%message_code = 9
     aero_objective_function%message = ' failed, curvature reversals out of bounds' 
     return
   end if
@@ -446,7 +469,7 @@ function aero_objective_function(designvars, include_penalty)
   
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 9
+    aero_objective_function%message_code = 10
     aero_objective_function%message = ' failed, flap angles out of bounds' 
     return
   end if
@@ -473,7 +496,7 @@ function aero_objective_function(designvars, include_penalty)
   
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 10
+    aero_objective_function%message_code = 11
     aero_objective_function%message = ' failed, flap hinge out of bounds' 
     return
   end if
@@ -485,7 +508,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyvaltotal > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyvaltotal*1.0D+06
-    aero_objective_function%message_code = 11
+    aero_objective_function%message_code = 12
     aero_objective_function%message = ' failed at sum of previous penalties' 
     return
   end if
@@ -519,11 +542,11 @@ function aero_objective_function(designvars, include_penalty)
   
 ! Add penalty for too large panel angles
 
-  penaltyval = penaltyval + max(0.0d0,AMAX-25.d0)/5.d0
+  penaltyval = penaltyval + max(0.0d0,AMAX-max_panel_angle)/5.d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 12
+    aero_objective_function%message_code = 13
     aero_objective_function%message = ' failed, too large panel angles' 
     return
   end if
@@ -538,7 +561,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 13
+    aero_objective_function%message_code = 14
     aero_objective_function%message = ' failed, camber out of bounds' 
     return
   end if
@@ -551,7 +574,7 @@ function aero_objective_function(designvars, include_penalty)
   if ( (penaltyvaltotal > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message = ' failed at sum of previous penalties' 
-    aero_objective_function%message_code = 14
+    aero_objective_function%message_code = 15
     return
   end if
 
@@ -568,20 +591,23 @@ function aero_objective_function(designvars, include_penalty)
 
     if (maxlift(1) == -100.d0) exit
 
-!   Check when lift or drag values are suspect
+!   Check when lift or drag values are suspect if converged
 
     check = .false.
-    if (trim(optimization_type(i)) == 'min-drag') then
-      if (drag(i) < (1.d0 - checktol)*mindrag(i)) check = .true.
-    else
-      if ((lift(i) > (1.d0 + checktol)*maxlift(i)) .or.                        &
-          (drag(i) < (1.d0 - checktol)*mindrag(i))) check = .true.
+    if (viscrms(i)<=1.0D-04) then
+      if (trim(optimization_type(i)) == 'min-drag') then
+        if (drag(i) < (1.d0 - drag_check_tol)*mindrag(i)) check = .true.
+      else
+        if ((lift(i) > (1.d0 + lift_check_tol)*maxlift(i)) .or.                        &
+            (drag(i) < (1.d0 - drag_check_tol)*mindrag(i))) check = .true.
+      end if
     end if
 
     if (check) then
       checkpt(i) = .true.
       ncheckpt = ncheckpt + 1
       checkpt_list(i) = ncheckpt
+      checkop(ncheckpt) = i
       opm_check(ncheckpt) = op_mode(i)
       opp_check(ncheckpt) = op_point(i)
       ma_check(ncheckpt) = mach(i)
@@ -796,7 +822,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 15
+    aero_objective_function%message_code = 16
     aero_objective_function%message = ' failed, unconverged points' 
     return
   end if
@@ -814,7 +840,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 16
+    aero_objective_function%message_code = 17
     aero_objective_function%message = ' failed, too low moment' 
     return
   end if
@@ -832,7 +858,7 @@ function aero_objective_function(designvars, include_penalty)
 
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 17
+    aero_objective_function%message_code = 18
     aero_objective_function%message = ' failed, too low lift' 
     return
   end if
@@ -850,7 +876,7 @@ function aero_objective_function(designvars, include_penalty)
   
   if ( (penaltyval > epsexit) .and. penalize ) then
     aero_objective_function%value = penaltyval*1.0D+06
-    aero_objective_function%message_code = 17
+    aero_objective_function%message_code = 19
     aero_objective_function%message = ' failed, too high drag' 
     return
   end if
@@ -862,12 +888,20 @@ function aero_objective_function(designvars, include_penalty)
 
   if (penalize) aero_objective_function%value =                                      &
                 aero_objective_function%value + penaltyvaltotal*1.0D+06
-  aero_objective_function%message_code = 0
-  write(text,'(5F12.6)') penaltyvaltotal
-  aero_objective_function%message = ' passed, penaltyvaltotal:'//trim(text)
+  write(text,'(F12.6)') penaltyvaltotal
+  if (ncheckpt .EQ. 0) then
+    message = ' passed, penaltyvaltotal:'//trim(text)
+    aero_objective_function%message_code = 100
+  else
+    aero_objective_function%message_code = 200
+    write(text1,'(1000I4)') (checkop(i),i=1,ncheckpt)
+    message = ' passed, penaltyvaltotal:'//trim(text)//' rechecked at: '//     &
+      trim(text1)
+  end if
+  aero_objective_function%message = message
 ! Update maxlift and mindrag only if it is a good design
 
-  if (penaltyvaltotal <= epsupdate) then
+  if (penaltyvaltotal <= epsupdate .OR. (.NOT. penalize)) then
     do i = 1, noppoint
 !$omp critical
       if (lift(i) > maxlift(i)) maxlift(i) = lift(i)
@@ -1392,9 +1426,11 @@ function write_function_restart_cleanup(restart_status, global_search,         &
              histunit, ncoord
   integer :: i, j
   double precision, dimension(:,:), allocatable :: x, z, alpha, lift, drag,    &
-                                                   moment, xtrt, xtrb,         &
-                                                   actual_flap_degrees,        &
-                                                   actual_x_flap
+                                                   drag_p, moment, xtrt, xtrb, &
+                                                   reynolds, mach, xtript,     &
+                                                   xtripb, ncrit, flap_x,      &
+                                                   flap_defl
+  integer, dimension(:,:), allocatable :: op_point
   double precision, dimension(:), allocatable :: fmin, relfmin, rad
   integer , dimension(:), allocatable :: time
   character(150), dimension(:), allocatable :: zoneinfo
@@ -1443,19 +1479,28 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   ncoord = size(xseedt,1) + size(xseedb,1) - 1
   allocate(x(ncoord,designcounter+1))
   allocate(z(ncoord,designcounter+1))
+  allocate(zoneinfo(designcounter+1))
+  
   allocate(alpha(noppoint,designcounter+1))
   allocate(lift(noppoint,designcounter+1))
   allocate(drag(noppoint,designcounter+1))
+  allocate(drag_p(noppoint,designcounter+1))
   allocate(moment(noppoint,designcounter+1))
   allocate(xtrt(noppoint,designcounter+1))
   allocate(xtrb(noppoint,designcounter+1))
-  allocate(actual_flap_degrees(noppoint,designcounter+1))
-  allocate(actual_x_flap(noppoint,designcounter+1))
-  allocate(zoneinfo(designcounter+1))
-  allocate(fmin(step+prevstep))
-  allocate(relfmin(step+prevstep))
-  allocate(rad(step+prevstep))
-  allocate(time(step+prevstep))
+  allocate(op_point(noppoint,designcounter+1))
+  allocate(reynolds(noppoint,designcounter+1))
+  allocate(mach(noppoint,designcounter+1))
+  allocate(xtript(noppoint,designcounter+1))
+  allocate(xtripb(noppoint,designcounter+1))
+  allocate(ncrit(noppoint,designcounter+1))
+  allocate(flap_x(noppoint,designcounter+1))
+  allocate(flap_defl(noppoint,designcounter+1))
+  
+  allocate(fmin(step+prevstep+1))
+  allocate(relfmin(step+prevstep+1))
+  allocate(rad(step+prevstep+1))
+  allocate(time(step+prevstep+1))
 
 ! Open coordinates file
 
@@ -1527,8 +1572,8 @@ function write_function_restart_cleanup(restart_status, global_search,         &
   read(histunit,*)
 
 ! Read optimizer data at each iteration
-write(*,*) step+prevstep
-  do i = 1, step+prevstep
+  write(*,*) step+prevstep
+  do i = 1, step+prevstep+1
     read(histunit,*) j, fmin(i), relfmin(i), rad(i), time(i)
   end do
 
@@ -1542,8 +1587,8 @@ write(*,*) step+prevstep
   write(histunit,'(A)') "Iteration  Objective function  "//&
                         "% Improvement over seed  Design radius"//&
                          "  Time (seconds)"
-  do i = 1, step+prevstep
-    write(stepchar,'(I11)') i
+  do i = 1, step+prevstep+1
+    write(stepchar,'(I11)') i-1
     write(fminchar,'(F14.10)') fmin(i)
     write(relfminchar,'(F14.10)') relfmin(i)
     write(radchar,'(ES14.6)') rad(i)
@@ -1562,14 +1607,24 @@ write(*,*) step+prevstep
   if (match_foils) then
     deallocate(x)
     deallocate(z)
+    deallocate(zoneinfo)
+    
     deallocate(alpha)
     deallocate(lift)
     deallocate(drag)
+    deallocate(drag_p)
     deallocate(moment)
     deallocate(xtrt)
     deallocate(xtrb)
-    deallocate(actual_flap_degrees)
-    deallocate(actual_x_flap)
+    deallocate(op_point)
+    deallocate(reynolds)
+    deallocate(mach)
+    deallocate(xtript)
+    deallocate(xtripb)
+    deallocate(ncrit)
+    deallocate(flap_x)
+    deallocate(flap_defl)
+    
     deallocate(fmin)
     deallocate(relfmin)
     deallocate(rad)
@@ -1604,13 +1659,17 @@ write(*,*) step+prevstep
 !   Read polars
 
     do j = 1, noppoint
-      read(polarunit,'(8ES14.6)') alpha(j,i), lift(j,i), drag(j,i),            &
-                                  moment(j,i), xtrt(j,i), xtrb(j,i),           &
-                                  actual_flap_degrees(j,i), actual_x_flap(j,i)
+      
+      read(polarunit,1000) alpha(j,i), lift(j,i), drag(j,i), drag_p(j,i),      &
+                           moment(j,i), xtrt(j,i), xtrb(j,i), op_point(j,i),   &
+                           reynolds(j,i), mach(j,i), xtript(j,i), xtripb(j,i), &
+                           ncrit(j,i), flap_x(j,i), flap_defl(j,i)
     end do
 
   end do
-
+  
+  1000 format(F8.3,F9.4,F10.5,F10.5,F9.4,F9.4,F9.4,I7,F13.6,F9.4,F10.4,F10.4,&
+       &      F6.2, F7.3, F8.2)
 ! Close polars file
 
   close(polarunit)
@@ -1619,8 +1678,10 @@ write(*,*) step+prevstep
 
   open(unit=polarunit, file=polarfile, status='replace')
   
-  write(polarunit,'(A)') 'title="Airfoil polars"'
-  write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb" "flap deflexion" "flap hinge position"'
+  write(polarunit,'(A)') ' Polar file '
+  write(polarunit,'(A)') '   alpha    CL        CD       CDp       CM    '//   &
+    & ' Top_Xtr  Bot_Xtr Number     Re/10^6    Mach   Top_Xtrip Bot_Xtrip'//   &
+    & ' Ncrit FxHinge  Fdefl'
 
   do i = 0, designcounter
 !   Write zone header
@@ -1636,10 +1697,11 @@ write(*,*) step+prevstep
     ! Write polars to file
 
     do j = 1, noppoint
-      write(polarunit,'(8ES14.6)') alpha(j,i+1), lift(j,i+1), drag(j,i+1),     &
-                                   moment(j,i+1), xtrt(j,i+1), xtrb(j,i+1),    &
-                                   actual_flap_degrees(j,i+1),                 &
-                                   actual_x_flap(j,i+1)
+      write(polarunit,1000) alpha(j,i+1), lift(j,i+1), drag(j,i+1),            &
+                            drag_p(j,i+1), moment(j,i+1), xtrt(j,i+1),         &
+                            xtrb(j,i+1), op_point(j,i+1), reynolds(j,i+1),     &
+                            mach(j,i+1), xtript(j,i+1), xtripb(j,i+1),         &
+                            ncrit(j,i+1), flap_x(j,i+1), flap_defl(j,i+1)
     end do
   end do
 
@@ -1651,12 +1713,24 @@ write(*,*) step+prevstep
 
   deallocate(x)
   deallocate(z)
+  deallocate(zoneinfo)  
+  
+  deallocate(alpha)
   deallocate(lift)
   deallocate(drag)
+  deallocate(drag_p)
   deallocate(moment)
-  deallocate(zoneinfo)
   deallocate(xtrt)
   deallocate(xtrb)
+  deallocate(op_point)
+  deallocate(reynolds)
+  deallocate(mach)
+  deallocate(xtript)
+  deallocate(xtripb)
+  deallocate(ncrit)
+  deallocate(flap_x)
+  deallocate(flap_defl)
+
   deallocate(fmin)
   deallocate(relfmin)
   deallocate(rad)

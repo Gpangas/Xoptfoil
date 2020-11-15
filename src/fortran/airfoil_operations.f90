@@ -637,14 +637,14 @@ subroutine my_stop(message, stoptype)
   character(4), intent(in), optional :: stoptype
 
   if ((.not. present(stoptype)) .or. (stoptype == 'stop')) then
-    write(*,*)
-    write(*,'(A)') 'Error: '//trim(message)
-    write(*,*)
+    write(*,'(A)') "|"
+    write(*,'(A)') '|   Error: '//trim(message)
+    write(*,'(A)') "|"
     stop 1
   else
-    write(*,*)
-    write(*,'(A)') 'Warning: '//trim(message)
-    write(*,*)
+    write(*,'(A)') "|"
+    write(*,'(A)') '|  Warning: '//trim(message)
+    write(*,'(A)') "|"
   end if
 
 end subroutine my_stop

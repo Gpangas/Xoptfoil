@@ -31,7 +31,8 @@ module input_sanity
 subroutine check_seed()
 
   use vardef
-  use math_deps,          only : interp_vector, curvature, derv1f1, derv1b1
+  use math_deps,          only : interp_vector, nu_curvature, derv1f1, derv1b1,&
+                                 spline_interp_z, spline_interp_t
   use xfoil_driver,       only : run_xfoil
   use xfoil_inc,          only : AMAX, CAMBR
   use airfoil_evaluation, only : xfoil_options, xfoil_geom_options, file_options
@@ -42,23 +43,24 @@ subroutine check_seed()
   double precision, dimension(size(xseedb,1)) :: curvb
   double precision, dimension(naddthickconst) :: add_thickvec
   double precision :: penaltyval, tegap, gapallow, maxthick, heightfactor
-  double precision :: panang1, panang2, maxpanang, curv1, curv2
+  double precision :: panang1, panang2, maxpanang, minpanang, curv1, curv2
   double precision :: checkval, len1, len2, growth1, growth2, xtrans, ztrans
   double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
-  double precision :: pi
+  double precision :: pi, te_angle, max_te_angle, max_growth_top, max_growth_bot
   integer :: i, nptt, nptb, nreversalst, nreversalsb, nptint, flap_idi
   character(30) :: text, text2
   character(14) :: opt_type
-  logical :: addthick_violation
+  logical :: addthick_violation, side
 
   penaltyval = 0.d0
   pi = acos(-1.d0)
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
-
-  write(*,*) 'Checking to make sure seed airfoil passes all constraints ...'
+  
+  write(*,*)
+  write(*,*) ' Checking to make sure seed airfoil passes all constraints ...'
   write(*,*)
 
 ! Get allowable panel growth rate
@@ -66,16 +68,23 @@ subroutine check_seed()
   growth_allowed = 0.d0
 
 ! Top surface growth rates
+  max_growth_top = 0.0d0
 
   len1 = sqrt((xseedt(2)-xseedt(1))**2.d0 + (zseedt(2)-zseedt(1))**2.d0)
   do i = 2, nptt - 1
     len2 = sqrt((xseedt(i+1)-xseedt(i))**2.d0 + (zseedt(i+1)-zseedt(i))**2.d0)
     growth1 = len2/len1
     growth2 = len1/len2
-    if (max(growth1,growth2) > growth_allowed)                                 &
-        growth_allowed = 1.5d0*max(growth1,growth2)
+    if (max(growth1,growth2) > max_growth_top)          &
+        max_growth_top = max(growth1,growth2)
+    if (max_growth_seed_mult * max(growth1,growth2) > growth_allowed)          &
+        growth_allowed = max_growth_seed_mult*max(growth1,growth2)
     len1 = len2
   end do
+  
+  write(text,'(F8.4)') max_growth_top
+  text = adjustl(text)
+  write(*,*) "   Max growth rate at top: "//trim(text)
 
 ! Bottom surface growth rates
 
@@ -84,10 +93,16 @@ subroutine check_seed()
     len2 = sqrt((xseedb(i+1)-xseedb(i))**2.d0 + (zseedb(i+1)-zseedb(i))**2.d0)
     growth1 = len2/len1
     growth2 = len1/len2
-    if (max(growth1,growth2) > growth_allowed)                               &
-        growth_allowed = 1.5d0*max(growth1,growth2)
+    if (max(growth1,growth2) > max_growth_bot)          &
+        max_growth_bot = max(growth1,growth2)
+    if (max_growth_seed_mult * max(growth1,growth2) > growth_allowed)          &
+        growth_allowed = max_growth_seed_mult*max(growth1,growth2)
     len1 = len2
   end do
+  
+  write(text,'(F8.4)') max_growth_bot
+  text = adjustl(text)
+  write(*,*) "   Max growth rate at bot: "//trim(text)
 
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
@@ -101,24 +116,31 @@ subroutine check_seed()
     curr_foil%z(i+nptt) = zseedb(i+1)!/foilscale - zoffset
   end do
   
-! Too blunt or sharp leading edge
+! Too blunt, sharp or disparate leading edge
 
   panang1 = atan((zseedt(2)-zseedt(1))/(xseedt(2)-xseedt(1))) *                &
             180.d0/acos(-1.d0)
   panang2 = atan((zseedb(1)-zseedb(2))/(xseedb(2)-xseedb(1))) *                &
             180.d0/acos(-1.d0)
   maxpanang = max(panang2,panang1)
-  if (maxpanang > 89.99d0) then
-    write(text,'(F8.4)') maxpanang
-    text = adjustl(text)
-    write(*,*) "LE panel angle: "//trim(text)//" degrees"
+  minpanang = min(panang2,panang1)
+  write(text,'(F8.4)') maxpanang
+  text = adjustl(text)
+  write(*,*) "   Max LE panel angle: "//trim(text)//" degrees"
+  if (maxpanang > max_leading_edge_angle) then
     call ask_stop("Seed airfoil's leading edge is too blunt.")
   end if
-  if (abs(panang1 - panang2) > 20.d0) then
-    write(text,'(F8.4)') abs(panang1 - panang2)
-    text = adjustl(text)
-    write(*,*) "LE panel angle: "//trim(text)//" degrees"
+  write(text,'(F8.4)') minpanang
+  text = adjustl(text)
+  write(*,*) "   Min LE panel angle: "//trim(text)//" degrees"
+  if (minpanang < min_leading_edge_angle) then
     call ask_stop("Seed airfoil's leading edge is too sharp.")
+  end if
+  write(text,'(F8.4)') abs(panang1 - panang2)
+  text = adjustl(text)
+  write(*,*) "   Dif LE panel angle: "//trim(text)//" degrees"
+  if (abs(panang1 - panang2) > dif_leading_edge_angle) then
+    call ask_stop("Seed airfoil's leading edge is too disparate.")
   end if
 
 ! Interpolate either bottom surface to top surface x locations or vice versa
@@ -130,7 +152,9 @@ subroutine check_seed()
     allocate(zb_interp(nptt))
     allocate(thickness(nptt))
     nptint = nptt
-    call interp_vector(xseedb, zseedb, xseedt, zb_interp)
+    side=.false.
+    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedt,zb_interp(1:nptt),side)
+    !call interp_vector(xseedb, zseedb, xseedt, zb_interp)
     x_interp = xseedt
     zt_interp = zseedt
   else
@@ -139,7 +163,9 @@ subroutine check_seed()
     allocate(zb_interp(nptb))
     allocate(thickness(nptb))
     nptint = nptb
-    call interp_vector(xseedt, zseedt, xseedb, zt_interp)
+    side=.true.
+    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedb,zt_interp(1:nptb),side)
+    !call interp_vector(xseedt, zseedt, xseedb, zt_interp)
     x_interp = xseedb
     zb_interp = zseedb
   end if
@@ -158,10 +184,13 @@ subroutine check_seed()
     if (thickness(i) > maxthick) maxthick = thickness(i)
 
 !   Check if thinner than specified wedge angle on back half of airfoil
-    
-    if (x_interp(i) > 0.5d0) then
+    max_te_angle = 0.d0
+    if (x_interp(i) > te_angle_x_apply) then
       gapallow = tegap + 2.d0 * heightfactor * (x_interp(nptint) -             &
                                                 x_interp(i))
+      te_angle = 2.0d0*abs( atan( (thickness(i) - tegap) /                     &
+                             (2.0d0 * (x_interp(nptint) - x_interp(i))) ) )
+      if (te_angle .GT. max_te_angle) max_te_angle = te_angle
       if (thickness(i) < gapallow) then
         xtrans = x_interp(i)!/foilscale - xoffset
         write(text,'(F8.4)') xtrans
@@ -172,8 +201,14 @@ subroutine check_seed()
     end if
 
   end do
+  
+  write(text,'(F8.4)') max_te_angle/pi*180.d0
+  text = adjustl(text)
+  write(text2,'(F8.4)') te_angle_x_apply
+  text2 = adjustl(text2)
+  write(*,*) "   MAx TE angle is "//trim(text)//" from "//trim(text2)//" to 1.0"
 
-! Too thin on back half
+! Too thin on specified back
 
   if (penaltyval > 0.d0)                                                       &
      call ask_stop("Seed airfoil is thinner than min_te_angle near the "//&
@@ -183,19 +218,21 @@ subroutine check_seed()
 ! Check additional thickness constraints
 
   if (naddthickconst > 0) then
-    call interp_vector(x_interp, thickness,                                    &
-                       addthick_x(1:naddthickconst), add_thickvec)
+    call spline_interp_t(curr_foil%npoint,curr_foil%x,curr_foil%z,             &
+                         addthick_x(1:naddthickconst),add_thickvec)
+    !call interp_vector(x_interp, thickness,                                    &
+    !                   addthick_x(1:naddthickconst), add_thickvec)
 
     addthick_violation = .false.
     do i = 1, naddthickconst
+      write(text,'(F8.4)') addthick_x(i)
+      text = adjustl(text)
+      write(text2,'(F8.4)') add_thickvec(i)
+      text2 = adjustl(text2)
+      write(*,*) "   Thickness at x = "//trim(text)//": "//trim(text2)
       if ( (add_thickvec(i) < addthick_min(i)) .or.                            &
            (add_thickvec(i) > addthick_max(i)) ) then
         addthick_violation = .true.
-        write(text,'(F8.4)') addthick_x(i)
-        text = adjustl(text)
-        write(text2,'(F8.4)') add_thickvec(i)
-        text2 = adjustl(text2)
-        write(*,*) "Thickness at x = "//trim(text)//": "//trim(text2)
       end if
     end do
 
@@ -210,21 +247,17 @@ subroutine check_seed()
   deallocate(zb_interp)
   deallocate(thickness)
 
-! Max thickness too low
+! Max thickness too low or too high
 
+  write(text,'(F8.4)') maxthick
+  text = adjustl(text)
+  write(*,*) "   Max Thickness: "//trim(text)
+  
   if (maxthick < min_thickness) then
-    write(text,'(F8.4)') maxthick
-    text = adjustl(text)
-    write(*,*) "Thickness: "//trim(text)
     call ask_stop("Seed airfoil violates min_thickness constraint.")
   end if
 
-! Max thickness too high
-
   if (maxthick > max_thickness) then
-    write(text,'(F8.4)') maxthick
-    text = adjustl(text)
-    write(*,*) "Thickness: "//trim(text)
     call ask_stop("Seed airfoil violates max_thickness constraint.")
   end if
 
@@ -234,8 +267,8 @@ subroutine check_seed()
 
 !   Compute curvature on top and bottom surfaces
 
-    curvt = curvature(nptt, xseedt, zseedt)
-    curvb = curvature(nptb, xseedb, zseedb)
+    curvt = nu_curvature(nptt, xseedt, zseedt)
+    curvb = nu_curvature(nptb, xseedb, zseedb)
 
 !   Check number of reversals that exceed the threshold
 
@@ -251,11 +284,11 @@ subroutine check_seed()
           ztrans = zseedt(i)!/foilscale - zoffset
           write(text2,'(F8.4)') ztrans
           text2 = adjustl(text2)
-          write(*,*) "Curvature reversal on top surface near (x, z) = ("//&
+          write(*,*) "   Curvature reversal on top surface near (x, z) = ("//&
                          trim(text)//", "//trim(text2)//")"
           write(text,'(F8.4)') curvt(i)
           text = adjustl(text)
-          write(*,*) "Curvature: "//trim(text)
+          write(*,*) "   Curvature: "//trim(text)
           nreversalst = nreversalst + 1
         end if
         curv1 = curv2
@@ -279,11 +312,11 @@ subroutine check_seed()
           ztrans = zseedb(i)!/foilscale - zoffset
           write(text2,'(F8.4)') ztrans
           text2 = adjustl(text2)
-          write(*,*) "Curvature reversal on bot surface near (x, z) = ("//&
+          write(*,*) "   Curvature reversal on bot surface near (x, z) = ("//&
                          trim(text)//", "//trim(text2)//")"
           write(text,'(F8.4)') curvb(i)
           text = adjustl(text)
-          write(*,*) "Curvature: "//trim(text)
+          write(*,*) "   Curvature: "//trim(text)
           nreversalsb = nreversalsb + 1
         end if
         curv1 = curv2
@@ -355,32 +388,30 @@ subroutine check_seed()
                  actual_flap_degrees(1:noppoint), xfoil_options, file_options, &
                  lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
   first_run_xfoil=.false.
+  write(*,*)
   
 ! Penalty for too large panel angles
-
-  if (AMAX > 25.d0) then
-    write(text,'(F8.4)') AMAX
-    text = adjustl(text)
-    write(*,*) "Max panel angle: "//trim(text)
+  
+  write(text,'(F8.4)') AMAX
+  text = adjustl(text)
+  write(*,*) "   Max panel angle: "//trim(text)
+  
+  if (AMAX > max_panel_angle) then
     call ask_stop("Seed airfoil panel angles are too large. Try adjusting "//&
                   "xfoil_paneling_options.")
   end if
 
-! Camber too high
+! Camber too high or too low
 
+  write(text,'(F8.4)') CAMBR
+  text = adjustl(text)
+  write(*,*) "   Max Camber: "//trim(text)
+  
   if (CAMBR > max_camber) then
-    write(text,'(F8.4)') CAMBR
-    text = adjustl(text)
-    write(*,*) "Camber: "//trim(text)
     call ask_stop("Seed airfoil violates max_camber constraint.")
   end if
 
-! Camber too low
-
   if (CAMBR < min_camber) then
-    write(text,'(F8.4)') CAMBR
-    text = adjustl(text)
-    write(*,*) "Camber: "//trim(text)
     call ask_stop("Seed airfoil violates min_camber constraint.")
   end if
 
@@ -400,40 +431,61 @@ subroutine check_seed()
   do i = 1, noppoint
 	! moment contraint
     if (trim(moment_constraint_type(i)) == 'use_seed') then
+      write(text,'(F8.4)') moment(i)
+      text = adjustl(text)
+      write(text2,*) i
+      text2 = adjustl(text2)
+      write(*,*) "   Moment at op "//trim(text2)//" : "//trim(text)
       min_moment(i) = moment(i)
     elseif (trim(moment_constraint_type(i)) == 'specify') then
+      write(text,'(F8.4)') moment(i)
+      text = adjustl(text)
+      write(text2,*) i
+      text2 = adjustl(text2)
+      write(*,*) "   Moment at op "//trim(text2)//": "//trim(text)
       if (moment(i) < min_moment(i)) then
-        write(text,'(F8.4)') moment(i)
-        text = adjustl(text)
-        write(*,*) "Moment: "//trim(text)
         write(text,*) i
         text = adjustl(text)
         call ask_stop("Seed airfoil violates min_moment constraint for "//&
                       "operating point "//trim(text)//".")
       end if
-  end if
+    end if
 	! lift contraint
     if (trim(lift_constraint_type(i)) == 'use_seed') then
+      write(text,'(F8.4)') lift(i)
+      text = adjustl(text)
+      write(text2,*) i
+      text2 = adjustl(text2)
+      write(*,*) "   Lift at op "//trim(text2)//" : "//trim(text)
       min_lift(i) = lift(i)
     elseif (trim(lift_constraint_type(i)) == 'specify') then
+      write(text,'(F8.4)') lift(i)
+      text = adjustl(text)
+      write(text2,*) i
+      text2 = adjustl(text2)
+      write(*,*) "   Lift at op "//trim(text2)//" : "//trim(text)
       if (lift(i) < min_lift(i)) then
-        write(text,'(F8.4)') lift(i)
-        text = adjustl(text)
-        write(*,*) "Lift: "//trim(text)
         write(text,*) i
         text = adjustl(text)
         call ask_stop("Seed airfoil violates min_lift constraint for "//&
                       "operating point "//trim(text)//".")
       end if
-  end if
+    end if
 	! drag contraint
     if (trim(drag_constraint_type(i)) == 'use_seed') then
+      write(text,'(F8.4)') drag(i)
+      text = adjustl(text)
+      write(text2,*) i
+      text2 = adjustl(text2)
+      write(*,*) "   Drag at op "//trim(text2)//" : "//trim(text)
       max_drag(i) = drag(i)
     elseif (trim(drag_constraint_type(i)) == 'specify') then
+      write(text,'(F8.4)') drag(i)
+      text = adjustl(text)
+      write(text2,*) i
+      text2 = adjustl(text2)
+      write(*,*) "   Drag at op "//trim(text2)//" : "//trim(text)
       if (drag(i) > max_drag(i)) then
-        write(text,'(F8.4)') drag(i)
-        text = adjustl(text)
-        write(*,*) "Drag: "//trim(text)
         write(text,*) i
         text = adjustl(text)
         call ask_stop("Seed airfoil violates max_drag constraint for "//&
@@ -541,8 +593,9 @@ subroutine check_seed()
     end if
     scale_factor(i) = 1.d0/checkval
   end do
-
-  write(*,*) 'Airfoil passed all constraints'
+  
+  write(*,*)
+  write(*,*) ' Airfoil passed all constraints'
   write(*,*)
   
 end subroutine check_seed

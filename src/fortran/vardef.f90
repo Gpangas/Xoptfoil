@@ -84,7 +84,10 @@ module vardef
   double precision :: min_thickness, max_thickness, min_te_angle,              &
                       growth_allowed, min_flap_degrees, max_flap_degrees,      &
                       min_flap_x, max_flap_x, max_tcTE, min_tcTE, min_camber,  &
-                      max_camber
+                      max_camber, max_growth_seed_mult, min_leading_edge_angle,&
+                      max_leading_edge_angle, dif_leading_edge_angle,          &
+                      te_angle_x_apply, lift_check_tol, drag_check_tol,        &
+                      max_panel_angle
   double precision :: curv_threshold
   integer :: max_curv_reverse_top, max_curv_reverse_bot
   ! added lift and drag constraints
@@ -93,6 +96,7 @@ module vardef
                                           drag_constraint_type
   character(80) :: airfoil_file
   double precision, dimension(max_op_points) :: min_moment, min_lift, max_drag
+
   character(17) :: shape_functions
   double precision, dimension(:), allocatable :: xmatcht, xmatchb, zmatcht,    &
                                                  zmatchb

@@ -2905,7 +2905,7 @@ C----- delete points on upper airfoil surface which "disappeared".
        IB1 = IB1-IDIFT
        IB2 = IB2-IDIFT
        DO 21 I=IT2+1, NB
-         write(*,*) XB(I), XB(I+IDIFT)
+C         write(*,*) XB(I), XB(I+IDIFT)
          SB(I) = SB(I+IDIFT)
          XB(I) = XB(I+IDIFT)
          YB(I) = YB(I+IDIFT)
@@ -3060,11 +3060,11 @@ C
         COEFFB = ( (D_P2 - COEFFA*3.0*(X_P2 - X_P1)**2.0)
      &           / (X_P2 - X_P1)**2.0 )
 C
-        write(*,*)
-        write(*,*) XB(IB1)
-        write(*,*) X_P1
-        write(*,*) X_P2
-        write(*,*)
+C        write(*,*)
+C        write(*,*) XB(IB1)
+C        write(*,*) X_P1
+C        write(*,*) X_P2
+C        write(*,*)
         DO 41 IP=0, NPADD
           DXUSE =  DXB*(FLOAT(IP))
 C          write(*,*) DXUSE
