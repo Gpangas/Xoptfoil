@@ -199,6 +199,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   character(100) :: restart_status_file
   character(19) :: restart_status
   character(14) :: stop_reason
+  double precision :: f0_penalty
+  character(200) :: message
 
   ! Set search types
   
@@ -228,11 +230,42 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
   call parametrization_init(optdesign, x0)
 
+  write(*,*)
+  write(*,*) 'x0: '
+  write(*,*) x0
+  
+! Set up mins and maxes
+  
+  call parametrization_maxmin(optdesign, x0, xmin, xmax)
+  
+  write(*,*)
+  write(*,*) 'xmin: '
+  write(*,*) xmin
+  write(*,*) 'xmax: '
+  write(*,*) xmax
+  
 ! Compute f0_ref, ignoring penalties for violated constraints
   objfunction_return = objective_function_nopenalty(x0) 
   f0_ref = objfunction_return%value
-  !write(*,*) f0_ref
-  !stop
+  message = objfunction_return%message
+  
+  write(*,*)
+  write(*,*) 'f0_ref:     ', f0_ref
+  write(*,*) 'message: ', message
+  
+! Compute with penalty
+  objfunction_return = objective_function(x0) 
+  f0_penalty = objfunction_return%value
+  message = objfunction_return%message
+  
+  write(*,*)
+  write(*,*) 'f0_penalty: ', f0_penalty
+  write(*,*) 'message: ', message
+  
+! Wait for user to check information
+  write(*,*)
+  write(*,*) 'Press Enter to continue'
+  read(*,*) 
 
 ! Set default restart status (global or local optimization) from user input
 
@@ -321,9 +354,6 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 ! Global optimization
 
   if (trim(restart_status) == 'global_optimization') then
-
-!   Set up mins and maxes
-    call parametrization_maxmin(optdesign, xmin, xmax)
 
 !   Write restart status to file
 
@@ -463,7 +493,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
-    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    tefact = 1.d0/(max_tcTE - min_tcTE)
     actual_tcTE = optdesign(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
       int_tcTE_spec)/tefact + min_tcTE
   else
@@ -481,12 +511,12 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     
 !   Get actual flap angles based on design variables
 
-    ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
+    ffact = 1.d0/(max_flap_degrees - min_flap_degrees)
     actual_flap_degrees(1:noppoint) = flap_degrees(1:noppoint)
     dvcounter = dvbbnd2 + 1
     do i = 1, nflap_optimize
       flap_idx = flap_optimize_points(i)
-      actual_flap_degrees(flap_idx) = optdesign(dvcounter)/ffact
+      actual_flap_degrees(flap_idx) = optdesign(dvcounter)/ffact+min_flap_degrees
       dvcounter = dvcounter + 1
     end do
 !   Set identical flap angles
@@ -495,7 +525,7 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
       actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
     end do
 !   Get flap chord based on design variables
-    fxfact = initial_perturb/(max_flap_x - min_flap_x)
+    fxfact = 1.d0/(max_flap_x - min_flap_x)
     actual_x_flap = optdesign(dvcounter)/fxfact + min_flap_x
     
 !   Run xfoil for requested operating points

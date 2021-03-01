@@ -47,7 +47,7 @@ module vardef
 
     double precision :: value
     integer :: message_code
-    character(100) :: message
+    character(200) :: message
     
   end type objfunction_type
   
@@ -110,7 +110,7 @@ module vardef
   double precision, dimension(:), allocatable :: modest_seed
   double precision, dimension(:), allocatable :: modesb_seed
   
-  double precision :: initial_perturb, tcTE_seed
+  double precision :: abs_initial_perturb, rel_initial_perturb, tcTE_seed
   double precision :: min_bump_width
   logical :: kulfan_bussoletti_LEM
   integer :: int_kulfan_bussoletti_LEM

@@ -48,7 +48,8 @@ subroutine check_seed()
   double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
-  double precision :: pi, te_angle, max_te_angle, max_growth_top, max_growth_bot
+  double precision :: pi, te_angle, actual_min_te_angle, max_growth_top,       &
+                      max_growth_bot
   integer :: i, nptt, nptb, nreversalst, nreversalsb, nptint, flap_idi
   character(30) :: text, text2
   character(14) :: opt_type
@@ -103,6 +104,10 @@ subroutine check_seed()
   write(text,'(F8.4)') max_growth_bot
   text = adjustl(text)
   write(*,*) "   Max growth rate at bot: "//trim(text)
+  
+  write(text,'(F8.4)') growth_allowed
+  text = adjustl(text)
+  write(*,*) "   Max growth rate allowed: "//trim(text)
 
 ! Format coordinates in a single loop in derived type. Also remove translation
 ! and scaling to ensure Cm_x=0.25 doesn't change.
@@ -175,6 +180,7 @@ subroutine check_seed()
   tegap = zseedt(nptt) - zseedb(nptb)
   maxthick = 0.d0
   heightfactor = tan(min_te_angle*acos(-1.d0)/180.d0/2.d0)
+  actual_min_te_angle = 2.d0
 
   do i = 2, nptint - 1
 
@@ -184,13 +190,12 @@ subroutine check_seed()
     if (thickness(i) > maxthick) maxthick = thickness(i)
 
 !   Check if thinner than specified wedge angle on back half of airfoil
-    max_te_angle = 0.d0
     if (x_interp(i) > te_angle_x_apply) then
       gapallow = tegap + 2.d0 * heightfactor * (x_interp(nptint) -             &
                                                 x_interp(i))
       te_angle = 2.0d0*abs( atan( (thickness(i) - tegap) /                     &
                              (2.0d0 * (x_interp(nptint) - x_interp(i))) ) )
-      if (te_angle .GT. max_te_angle) max_te_angle = te_angle
+      if (te_angle .LT. actual_min_te_angle) actual_min_te_angle = te_angle
       if (thickness(i) < gapallow) then
         xtrans = x_interp(i)!/foilscale - xoffset
         write(text,'(F8.4)') xtrans
@@ -202,11 +207,11 @@ subroutine check_seed()
 
   end do
   
-  write(text,'(F8.4)') max_te_angle/pi*180.d0
+  write(text,'(F8.4)') actual_min_te_angle/pi*180.d0
   text = adjustl(text)
   write(text2,'(F8.4)') te_angle_x_apply
   text2 = adjustl(text2)
-  write(*,*) "   MAx TE angle is "//trim(text)//" from "//trim(text2)//" to 1.0"
+  write(*,*) "   Min TE angle is "//trim(text)//" from "//trim(text2)//" to 1.0"
 
 ! Too thin on specified back
 

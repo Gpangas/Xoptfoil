@@ -521,8 +521,10 @@ subroutine sort_vector(vec, idxs)
   end do
 
 end subroutine sort_vector
-!==============================================================================!
+
+!=============================================================================80
 ! Computes the binomial coefficient nCi.
+!=============================================================================80
 pure function BinCoef(n,i)
 
   implicit none
@@ -533,8 +535,9 @@ pure function BinCoef(n,i)
   BinCoef   = factorial(n)/(factorial(i)*factorial(n-i))
 
 end function BinCoef
-
+!=============================================================================80
 ! Function to calculate the factorial of a number.
+!=============================================================================80
 Pure real(8) function factorial(n)
     
   implicit none
@@ -548,8 +551,9 @@ Pure real(8) function factorial(n)
   end do
 
 end function factorial
-
-! Function that computes the value of the "class fucntion" of the KB parameterization.
+!=============================================================================80
+! Function that computes the value of the "class fucntion" of the KBP.
+!=============================================================================80
 pure function fx(x)
 
   implicit none
@@ -561,7 +565,9 @@ pure function fx(x)
 
 end function fx
 
-  ! ----------------------------------------------------------------------------
+!=============================================================================80
+! shape function for KBP
+!=============================================================================80
 function surface_function(x,weight,BPO, int_LEM)
 
   implicit none
@@ -578,17 +584,21 @@ function surface_function(x,weight,BPO, int_LEM)
 
   ! Bezier computation loop
   do i=0,BPO
-    surface_function = surface_function+weight(i+1)*BinCoef(BPO,i)*(x**i)*((1.0d0-x)**(BPO-i))
+    surface_function = surface_function + weight(i+1) * BinCoef(BPO,i) *       &
+                                           (x**i)*((1.0d0-x)**(BPO-i))
   end do
 
   if (int_LEM .eq. 1) then
-    surface_function = surface_function+weight(BPO+1+int_LEM)*(x**0.5)*((1.0d0-x)**(BPO-0.5))
+    surface_function = surface_function + weight(BPO+1+int_LEM) *              &
+                                           (x**0.5)*((1.0d0-x)**(BPO-0.5))
   end if
     
   return
 
-  end function surface_function
-  
+end function surface_function
+!=============================================================================80
+! SVD solve subroutine
+!=============================================================================80
 SUBROUTINE Solve_SVD(np,a,b,x)
 
 implicit none
@@ -631,11 +641,12 @@ SUBROUTINE svbksb(u,w,v,m,n,mp,np,b,x)
 INTEGER m,mp,n,np,NMAX
 REAL b(mp),u(mp,np),v(np,np),w(np),x(np)
 PARAMETER (NMAX=500) !Maximum anticipated value of n.
-!Solves A · X = B for a vector X, where A is specified by the arrays u, w, v as returned by
-!svdcmp. m and n are the logical dimensions of a, and will be equal for square matrices. mp
-!and np are the physical dimensions of a. b(1:m) is the input right-hand side. x(1:n) is
-!the output solution vector. No input quantities are destroyed, so the routine may be called
-!sequentially with different b’s.
+!Solves A · X = B for a vector X, where A is specified by the arrays u, w, v as 
+!returned by svdcmp. m and n are the logical dimensions of a, and will be equal 
+!for square matrices. mp and np are the physical dimensions of a. b(1:m) is the 
+!input right-hand side. x(1:n) is the output solution vector. No input 
+!quantities are destroyed, so the routine may be called sequentially with 
+!different b’s.
 INTEGER i,j,jj
 REAL s,tmp(NMAX)
 do j=1,n !Calculate U^T B.

@@ -103,7 +103,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   double precision, dimension(size(xmin,1),pso_options%pop) :: dv, vel,        &
                                                                bestdesigns
   integer, dimension(pso_options%pop) :: message_codes
-  character(100), dimension(pso_options%pop) :: messages
+  character(200), dimension(pso_options%pop) :: messages
   type(objfunction_type) :: objfunction_return
   logical :: use_x0, converged, signal_progress, new_history_file
   integer :: stepstart, steptime, restarttime
@@ -114,6 +114,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   character(25) :: relfminchar
   character(80), dimension(20) :: commands
   character(100) :: histfile
+  integer :: CHUNK = 1
 
   nconstrained = size(constrained_dvs,1)
 
@@ -367,7 +368,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 !$omp end master
 !$omp barrier
 
-!$omp do
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
 
 !   Update each particle's position, evaluate objective function, etc.
 
@@ -578,7 +579,7 @@ subroutine pso_write_restart(step, designcounter, dv, objval, vel, speed,      &
   double precision, intent(in) :: wcurr
   integer, intent(in) :: time
   integer, dimension(:), intent(in) :: message_codes
-  character(100), dimension(:), intent(in) :: messages
+  character(200), dimension(:), intent(in) :: messages
 
   character(100) :: restfile
   integer :: iunit
@@ -635,7 +636,7 @@ subroutine pso_read_restart(step, designcounter, dv, objval, vel, speed,       &
   double precision, intent(out) :: wcurr
   integer, intent(out) :: time
   integer, dimension(:), intent(inout) :: message_codes
-  character(100), dimension(:), intent(inout) :: messages
+  character(200), dimension(:), intent(inout) :: messages
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -742,7 +743,7 @@ subroutine pso_write_dvs(step, dv, objval, message_codes, messages, x0, f0,    &
   double precision, dimension(:), intent(in) ::  x0, xopt, objval
   double precision, dimension(:,:), intent(in) :: dv
   integer, dimension(:), intent(in) :: message_codes
-  character(100), dimension(:), intent(in) :: messages
+  character(200), dimension(:), intent(in) :: messages
 
   integer :: i,j
   

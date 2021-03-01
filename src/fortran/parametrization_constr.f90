@@ -16,36 +16,15 @@ module parametrization_constr
 !
 !/////////////////////////////////////////////////////////////////////////////80
 
-!!=============================================================================80
-!!
-!! Populates shape function arrays for KBP shape functions
-!!
-!!=============================================================================80
-!subroutine KBP_shape(x,weight,shape_function)
-!  
-!  use math_deps, only : BinCoef
+! ----------------------------------------------------------------------------80
 !
-!  implicit none
+! Subroutine that implements the Kulfan-Bussoletti Parameterization,     
+! weights to coordinates.
 !
-!  double precision, dimension(:), intent (in) ::  x, weight
-!  double precision, dimension(:,:), intent(inout) :: shape_function
-!    
-!  integer :: i, j, BPO
-!  
-!  BPO = size(weight,1)-1
-!  
-!  do i=0,BPO
-!    do j=1,size(x,1)
-!      shape_function(i+1,j) = weight(i+1)*BinCoef(BPO,i)*(x(j)**i)*((1.0d0-x(j))**(BPO-i))
-!    end do
-!  end do
-!
-!end subroutine KBP_shape
-
-! ----------------------------------------------------------------------------
-! Subroutine that implements the Kulfan-Bussoletti Parameterization, weights to coordinates.
-subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
-                       symmetrical, tTE)
+! ----------------------------------------------------------------------------80
+  
+  subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,   &
+    symmetrical, tTE)
   use vardef, only : int_kulfan_bussoletti_LEM
   
   implicit none
@@ -72,11 +51,13 @@ subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
   
   ! Calculates the Z coordinate of the airfoil
   do i=1,nPointst
-    call KBP_Point(Wu, tTE/2.0d0, nu, Xu_seed(i), Zu(i), int_kulfan_bussoletti_LEM)
+    call KBP_Point(Wu, tTE/2.0d0, nu, Xu_seed(i), Zu(i),                       &
+                                                      int_kulfan_bussoletti_LEM)
   end do
   if (.not. symmetrical) then
     do i=1,nPointsb
-      call KBP_Point(Wl, -tTE/2.0d0, nl, Xl_seed(i), Zl(i), int_kulfan_bussoletti_LEM)
+      call KBP_Point(Wl, -tTE/2.0d0, nl, Xl_seed(i), Zl(i),                    &
+                                                      int_kulfan_bussoletti_LEM)
     end do
     
   ! For symmetrical airfoils, just mirror the top surface
@@ -87,93 +68,110 @@ subroutine KBP_airfoil(Xu_seed, Zu_seed, Xl_seed, Zl_seed, Wu, Wl, Zu, Zl,     &
   end if
 
   
-  end subroutine  KBP_airfoil
+end subroutine  KBP_airfoil
   
-  ! ----------------------------------------------------------------------------
-! Subroutine that computes one point in the the Kulfan-Bussoletti Parameterization.
+! ----------------------------------------------------------------------------80
+!
+! Subroutine that computes one point in the the Kulfan-Bussoletti 
+! Parameterization.
+!
+! ----------------------------------------------------------------------------80
+
 subroutine KBP_Point(weight,tTE,BPO,x,z, int_LEM)
   use math_deps, only : surface_function
   
   implicit none
 
-  integer, intent (in) ::       BPO               ! BPO->Bernstein Polynomial Order
-  real*8, intent (in) ::        x, tTE            ! non-dimenstional
-  real*8, intent (out) ::       z
-  integer, intent (in) ::       int_LEM           ! use LEM ? yes (1) or no (0)
-  real*8, dimension(BPO+1+int_LEM) ::   weight
+  integer, intent (in) ::       BPO            ! BPO->Bernstein Polynomial Order
+  real*8, intent (in) ::        x, tTE         ! non-dimenstional x and z_TE
+  real*8, intent (out) ::       z              ! non-dimenstional z
+  integer, intent (in) ::       int_LEM        ! use LEM? yes (1) or no (0)
+  real*8, dimension(BPO+1+int_LEM) ::   weight ! weights
 
   z         = (x**0.5)*(1.0d0-x)*surface_function(x,weight,BPO, int_LEM)+x*tTE
 
 end subroutine KBP_Point
 
-  ! ----------------------------------------------------------------------------
-! Subroutine that implements the Kulfan-Bussoletti Parameterization, coordinates to weights.
+! ----------------------------------------------------------------------------80
+!
+! Subroutine that implements the Kulfan-Bussoletti Parameterization, 
+! coordinates to weights.
+!
+! ----------------------------------------------------------------------------80
 subroutine KBP_init(Xu, Zu, Xl, Zl, Wu, Wl)
   
-  use vardef, only : nparams_top, nparams_bot, int_kulfan_bussoletti_LEM
+  use vardef, only : int_kulfan_bussoletti_LEM
 
   implicit none
 
-  real*8, dimension(:), intent(in) ::  Xu, Xl, Zu, Zl        ! airfoil coordinates
-  real*8, dimension(nparams_top+int_kulfan_bussoletti_LEM), intent(inout) :: Wu                    ! array with the weights of the Bernstein polinomials
-  real*8, dimension(nparams_bot+int_kulfan_bussoletti_LEM), intent(inout) :: Wl                    ! array with the weights of the Bernstein polinomials
-  real*8, dimension(:), allocatable :: Wu_send, Wl_send      ! array with the weights of the Bernstein polinomials
+  real*8, dimension(:), intent(in) ::    Xu, Xl, Zu, Zl    ! airfoil coordinates
+  real*8, dimension(:), intent(inout) :: Wu ! weights of Bernstein polinomials
+  real*8, dimension(:), intent(inout) :: Wl ! weights of Bernstein polinomials
 
-  integer ::                           nu, nl                ! n is the order of the polynomial
-  integer ::                           i, j
-  real*8 ::                            tTE
-  write(*,*) "init", int_kulfan_bussoletti_LEM
+  integer :: nu, nl ! n is the order of the polynomial
+  integer :: mu, ml
+  real*8 ::  tTE
+
   ! Set the value of zcTE, dimensionless trailing edge thickness
-  i       = size(Zu,1)
-  j       = size(Zl,1)
-  tTE    = Zu(i)-Zl(j)
+  mu       = size(Zu,1)
+  ml       = size(Zl,1)
+  tTE    = Zu(mu)-Zl(ml)
 
-  nu=nparams_top-1
-  nl=nparams_bot-1
+  nu = size(Wu)-1-int_kulfan_bussoletti_LEM
+  nl = size(Wl)-1-int_kulfan_bussoletti_LEM
   
-  allocate(Wu_send(nu+1+int_kulfan_bussoletti_LEM))
-  allocate(Wl_send(nl+1+int_kulfan_bussoletti_LEM))
   ! Set the weights of the Bernstein Polynomials.
-  call KBParameterization_fitting(i,Xu,Zu,nu,tTE/2.0d0,int_kulfan_bussoletti_LEM,Wu_send)
-  Wu=Wu_send
-  call KBParameterization_fitting(j,Xl,Zl,nl,-tTE/2.0d0,int_kulfan_bussoletti_LEM,Wl_send)
-  Wl=Wl_send
+  call KBParameterization_fitting(mu,Xu,Zu,nu,tTE/2.0d0,                       &
+                                                   int_kulfan_bussoletti_LEM,Wu)
+  call KBParameterization_fitting(ml,Xl,Zl,nl,-tTE/2.0d0,                      &
+                                                   int_kulfan_bussoletti_LEM,Wl)
 
-  write(*,*) nu, nl
-  write(*,*) size(wu,1), size(wl,1)
-  write(*,*)
-  do i=1,size(wu,1)
-    write(*,*) wu(i), wl(i)
-  end do
-  
+  !write(*,*) nu, nl
+  !write(*,*) size(wu,1), size(wl,1)
+  !write(*,*)
+  !do i=1,size(wu,1)
+  !  write(*,*) wu(i), wl(i)
+  !end do
 end subroutine KBP_init
 
-! ----------------------------------------------------------------------------
-! Fits a KB Parameterization of order n to the XZ coordinates of a given airfoil (top or bottom half)
-!  using least squares to calculate the weights.
+! ----------------------------------------------------------------------------80
+!
+! Fits a KB Parameterization of order n to the XZ coordinates of 
+! a given airfoil (top or bottom half) using least squares to 
+! calculate the weights.
+!
+! (input) ndata     -> no. of data points
+! (input) X, Z      -> airfoil coordinates
+! (input) zcTE      -> dimensionless trailing edge coordinate
+! (input) n         -> degree of polynomial
+! (input) int_LEM   -> whether to use LEM: yes (1) or no (0)
+! (input/output) W  -> weight vector 
+!
+! ----------------------------------------------------------------------------80
+
 subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
 
   use math_deps, only : SOLVE_SVD, fx, BINCOEF
 
   implicit none
   
-  integer, intent(in) ::                                      ndata           ! no. of data points
-  double precision, intent (in), dimension(ndata) ::          X, Z
-  double precision, intent (in) ::                            zcTE            ! dimensionless trailing edge thickness
-  integer, intent (in) ::                                     n        ! degree of polynomial
-  integer, intent (in) ::                                     int_LEM           ! use LEM ? yes (1) or no (0)
-  double precision, intent (out), dimension(n+1+int_LEM) ::   W               ! weight vector for the KB parameterization Bernstein Polynomials
+  integer, intent(in) ::                                  ndata
+  double precision, intent (in), dimension(ndata) ::      X, Z
+  double precision, intent (in) ::                        zcTE
+  integer, intent (in) ::                                 n
+  integer, intent (in) ::                                 int_LEM
+  double precision, intent (inout), dimension(:) ::       W
   
-  double precision, dimension(ndata,n+1+int_LEM) ::           G !G.W=F
-  double precision, dimension(ndata) ::                       F
+  double precision, dimension(ndata,n+1+int_LEM) ::       G !G.W=F
+  double precision, dimension(ndata) ::                   F
   
-  double precision, dimension(n+1+int_LEM,ndata) ::           G_trans
+  double precision, dimension(n+1+int_LEM,ndata) ::       G_trans
   
-  double precision, dimension(n+1+int_LEM,n+1+int_LEM) ::     A
-  double precision, dimension(n+1+int_LEM) ::                 B
-  real, dimension(n+1+int_LEM) ::                             W_send
+  double precision, dimension(n+1+int_LEM,n+1+int_LEM) :: A
+  double precision, dimension(n+1+int_LEM) ::             B
+  real, dimension(n+1+int_LEM) ::                         W_send
   
-  integer ::                                                  i,j
+  integer ::                                              i,j
     
   F  = 0.0d0
   G  = 0.0d0  
@@ -181,13 +179,13 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
   do i=1,ndata
     F(i)=Z(i)-X(i)*zcTE
     do j=0,n
-      if ( (X(i) .eq. 0) .or. (X(i) .eq. 1)) then
-         G(i,j+1) = 0.0d0
+      if ( (X(i) .EQ. 0.d0) .or. (X(i) .EQ. 1.d0)) then
+        G(i,j+1) = 0.0d0
       else
         G(i,j+1) = fx(X(i)) * BINCOEF(n,j) * (X(i)**j)*((1.0d0-X(i))**(n-j))
       end if
     end do
-    if (int_LEM .eq. 1) then
+    if (int_LEM .EQ. 1) then
       G(i,n+1+int_LEM) = fx(X(i)) * (X(i)**0.5d0)*((1.0d0-X(i))**(n-0.5d0))
     end if
   end do
@@ -221,6 +219,7 @@ xmodest, xmodesb, modest, modesb, zt_new, zb_new,            &
 symmetrical , tTE)
   
   use vardef, only : b_spline_xtype, b_spline_degree
+  use math_deps, only : sort_vector
 
   implicit none
 
@@ -284,10 +283,14 @@ symmetrical , tTE)
     xmodest_use(nmodest)=xt_seed(nPointst)
     xmodest_use(3:nmodest-1)=modest(1:nmodest-3)
   
+    call sort_vector(xmodest_use)
+    
     xmodesb_use(1)=0.0d0
     xmodesb_use(2)=0.0d0
     xmodesb_use(nmodesb)=xb_seed(nPointsb)
     xmodesb_use(3:nmodesb-1)=modesb(1:nmodesb-3)
+    
+    call sort_vector(xmodesb_use)
     
     zmodest_use(1)=0.0d0
     zmodest_use(nmodest)=+tTE/2.0d0
@@ -532,13 +535,13 @@ subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
     allocate(modest(2*nparams_top-5), modesb(2*nparams_bot-5))
     allocate(modest_full(nparams_top*2), modesb_full(nparams_bot*2))
 
-    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,    &
-    xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
-    modest_full(1+nparams_top:2*nparams_top),top_b_matrix)
+    !call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,    &
+    !xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
+    !modest_full(1+nparams_top:2*nparams_top),top_b_matrix)
 
-   ! call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointst,     &
-   !xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
-   !modest_full(1+nparams_top:2*nparams_top))
+   call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointst,     &
+   xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
+   modest_full(1+nparams_top:2*nparams_top))
     
     !x
     modest(1:nparams_top-3)=modest_full(3:nparams_top-1)
@@ -546,13 +549,13 @@ subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
     modest(nparams_top-2:2*nparams_top-5)=modest_full(nparams_top+2:2*nparams_top-1)
     
 
-    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,    &
-    xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
-    modesb_full(1+nparams_bot:2*nparams_bot),bot_b_matrix)
+    !call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,    &
+    !xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
+    !modesb_full(1+nparams_bot:2*nparams_bot),bot_b_matrix)
 
-   ! call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointsb,     &
-   !xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
-   !modesb_full(1+nparams_bot:2*nparams_bot))
+   call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointsb,     &
+   xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
+   modesb_full(1+nparams_bot:2*nparams_bot))
     
     !x
     modesb(1:nparams_bot-3)=modesb_full(3:nparams_bot-1)
@@ -1187,13 +1190,17 @@ subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new, tT
   Gamma_le=modesb(4)
   Alpha_te=modesb(5)                
   Beta_te=modest(5)                           
-  Zte = 0.d0
+  Zte = 0.0d0
   dZte = tTE
   
   ! Calculating the control points of the bezier curves.
-  call SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_max,Rle,Beta_te,dZte,error_code_t)
+  call SetThicknessControlPoints(Xt_le, Xt_te, Yt_le, Yt_te,                   &
+                                 Xt_max, Yt_max, Kt_max, Rle, Beta_te, dZte,   &
+                                 error_code_t)
 
-  call SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,Gamma_le,Alpha_te,Zte,error_code_c)
+  call SetCamberControlPoints(Xc_le, Xc_te, Yc_le, Yc_te,                      &
+                              Xc_max, Yc_max, Kc_max, Gamma_le, Alpha_te, Zte, &
+                              error_code_c)
 
   ! Calculate the Z values top
   call BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,xPt,zPt_new,nPt,0)
@@ -1201,7 +1208,7 @@ subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new, tT
   ! Calculate the Z values bot
   call BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,xPb,zPb_new,nPb,1)
   
-  if (error_code_t /= 0) then
+  if (error_code_t /= 0 .OR. error_code_c /= 0) then
     zPt_new=0.d0
     zPb_new=0.d0
   end if
@@ -1209,22 +1216,26 @@ subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new, tT
 end subroutine BPP_airfoil
 
 ! -------------------------------------------------------------------
-subroutine SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_max,Rle,Beta_te,dZte,error_code)
+subroutine SetThicknessControlPoints(Xt_le, Xt_te, Yt_le, Yt_te,               &
+                                    Xt_max, Yt_max, Kt_max, Rle, Beta_te, dZte,&
+                                    error_code)
 
   implicit none
 
-  real*8, intent(in) :: Xt_max, Yt_max, Kt_max            ! Position and magnitude of the maximum thickness
-  real*8, intent(in) :: Rle                               ! Leading edge radius
-  real*8, intent(in) :: Beta_te                           ! Trailing edge wedge angle
-  real*8, intent(in) :: dZte                              ! Trailing edge thickness
-  real*8 :: Rt                                            ! Thickness auxiliar parameter
+  real*8, intent(in) :: Xt_max, Yt_max, Kt_max ! Position and magnitude of the 
+                                               ! maximum thickness
+  real*8, intent(in) :: Rle                    ! Leading edge radius
+  real*8, intent(in) :: Beta_te                ! Trailing edge wedge angle
+  real*8, intent(in) :: dZte                   ! Trailing edge thickness
+  real*8 :: Rt                                 ! Thickness auxiliar parameter
 
-  real*8, dimension(4), intent(inout) :: Xt_le, Xt_te, Yt_le, Yt_te  ! Control points for the thickness bezier curves
+  real*8, dimension(4), intent(inout) :: Xt_le, Xt_te, Yt_le, Yt_te  ! Control 
+                                        ! points for the thickness bezier curves
   integer, intent(out) :: error_code
-  integer :: error
+  integer :: error = 0
   
   ! Computes the Rt auxiliar parameter.
-  call Rt_calc(Rt,Kt_max,Xt_max,Yt_max,Rle,error_code)
+  call Rt_calc(Rt, Kt_max, Xt_max, Yt_max, Rle, error_code)
 
   ! Set the values of the leading edge Bezier curve control points.
   Xt_le(1)=0.0d0
@@ -1232,8 +1243,8 @@ subroutine SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_ma
   Xt_le(3)=Rt
   Xt_le(4)=Xt_max
 
-  ! Check the validity of the control points' values.
-  call BPPCheckControlPoints(Xt_le,0.0d0,Xt_max,1,error)
+  !! Check the validity of the control points' values.
+  !call BPPCheckControlPoints(Xt_le,0.0d0,Xt_max,1,error)
 
   if (error /= 0) error_code=error
   
@@ -1242,17 +1253,18 @@ subroutine SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_ma
   Yt_le(3)=Yt_max
   Yt_le(4)=Yt_max
 
-  call BPPCheckControlPoints(Yt_le,0.0d0,Yt_max,2,error)
+  !call BPPCheckControlPoints(Yt_le,0.0d0,Yt_max,2,error)
 
   if (error /= 0) error_code=error
   
   ! Set the values of the trailing edge Bezier curve control points.
   Xt_te(1)=Xt_max
   Xt_te(2)=2.0d0*Xt_max-Rt
-  Xt_te(3)=1.0d0+(dZte-(3.0d0*Kt_max*(Xt_max-Rt)**2/2.0d0+Yt_max))*1.0d0/tan(Beta_te)
+  Xt_te(3)=1.0d0+(dZte-(3.0d0*Kt_max*(Xt_max-Rt)**2./2.0d0+Yt_max)) *          &
+                                                              1.0d0/tan(Beta_te)
   Xt_te(4)=1.0d0
 
-  call BPPCheckControlPoints(Xt_te,Xt_max,1.0d0,3,error)
+  !call BPPCheckControlPoints(Xt_te,Xt_max,1.0d0,3,error)
 
   if (error /= 0) error_code=error
   
@@ -1261,23 +1273,26 @@ subroutine SetThicknessControlPoints(Xt_le,Xt_te,Yt_le,Yt_te,Xt_max,Yt_max,Kt_ma
   Yt_te(3)=3.0d0*Kt_max*(Xt_max-Rt)**2/2.0d0+Yt_max
   Yt_te(4)=dZte
 
-  call BPPCheckControlPoints(Yt_te,Yt_max,0.0d0,4,error)
+  !call BPPCheckControlPoints(Yt_te,Yt_max,0.0d0,4,error)
 
   if (error /= 0) error_code=error
   
 end subroutine SetThicknessControlPoints
 
 ! -------------------------------------------------------------------
-subroutine SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,Gamma_le,Alpha_te,Zte,error_code)
-
+subroutine SetCamberControlPoints(Xc_le, Xc_te, Yc_le, Yc_te,                  &
+                              Xc_max, Yc_max, Kc_max, Gamma_le, Alpha_te, Zte, &
+                              error_code)
   implicit none
 
-  real*8, intent(in) :: Xc_max, Yc_max, Kc_max            ! Position and magnitude of the maximum camber
-  real*8, intent(in) :: Gamma_le, Alpha_te                ! Leading and trailing edge angle
-  real*8, intent(in) :: Zte                               ! Trailing edge vertical coordinate
-  real*8 :: Rc                                            ! Camber auxiliar parameter
+  real*8, intent(in) :: Xc_max, Yc_max, Kc_max ! Position and magnitude of the 
+                                             ! maximum camber
+  real*8, intent(in) :: Gamma_le, Alpha_te   ! Leading and trailing edge angle
+  real*8, intent(in) :: Zte                  ! Trailing edge vertical coordinate
+  real*8 :: Rc                               ! Camber auxiliar parameter
 
-  real*8, dimension(4), intent(inout) :: Xc_le, Xc_te, Yc_le, Yc_te  ! Control points for the camber bezier curves
+  real*8, dimension(4), intent(inout) :: Xc_le, Xc_te, Yc_le, Yc_te  ! Control
+                                          ! points for the camber bezier curves
   integer, intent(out) :: error_code
   integer :: error
   
@@ -1293,7 +1308,7 @@ subroutine SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,G
   Xc_le(3)=Xc_max-(2.0d0*(Rc-Yc_max)/(3.0d0*Kc_max))**0.5
   Xc_le(4)=Xc_max
 
-  call BPPCheckControlPoints(Xc_le,0.0d0,Xc_max,5,error)
+  !call BPPCheckControlPoints(Xc_le,0.0d0,Xc_max,5,error)
 
   if (error /= 0) error_code=error
   
@@ -1302,7 +1317,7 @@ subroutine SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,G
   Yc_le(3)=Yc_max
   Yc_le(4)=Yc_max
 
-  call BPPCheckControlPoints(Yc_le,0.0d0,Yc_max,6,error)
+  !call BPPCheckControlPoints(Yc_le,0.0d0,Yc_max,6,error)
 
   if (error /= 0) error_code=error
   
@@ -1312,7 +1327,7 @@ subroutine SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,G
   Xc_te(3)=1.0d0+(Zte-Rc)/(tan(Alpha_te))
   Xc_te(4)=1.0d0
 
-  call BPPCheckControlPoints(Xc_te,Xc_max,1.0d0,7,error)
+  !call BPPCheckControlPoints(Xc_te,Xc_max,1.0d0,7,error)
 
   if (error /= 0) error_code=error
   
@@ -1321,14 +1336,14 @@ subroutine SetCamberControlPoints(Xc_le,Xc_te,Yc_le,Yc_te,Xc_max,Yc_max,Kc_max,G
   Yc_te(3)=Rc
   Yc_te(4)=Zte
 
-  call BPPCheckControlPoints(Yc_te,Yc_max,0.0d0,8,error)
+  !call BPPCheckControlPoints(Yc_te,Yc_max,0.0d0,8,error)
 
   if (error /= 0) error_code=error
   
 end subroutine SetCamberControlPoints
 
 ! -------------------------------------------------------------------
-subroutine Rt_calc(Rt,Kt_max,Xt_max,Yt_max,Rle,error_code)
+subroutine Rt_calc(Rt, Kt_max, Xt_max, Yt_max, Rle, error_code)
 
   use PolynomialRoots
 
@@ -1349,7 +1364,8 @@ subroutine Rt_calc(Rt,Kt_max,Xt_max,Yt_max,Rle,error_code)
   a(4)=-27.0d0*(Kt_max**2)*Xt_max
   a(3)=9.0d0*Kt_max*Yt_max+(81.0d0*(Kt_max**2)*(Xt_max**2)/2.0d0)
   a(2)=2.0d0*Rle-18.0d0*Kt_max*Xt_max*Yt_max-27.0d0*(Kt_max**2)*(Xt_max**3)
-  a(1)=3.0d0*(Yt_max**2)+9.0d0*Kt_max*(Xt_max**2)*Yt_max+(27.0d0*(Kt_max**2)*(Xt_max**4)/4.0d0)
+  a(1)=3.0d0*(Yt_max**2)+9.0d0*Kt_max*(Xt_max**2)*Yt_max +                     &
+                                          (27.0d0*(Kt_max**2)*(Xt_max**4)/4.0d0)
 
   ! Get the roots of the polynomial
   call QuarticRoots(a,X_root)
@@ -1360,9 +1376,9 @@ subroutine Rt_calc(Rt,Kt_max,Xt_max,Yt_max,Rle,error_code)
   do i=1,4
     if(AImag(X_root(i)).NE.0) cycle                                                    ! Discard the complex roots
     if(Real(X_root(i)).GT.max(0.d0,Xt_max-(-2.0d0*Yt_max/(3.0d0*Kt_max))**0.5)) then   ! Discard real roots smaller than the lower boundary
-        if(Real(X_root(i)).LT.Rt) then                                                 ! Make sure the used root is the smallest within the boundaries
-            Rt=Real(X_root(i))
-        end if
+      if(Real(X_root(i)).LT.Rt) then                                                   ! Make sure the used root is the smallest within the boundaries
+        Rt=Real(X_root(i))
+      end if
     end if
   end do
   
@@ -1384,7 +1400,7 @@ subroutine Rt_calc(Rt,Kt_max,Xt_max,Yt_max,Rle,error_code)
 end subroutine Rt_calc
 
 ! -------------------------------------------------------------------
-subroutine Rc_calc(Rc,Kc_max,Gamma_le,Alpha_te,Zte,Yc_max, error_code)
+subroutine Rc_calc(Rc,Kc_max,Gamma_le,Alpha_te,Zte,Yc_max,error_code)
 
   implicit none
 
@@ -1395,14 +1411,19 @@ subroutine Rc_calc(Rc,Kc_max,Gamma_le,Alpha_te,Zte,Yc_max, error_code)
 
   error_code=0
   
-  Aux4=16.0d0+6.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))*      &
-    (1.0d0-Yc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))+Zte/tan(alpha_te))
-  Aux1=4*(16.0d0+6.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))*   &
-    (1.0d0-Yc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))+Zte/tan(alpha_te)))**0.5
-  Aux2=(16.0d0+3.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))*(1.0d0+Zte/tan(alpha_te)))
-  Aux3=3.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))**2
+  Aux4=(16.0d0+6.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te))) *    &
+    (1.0d0 - Yc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te))) +            &
+                                                        Zte/tan(alpha_te)))**0.5
+  
+  Aux1=4*(16.0d0+6.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te))) *  &
+    (1.0d0 - Yc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te))) +            &
+                                                        Zte/tan(alpha_te)))**0.5
+  
+  Aux2=(16.0d0+3.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te))) *    &
+                                                      (1.0d0+Zte/tan(alpha_te)))
+  Aux3=3.0d0*Kc_max*((1.0d0/tan(Gamma_le))+(1.0d0/tan(alpha_te)))**2.0d0
 
-  if (((Aux2+Aux1)/Aux3).GT.0.AND.((Aux2+Aux1)/Aux3).LT.Yc_max) then
+  if ((Aux2+Aux1)/Aux3 .GT. 0 .AND. ((Aux2+Aux1)/Aux3).LT.Yc_max) then
       Rc=(Aux2+Aux1)/Aux3
     elseif (((Aux2-Aux1)/Aux3).GT.0.AND.((Aux2-Aux1)/Aux3).LT.Yc_max) then
       Rc=(Aux2-Aux1)/Aux3
@@ -1422,24 +1443,31 @@ subroutine Rc_calc(Rc,Kc_max,Gamma_le,Alpha_te,Zte,Yc_max, error_code)
 end subroutine Rc_calc
 
 ! -------------------------------------------------------------------
-subroutine BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,X,Z,nPoints,UpperLower_identifier)
+subroutine BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,          &
+                     X,Z,nPoints,UpperLower_identifier)
 
   implicit none
 
-  Real*8, dimension(4), intent(in) :: Xt_le, Xt_te, Yt_le, Yt_te, Xc_le, Xc_te, Yc_le, Yc_te
+  Real*8, dimension(4), intent(in) :: Xt_le, Xt_te, Yt_le, Yt_te,              &
+                                      Xc_le, Xc_te, Yc_le, Yc_te
   integer, intent(in) :: nPoints
-  integer, intent(in) :: UpperLower_identifier           ! Parameter that identifies the use of the upper, 0, or lower surface, 1
-  Real*8, dimension(npoints), intent(in) :: X         ! Airfoil coordinates
-  Real*8, dimension(npoints), intent(inout) :: Z         ! Airfoil coordinates
+  integer, intent(in) :: UpperLower_identifier   ! Parameter that identifies the
+                                      ! use of the upper, 0, or lower surface, 1
+  Real*8, dimension(npoints), intent(in) :: X    ! Airfoil coordinates
+  Real*8, dimension(npoints), intent(inout) :: Z ! Airfoil coordinates
 
-  integer, dimension(2) :: LEte_identifier               ! Parameter that identifies the use of the leading edge or trailing edge bezier curve for the (thickness,camber)
+  integer, dimension(2) :: LEte_identifier       ! Parameter that identifies the
+                 ! use of the leading edge or trailing edge bezier curve for the 
+                 ! (thickness,camber)
 
   integer :: i
-  real*8, dimension(2) :: t                              ! Parameter for the calculation of the bezir curves for the (thickness,camber)
+  real*8, dimension(2) :: t                      ! Parameter for the calculation
+                                ! of the bezir curves for the (thickness,camber)
 
   do i=1,nPoints      
     call BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X(i))
-    call BPP_Calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,X(i),Z,nPoints,i,UpperLower_identifier)
+    call BPP_Calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,X(i),Z(i),       &
+      nPoints,UpperLower_identifier)
   end do
 
 end subroutine BPP_Get_z
@@ -1456,8 +1484,8 @@ subroutine BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X)
   integer, dimension(2), intent(inout) :: LEte_identifier
   real*8, dimension(2), intent(inout) :: t
   real*8, intent(in) :: X
-  Complex*16, dimension(3) :: X_root      ! cubic roots
-  real*8, dimension(4) :: a               ! coeffitients to solve the cubic equation
+  Complex*16, dimension(3) :: X_root ! cubic roots
+  real*8, dimension(4) :: a          ! coeffitients to solve the cubic equation
 
   integer :: i
 
@@ -1469,7 +1497,7 @@ subroutine BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X)
 
   a(1)=Xt_le(1)-X
   a(2)=3.0d0*Xt_le(2)-3.0d0*Xt_le(1)
-  a(3)=3.0d0*Xt_le(3)-6.0d0*Xt_le(2)+.0d03*Xt_le(1)
+  a(3)=3.0d0*Xt_le(3)-6.0d0*Xt_le(2)+3.0d0*Xt_le(1)
   a(4)=Xt_le(4)-3.0d0*Xt_le(3)+3.0d0*Xt_le(2)-Xt_le(1)
 
   call CubicRoots(a,X_root)
@@ -1500,7 +1528,7 @@ subroutine BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X)
 
   end if
 
-  if (t(1).LT.0.0d0.OR.t(1).GT.1.0d0) LEte_identifier(1)=-1       ! Identifies error in the thickness section
+  if (t(1).LT.0.0d0-1.E-6.OR.t(1).GT.1.0d0+1.E-6) LEte_identifier(1)=-1       ! Identifies error in the thickness section
 
   ! Camber Bezier curve
 
@@ -1537,12 +1565,13 @@ subroutine BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X)
 
   end if
 
-  if (t(2).LT.0.0d0.OR.t(2).GT.1.0d0) LEte_identifier(2)=-1       ! Identifies error in the thickness section
+  if ((t(2).LT.0.0d0-1.E-6).OR.(t(2).GT.1.0d0+1.E-6)) LEte_identifier(2)=-1       ! Identifies error in the thickness section
 
 end subroutine BPP_Get_t
 
 ! -------------------------------------------------------------------
-subroutine BPP_calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,X,Z,nPoints,i,UpperLower_identifier)
+subroutine BPP_calc_z(Yt_le,Yt_te,Yc_le,Yc_te,                                 &
+                      LEte_identifier,t,X,Z,nPoints,UpperLower_identifier)
 
   implicit none
 
@@ -1551,33 +1580,38 @@ subroutine BPP_calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,X,Z,nPoints,i,Up
   real*8, dimension(2), intent(in) :: t
   real*8, intent(in) :: X
   integer, intent(in) :: nPoints
-  real*8, dimension(nPoints), intent(inout) :: Z
-  integer, intent(in) :: i                            !number of the point
+  real*8, intent(inout) :: Z
   integer, intent(in) :: UpperLower_identifier
   real*8 :: Z_thickness, Z_camber                     !Partial values of Z
 
   if (LEte_identifier(1).EQ.0) then
-      Z_thickness=((1-t(1))**3)*Yt_le(1)+3*((1-t(1))**2)*t(1)*Yt_le(2)+3*(1-t(1))*(t(1)**2)*Yt_le(3)+(t(1)**3)*Yt_le(4)
+      Z_thickness=((1-t(1))**3)*Yt_le(1)+                                      &
+                  3*((1-t(1))**2)*t(1)*Yt_le(2)+                               &
+                  3*(1-t(1))*(t(1)**2)*Yt_le(3)+                               &
+                  (t(1)**3)*Yt_le(4)
   elseif (LEte_identifier(1).EQ.1) then
-      Z_thickness=((1-t(1))**3)*Yt_te(1)+3*((1-t(1))**2)*t(1)*Yt_te(2)+3*(1-t(1))*(t(1)**2)*Yt_te(3)+(t(1)**3)*Yt_te(4)
+      Z_thickness=((1-t(1))**3)*Yt_te(1)+                                      &
+                  3*((1-t(1))**2)*t(1)*Yt_te(2)+                               &
+                  3*(1-t(1))*(t(1)**2)*Yt_te(3)+                               &
+                  (t(1)**3)*Yt_te(4)
   end if
 
   if (LEte_identifier(2).EQ.0) then
-      Z_camber=((1-t(2))**3)*Yc_le(1)+3*((1-t(2))**2)*t(2)*Yc_le(2)+3*(1-t(2))*(t(2)**2)*Yc_le(3)+(t(2)**3)*Yc_le(4)
+    Z_camber=((1-t(2))**3)*Yc_le(1)+                                           &
+             3*((1-t(2))**2)*t(2)*Yc_le(2)+                                    &
+             3*(1-t(2))*(t(2)**2)*Yc_le(3)+                                    &
+             (t(2)**3)*Yc_le(4)
   elseif (LEte_identifier(2).EQ.1) then
-      Z_camber=((1-t(2))**3)*Yc_te(1)+3*((1-t(2))**2)*t(2)*Yc_te(2)+3*(1-t(2))*(t(2)**2)*Yc_te(3)+(t(2)**3)*Yc_te(4)
+    Z_camber=((1-t(2))**3)*Yc_te(1)+                                           &
+             3*((1-t(2))**2)*t(2)*Yc_te(2)+                                    &
+             3*(1-t(2))*(t(2)**2)*Yc_te(3)+                                    &
+             (t(2)**3)*Yc_te(4)
   end if
 
-
-  !if (X.EQ.1.0d0) then
-  !  Z(i)=Yc_te(4)+Yt_te(4)
-  !  Z(nPoints)=Yc_te(4)-Yt_te(4)
-  !else if (X.EQ.0.0d0) then
-  !  Z(i)=0.0d0
   if (UpperLower_identifier.EQ.0) then
-    Z(i)=Z_camber+Z_thickness/2.0d0
+    Z=Z_camber+Z_thickness/2.0d0
   else
-    Z(i)=Z_camber-Z_thickness/2.0d0
+    Z=Z_camber-Z_thickness/2.0d0
   end if
 
 end subroutine BPP_calc_z
@@ -1658,7 +1692,7 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   real*8, dimension(size(xseedt,1)) :: zthick, zcamber, curvaturethick,        &
     curvaturecamber, first_derivative_thick, first_derivative_camber 
   real*8, dimension(size(xseedt,1)+size(xseedb,1)-1) :: xspline, zspline, curvaturespline
-  integer :: i
+  integer :: i, counter
   
   nPt=size(xseedt,1)
   nPb=size(xseedb,1)
@@ -1671,7 +1705,16 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   zthick=zseedt-zseedb_interpolated
   zcamber=(zseedt+zseedb_interpolated)/2.0d0
 
- do i=1,nPt
+  !do i=1,nPt
+  !  write(*,*) xseedt(i), zthick(i)
+  !end do
+  ! 
+  !do i=1,nPt
+  !  write(*,*) xseedt(i), zcamber(i)
+  !end do
+  !write(*,*)
+  
+  do i=1,nPt
     xspline(i)=xseedt(nPt+1-i)
     zspline(i)=zseedt(nPt+1-i)
   end do
@@ -1683,6 +1726,9 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
     
   curvaturethick=nu_curvature(nPt, xseedt, zthick)
   curvaturecamber=nu_curvature(nPt, xseedt, zcamber)
+  
+  !curvaturethick=curv_spline(nPt, xseedt, zthick)
+  !curvaturecamber=curv_spline(nPt, xseedt, zcamber)
   
   first_derivative_thick=nu_first_derivative(nPt, xseedt, zthick)
   first_derivative_camber=nu_first_derivative(nPt, xseedt, zcamber)
@@ -1700,6 +1746,10 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
     end if
   end do
   
+  write(*,*) 'Xt_max', xBPP(1)
+  write(*,*) 'Yt_max', xBPP(2)
+  write(*,*) 'Kt_max', xBPP(3)
+  
   ! get Xc_max,Yc_max,Kc_max
 
   do i=1,nPt
@@ -1710,20 +1760,40 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
     end if
   end do
   
+  write(*,*) 'Xc_max', xBPP(4)
+  write(*,*) 'Yc_max', xBPP(5)
+  write(*,*) 'Kc_max', xBPP(6)
+  
   ! get Rle
   
-  xBPP(7) = 1.d0/curvaturethick(nPt)
+  xBPP(7) = 1.d0/curvaturethick(1)
+  write(*,*) 'Rle', xBPP(7)
   
   ! get Gamma_le,Alpha_te,Beta_te
   
-  xBPP(8)=abs(atan(first_derivative_camber(1)))
-  xBPP(9)=-atan(first_derivative_camber(nPt))
-  xBPP(10)=-atan(first_derivative_thick(nPt))
+  do i = 1, nPt
+    if (xseedt(i) .LT. 0.001d0) then
+      xBPP(8) = atan(first_derivative_camber(i))
+    end if
+  end do
+  
+  do i = 1, nPt
+    if (xseedt(nPt-i+1) .GT. 0.98d0) then
+      xBPP(9)=-atan(first_derivative_camber(nPt-i+1))
+      xBPP(10)=-atan(first_derivative_thick(nPt-i+1))
+    end if
+  end do
+  
+  write(*,*) 'Gamma_le', xBPP(8)/acos(-1.0d0)*180.d0
+  write(*,*) 'Alpha_te', xBPP(9)/acos(-1.0d0)*180.d0
+  write(*,*) 'Beta_te',xBPP(10)/acos(-1.0d0)*180.d0
   
   ! get Zte,dZte
   
   xBPP(11)= zcamber(nPt)
   xBPP(12)= zthick(nPt)
+  write(*,*) 'Zte', xBPP(11)
+  write(*,*) 'dZte',xBPP(12)
   
   ! set output
   modest(1:3)=xBPP(1:3)
@@ -1801,6 +1871,69 @@ subroutine d_SplineAirfoilInterpolation(ntop,xtop,ytop,nbot,xbot,ybot,ybot_at_xt
   return
   
 end subroutine d_SplineAirfoilInterpolation
+
+function curv_spline(N, X, Y)
+
+  integer, intent(in) :: N
+  double precision, dimension(N), intent(in) :: X, Y
+  double precision, dimension(N) :: curv_spline
+
+ ! Local variables.
+  integer :: I
+  real*8, dimension(N) :: S, XP, YP
+  real*8 :: SBREF
+
+  interface
+    double precision function CURV(SS,X,XS,Y,YS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, Y,YS, S
+    end function CURV
+  end interface 
+  
+  CALL SCALC(X,Y,S,N)
+  CALL SEGSPL(X,XP,S,N)
+  CALL SEGSPL(Y,YP,S,N)
+
+!---- normalizing length (~ chord)
+  SBREF = (S(N)-S(1))
+
+!---- set up curvature array
+  DO I = 1, N
+    curv_spline(I) = CURV(S(I),X,XP,Y,YP,S,N) * SBREF
+  ENDDO
+  
+end function curv_spline
+
+function der1_spline(N, X, Y)
+
+  integer, intent(in) :: N
+  double precision, dimension(N), intent(in) :: X, Y
+  double precision, dimension(N) :: der1_spline
+
+ ! Local variables.
+  integer :: I
+  real*8, dimension(N) :: S, XP, YP
+  real*8 :: SBREF
+
+  interface
+    double precision function DEVAL(SS,X,XS,S,N)
+      integer, intent(in) :: N
+      double precision, intent(in) :: SS
+      double precision, dimension(N), intent(in) :: X, XS, S
+    end function DEVAL
+  end interface 
+  
+  CALL SCALC(X,Y,S,N)
+  CALL SEGSPL(X,XP,S,N)
+  CALL SEGSPL(Y,YP,S,N)
+
+!---- set up curvature array
+  DO I = 1, N
+    der1_spline(I) = DEVAL(S(I),Y,YP,S,N) / DEVAL(S(I),X,XP,S,N)
+  ENDDO
+  
+end function der1_spline
 
 end module parametrization_constr
   

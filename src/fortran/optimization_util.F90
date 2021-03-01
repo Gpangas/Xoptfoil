@@ -112,7 +112,8 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
   double precision, intent(in) :: feasible_limit
   integer, intent(in) :: attempts
   integer, dimension(:), intent(inout) :: message_codes
-  character(100), dimension(:), intent(inout) :: messages
+  character(200), dimension(:), intent(inout) :: messages
+  integer :: CHUNK = 1
 
   interface
     type(objfunction_type) function objfunc(x)
@@ -143,7 +144,8 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
   call random_number(dv)
 
 ! Initial population of designs set between xmin and xmax
-
+  
+  write(*,*)
   write(*,*) 'Generating and evaluating initial designs ...'
   write(*,*)
   
@@ -156,7 +158,7 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
     objval(1) = objfunction_return%value
     message_codes(1) = objfunction_return%message_code
     messages(1) = objfunction_return%message
-!$omp do
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
     do i = 2, pop
       dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
       objfunction_return = objfunc(dv(:,i))
@@ -166,7 +168,7 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
     end do
 !$omp end do
   else
-!$omp do
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
     do i = 1, pop
       dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
       objfunction_return = objfunc(dv(:,i))
@@ -189,9 +191,8 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
     write(*,*)
 !$omp end master
 
-
-!$omp do
-    do i = 1, pop
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
+    do i = 1, pop 
 
       write(text2,*) i
       text2 = adjustl(text2)
@@ -564,12 +565,12 @@ subroutine bubble_sort_plus(dv, objvals, message_codes, messages)
   double precision, dimension(:,:), intent(inout) :: dv
   double precision, dimension(:), intent(inout) :: objvals
   integer, dimension(:), intent(inout) :: message_codes
-  character(100), dimension(:), intent(inout) :: messages
+  character(200), dimension(:), intent(inout) :: messages
 
   double precision, dimension(size(dv,1),size(dv,2)) :: tempdv
   double precision, dimension(size(dv,2)) :: tempvals
   integer, dimension(size(dv,2)) :: tempmessage_codes
-  character(100), dimension(size(dv,2)) :: tempmessages
+  character(200), dimension(size(dv,2)) :: tempmessages
   integer, dimension(size(dv,2)) :: finalorder, temporder
   integer :: nvars, ndesigns, i, sortcounter
   logical :: sorted

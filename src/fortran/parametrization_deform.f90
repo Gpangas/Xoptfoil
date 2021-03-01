@@ -84,7 +84,7 @@ end subroutine create_shape
 !=============================================================================80
 subroutine HH_shape(x, modes, shape_function)
 
-  use vardef, only : initial_perturb, min_bump_width
+  use vardef, only : abs_initial_perturb, min_bump_width
 
   double precision, dimension(:), intent(in) :: x, modes
   double precision, dimension(:,:), intent(inout) :: shape_function
@@ -98,8 +98,8 @@ subroutine HH_shape(x, modes, shape_function)
   xle = x(1)
   
   nmodes = size(modes,1)/3
-  t1fact = initial_perturb/(1.d0 - 0.001d0)
-  t2fact = initial_perturb/(10.d0 - min_bump_width)
+  t1fact = abs_initial_perturb/(1.d0 - 0.001d0)
+  t2fact = abs_initial_perturb/(10.d0 - min_bump_width)
   pi = acos(-1.d0)
 
   do i = 1, nmodes

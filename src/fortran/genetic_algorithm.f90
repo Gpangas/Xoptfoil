@@ -128,7 +128,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   double precision, dimension(:,:), allocatable :: stackdv
   double precision, dimension(:), allocatable :: stackobjval
   integer, dimension(:), allocatable :: message_codes
-  character(100), dimension(:), allocatable :: messages
+  character(200), dimension(:), allocatable :: messages
   type(objfunction_type) :: objfunction_return
   logical :: use_x0, converged, signal_progress, new_history_file
   integer :: stepstart, steptime, restarttime
@@ -139,6 +139,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   character(25) :: relfminchar
   character(80), dimension(20) :: commands
   character(100) :: histfile
+  integer :: CHUNK = 1
 
   nconstrained = size(constrained_dvs,1)
 
@@ -174,7 +175,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   call init_random_seed()
 
 ! Set up initial designs
-
+  use_x0 = .true.
   if (.not. restart) then
     call initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0, x0,  &
                          ga_options%feasible_init, ga_options%feasible_limit,  &
@@ -364,7 +365,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 !$omp end master
 !$omp barrier
 
-!$omp do
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
 
 !   Procreate to generate offspring pairs
 
@@ -859,7 +860,7 @@ subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time, &
   double precision, intent(in) :: fmin
   integer, intent(in) :: time
   integer, dimension(:), intent(in) :: message_codes
-  character(100), dimension(:), intent(in) :: messages
+  character(200), dimension(:), intent(in) :: messages
 
   character(100) :: restfile
   integer :: iunit
@@ -914,7 +915,7 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time,  &
   double precision, intent(out) :: fmin
   integer, intent(out) :: time
   integer, dimension(:), intent(inout) :: message_codes
-  character(100), dimension(:), intent(inout) :: messages
+  character(200), dimension(:), intent(inout) :: messages
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -1019,7 +1020,7 @@ subroutine ga_write_dvs(step, dv, objval, message_codes, messages, x0, f0,     &
   double precision, dimension(:), intent(in) ::  x0, xopt, objval
   double precision, dimension(:,:), intent(in) :: dv
   integer, dimension(:), intent(in) :: message_codes
-  character(100), dimension(:), intent(in) :: messages
+  character(200), dimension(:), intent(in) :: messages
 
   integer :: i,j
   

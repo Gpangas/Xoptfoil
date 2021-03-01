@@ -46,10 +46,11 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
   type(airfoil_type), intent(out) :: foil
   double precision, intent(out) :: xoffset, zoffset, foilscale, foilangle,     &
                                    TE_thick
+  double precision :: xoffset_i, zoffset_i, foilscale_i, foilangle_i
   real*8 :: zotop, zobot
 
   type(airfoil_type) :: tempfoil
-  integer :: pointsmcl
+  integer :: pointsmcl, i
 
   if (trim(seed_airfoil) == 'from_file') then
 
@@ -63,10 +64,18 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
 
     pointsmcl = 200
     call naca_456(naca_options, pointsmcl, tempfoil)
+    
+  elseif (trim(seed_airfoil) == 'from_variables') then
+
+!   Create airfoil from design variables
+
+    pointsmcl = 200
+    call d_variables(airfoil_file, pointsmcl, tempfoil)
 
   else
 
-    write(*,*) "Error: seed_airfoil should be 'from_file' or 'naca'."
+    write(*,*) "Error: seed_airfoil should be 'from_file' or 'naca' or "//     &
+      &"'from_variables'"
     write(*,*)
     stop
 
@@ -76,34 +85,62 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
 
   call smooth_paneling(tempfoil, xfoil_geom_options, foil)
 
-! Calculate leading edge information
-
-  call le_find(foil%x, foil%z, foil%leclose, foil%xle, foil%zle,               &
-               foil%addpoint_loc)
-
-! Translate and scale
-
-  call transform_airfoil(foil, xoffset, zoffset, foilscale, foilangle)
+  xoffset = 0.d0
+  zoffset = 0.d0
+  foilscale = 1.d0
+  foilangle = 0.d0
   
-! TE fix
+! LE and TE loop 
+  do i = 1, 200 
   
-  call foil_interp(foil%npoint,foil%x, foil%z,1.0d0,zotop,1.0d0,zobot)
+  ! Calculate leading edge information
+
+    call le_find(foil%x, foil%z, foil%leclose, foil%xle, foil%zle,             &
+                 foil%addpoint_loc)
+
+  ! Translate and scale
+
+    call transform_airfoil(foil, xoffset_i, zoffset_i, foilscale_i, foilangle_i)
   
-  if (foil%z(1) .GT. foil%z(foil%npoint)) then
+    !write(*,*) '  xoffset_i   =', xoffset_i
+    !write(*,*) '  zoffset_i   =', zoffset_i
+    !write(*,*) '  foilangle_i = ', foilangle_i*180.d0/acos(-1.d0)
+    !write(*,*) '  foilscale_i =', foilscale_i
+    
+    xoffset = xoffset + xoffset_i
+    zoffset = zoffset + zoffset_i
+    foilscale = foilscale * foilscale_i
+    foilangle = foilangle + foilangle_i
+  
+  ! TE update 
+  
+    call foil_interp(foil%npoint,foil%x, foil%z,1.0d0,zotop,1.0d0,zobot)
+
     foil%x(1)=1.0d0
     foil%z(1)=zotop
-  
+    
     foil%x(foil%npoint)=1.0d0
     foil%z(foil%npoint)=zobot
-  else
-    foil%x(1)=1.0d0
-    foil%z(1)=zobot
   
-    foil%x(foil%npoint)=1.0d0
-    foil%z(foil%npoint)=zotop
-  end if
+    !write(*,*) (foil%z(foil%npoint)+foil%z(1))/2.0d0
+    if ((foil%z(foil%npoint)+foil%z(1))/2.0d0 .LT. 1.E-12) exit
+    
+  end do
   
-  TE_thick=abs(zobot-zotop)
+  !write(*,*)
+  !do i = 1, foil%npoint
+  !  write(*,*) foil%x(i), foil%z(i)
+  !end do
+  !write(*,*)
+  
+  write(*,*) 'Changes on airffoil:'
+  write(*,*) '  xoffset   =', xoffset
+  write(*,*) '  zoffset   =', zoffset
+  write(*,*) '  foilangle = ', foilangle*180.d0/acos(-1.d0)
+  write(*,*) '  foilscale =', foilscale
+  write(*,*) !(foil%z(foil%npoint)+foil%z(1))/2.0d0
+  
+  TE_thick = foil%z(1) - foil%z(foil%npoint)
   
 end subroutine get_seed_airfoil
 
@@ -304,6 +341,140 @@ subroutine cc_ordering(foil)
   end if
 
 end subroutine cc_ordering
+
+!=============================================================================80
+!
+! Reads an airfoil from a file, loads it into the airfoil_type, sets ordering
+! correctly
+!
+!=============================================================================80
+subroutine d_variables(filename, pointsmcl, foil)
+
+  use vardef,      only : airfoil_type, shape_functions, symmetrical,          &
+                          tcTE_seed, nparams_top, nparams_bot, int_tcTE_spec,  &
+                          tcTE, modest_seed, modesb_seed
+  use memory_util, only : allocate_airfoil
+  use parametrization, only : parametrization_dvs, create_airfoil
+  use naca, only : cosine_spacing
+
+  character(*), intent(in) :: filename
+  integer, intent(in) :: pointsmcl
+  type(airfoil_type), intent(out) :: foil
+
+  character(20) :: fmt, text
+  double precision, dimension(pointsmcl) :: x, xu, xl, zu, zl, zu_r, zl_r
+  integer :: ndvs_top, ndvs_bot, ndvs
+  double precision, dimension(:), allocatable :: vars
+
+  integer :: iunit, ioerr, ios, i
+
+  write(*,*) 'Reading variables from file: '//trim(filename)//' ...'
+  write(*,*)
+
+! Get number of variables
+  
+  call parametrization_dvs(nparams_top, nparams_bot, shape_functions,          &
+                                                             ndvs_top, ndvs_bot)
+  ndvs = ndvs_top + ndvs_bot + int_tcTE_spec
+  
+  allocate(vars(ndvs))
+  
+! Read variables from file
+    
+  iunit = 12
+  
+  open(unit=iunit, file=filename, status='old', iostat=ioerr)
+  if (ioerr /= 0) then
+    write(*,*) 'Error: cannot find variables file '//trim(filename)
+    write(*,*)
+    stop
+  end if
+
+  ! Skip file header
+
+  read(iunit,*)
+  read(iunit,*)
+
+  ! Read variables
+  write(fmt,*) ndvs
+  fmt = '('//trim(adjustl(fmt))//'(F12.8))'
+  read(iunit,fmt,IOSTAT=ios) (vars(i),i=1,ndvs)
+  
+  if (ios /= 0) then
+    write(*,*) 'Error: Number of variables do not match input file '//trim(filename)
+    write(*,*)
+    stop
+  end if
+
+  ! Close file
+
+  close(iunit)
+  
+! Write what was read
+  
+  write(*,*) 'Read : '
+  do i = 1, size(vars,1)
+    write(text,*) i
+    if (i .LE. ndvs_top) then
+      write(*,'(8x,A,4x,F12.8)') 'top '//trim(adjustl(text)), vars(i)
+    elseif (i .LE. ndvs_top+ndvs_bot) then
+      write(text,*) i - ndvs_top
+      write(*,'(8x,A,4x,F12.8)') 'bot '//trim(adjustl(text)), vars(i)
+    end if
+  end do
+  if (int_tcTE_spec .EQ. 1) write(*,'(8x,A,F12.8)') 'TE_thick ', vars(ndvs)
+  write(*,*)
+  
+! Create seed distributions
+
+  call cosine_spacing(x, pointsmcl, 0.d0, 1.d0)
+  
+  xu = x
+  xl = x
+  zu = 0.d0
+  zl = 0.d0
+
+! Get real z
+  if (int_tcTE_spec .EQ. 1) then
+    tcTE_seed = vars(ndvs)
+  else
+    tcTE_seed = tcTE
+  end if
+
+  call create_airfoil(xu, zu, xl, zl, vars(1:ndvs_top),                        &
+    vars(ndvs_top+1:ndvs_top+ndvs_bot), zu_r, zl_r, shape_functions,           &
+    symmetrical, tcTE_seed)
+  
+  zu = zu_r
+  zl = zl_r
+
+! Format coordinates in a single loop (in airfoil_type derived type)
+
+  foil%npoint = 2*pointsmcl - 1
+  call allocate_airfoil(foil)
+  do i = 1, pointsmcl
+    foil%x(i) = xu(pointsmcl-i+1)
+    foil%z(i) = zu(pointsmcl-i+1)
+  end do
+  do i = 1, pointsmcl - 1
+    foil%x(i+pointsmcl) = xl(i+1)
+    foil%z(i+pointsmcl) = zl(i+1)
+  end do
+  
+! Initialize seed modes
+  if (.NOT. symmetrical) then
+    allocate(modest_seed(ndvs_top),modesb_seed(ndvs_bot))
+  
+    modest_seed = vars(1:ndvs_top)
+    modesb_seed = vars(ndvs_top+1:ndvs_top+ndvs_bot)
+  else
+    allocate(modest_seed(ndvs_top),modesb_seed(ndvs_top))
+  
+    modest_seed = vars(1:ndvs_top)
+    modesb_seed = modest_seed
+  end if
+  
+end subroutine d_variables
 
 !=============================================================================80
 !

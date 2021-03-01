@@ -74,7 +74,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   double precision :: maxt, xmaxt, maxc, xmaxc, design_cl, a, leidx
   double precision :: pso_tol, simplex_tol, ncrit, xtript, xtripb, vaccel
   double precision :: cvpar, cterat, ctrrat, xsref1, xsref2, xpref1, xpref2
-  double precision :: feasible_limit
+  double precision :: feasible_limit, pso_speed_limit
   double precision :: ga_tol, parent_fraction, roulette_selection_pressure,    &
                       tournament_fraction, crossover_range_factor,             &
                       mutant_probability, chromosome_mutation_rate,            &
@@ -88,11 +88,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
   namelist /optimization_options/ search_type, global_search, local_search,    &
             seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
-            nparameters_bot, flap_optimization_only, initial_perturb,          &
-            min_bump_width, kulfan_bussoletti_LEM, b_spline_degree,            &
-            b_spline_xtype, b_spline_distribution, restart, restart_write_freq,&
-            write_designs, write_cp_file, write_bl_file, write_dvs_file,       &
-            number_threads
+            nparameters_bot, flap_optimization_only, abs_initial_perturb,      &
+            rel_initial_perturb, min_bump_width, kulfan_bussoletti_LEM,        &
+            b_spline_degree, b_spline_xtype, b_spline_distribution, restart,   &
+            restart_write_freq, write_designs, write_cp_file, write_bl_file,   &
+            write_dvs_file, number_threads
   namelist /operating_conditions/ noppoint, op_mode, op_point, op_point_start, &
             op_point_end, op_point_step, reynolds, mach, use_flap,  x_flap,    &
             flap_connection, connection_apply, connection_radius, x_flap_spec, &
@@ -117,7 +117,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   namelist /initialization/ feasible_init, feasible_limit,                     &
                             feasible_init_attempts
   namelist /particle_swarm_options/ pso_pop, pso_tol, pso_maxit,               &
-                                    pso_convergence_profile
+                                    pso_speed_limit, pso_convergence_profile
   namelist /genetic_algorithm_options/ ga_pop, ga_tol, ga_maxit,               &
             parents_selection_method, parent_fraction,                         &
             roulette_selection_pressure, tournament_fraction,                  &
@@ -154,7 +154,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   nparameters_top = 4
   nparameters_bot = 4
   flap_optimization_only = .false.
-  initial_perturb = 0.025d0
+  abs_initial_perturb = 0.025d0
+  rel_initial_perturb = 0.0d0
   restart = .false.
   restart_write_freq = 20
   write_designs = .true.
@@ -328,7 +329,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     rewind(iunit)
     read(iunit, iostat=iostat1, nml=naca_airfoil)
     call namelist_check('naca_airfoil', iostat1, 'warn')
-
+    
+    airfoil_file = 'naca_family.dat'
     naca_options%family = family
     naca_options%maxt = maxt
     naca_options%xmaxt = xmaxt
@@ -357,6 +359,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   pso_pop = 40
   pso_tol = 1.D-04
   pso_maxit = 700
+  pso_speed_limit = 0.025d0
   pso_convergence_profile = 'exhaustive'
 
 ! Set default genetic algorithm options
@@ -390,7 +393,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       call namelist_check('particle_swarm_options', iostat1, 'warn')
       pso_options%pop = pso_pop
       pso_options%tol = pso_tol
-      pso_options%maxspeed = initial_perturb
+      pso_options%maxspeed = pso_speed_limit
       pso_options%maxit = pso_maxit
       pso_options%convergence_profile = pso_convergence_profile
       pso_options%feasible_init = feasible_init
@@ -637,7 +640,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " nparameters_top = ", nparameters_top
   write(*,*) " nparameters_bot = ", nparameters_bot
   write(*,*) " flap_optimization_only = ", flap_optimization_only  
-  write(*,*) " initial_perturb = ", initial_perturb
+  write(*,*) " abs_initial_perturb = ", abs_initial_perturb
+  write(*,*) " rel_initial_perturb = ", rel_initial_perturb
   write(*,*) " restart = ", restart
   write(*,*) " restart_write_freq = ", restart_write_freq
   write(*,*) " write_designs = ", write_designs
@@ -779,6 +783,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       write(*,*) " pso_pop = ", pso_options%pop
       write(*,*) " pso_tol = ", pso_options%tol
       write(*,*) " pso_maxit = ", pso_options%maxit
+      write(*,*) " pso_speed_limit = ", pso_options%maxspeed
       write(*,*) " pso_convergence_profile = ", pso_options%convergence_profile
       write(*,'(A)') " /"
       write(*,*)
@@ -891,7 +896,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(100,*) " nparameters_top = ", nparameters_top
   write(100,*) " nparameters_bot = ", nparameters_bot
   write(100,*) " flap_optimization_only = ", flap_optimization_only  
-  write(100,*) " initial_perturb = ", initial_perturb
+  write(100,*) " abs_initial_perturb = ", abs_initial_perturb
+  write(100,*) " rel_initial_perturb = ", rel_initial_perturb
   write(100,*) " restart = ", restart
   write(100,*) " restart_write_freq = ", restart_write_freq
   write(100,*) " write_designs = ", write_designs
@@ -1033,6 +1039,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       write(100,*) " pso_pop = ", pso_options%pop
       write(100,*) " pso_tol = ", pso_options%tol
       write(100,*) " pso_maxit = ", pso_options%maxit
+      write(100,*) " pso_speed_limit = ", pso_options%maxspeed
       write(100,*) " pso_convergence_profile = ", pso_options%convergence_profile
       write(100,'(A)') "/"
       write(100,*)
@@ -1131,8 +1138,15 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 ! Optimization settings
 
   if (trim(seed_airfoil) /= 'from_file' .and.                                  &
-      trim(seed_airfoil) /= 'naca')                                            &
-    call my_stop("seed_airfoil must be 'from_file' or 'naca'.")
+      trim(seed_airfoil) /= 'naca' .and.                                       &
+      trim(seed_airfoil) /= 'from_variables')                                            &
+    call my_stop("seed_airfoil must be 'from_file' or 'naca' or "//            &
+      &"'from_variables'.")
+  if (trim(seed_airfoil) .EQ. 'from_variables' .AND.                           &
+     (trim(shape_functions) /= 'hicks-henne' .OR.                              &
+      trim(shape_functions) /= 'naca'))                                        &
+    call my_stop("seed_airfoil must not be 'from_variables' when using "//     &
+    &"'naca' or 'hicks-henne' shape_functions")
   if (trim(shape_functions) /= 'hicks-henne' .and.                             &
       trim(shape_functions) /= 'naca' .and.                                    &
       trim(shape_functions) /= 'kulfan-bussoletti' .and.                       &
@@ -1144,8 +1158,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("nparameters_top must be >= 0.")
   if (nparameters_bot < 0)                                                     &
     call my_stop("nparameters_bot must be >= 0.")
-  if (initial_perturb <= 0.d0)                                                 &
-    call my_stop("initial_perturb must be > 0.")
+  if (abs_initial_perturb <= 0.d0)                                             &
+    call my_stop("abs_initial_perturb must be > 0.")
+  if (rel_initial_perturb <= 0.d0)                                             &
+    call my_stop("rel_initial_perturb must be > 0.")
   if (min_bump_width <= 0.d0)                                                  &
     call my_stop("min_bump_width must be > 0.")
   if (b_spline_degree < 2)                                                     &
@@ -1292,8 +1308,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     &" should be >= 1.", "warm")
   if (min_leading_edge_angle < 0.d0) call my_stop("min_leading_edge_angle"//   &
     &" must be >= 0.")
-  if (max_leading_edge_angle > 89.99d0) call my_stop("max_leading_edge_angle"//&
-    &" must be <= 89.99")
+  if (max_leading_edge_angle > 90.00d0) call my_stop("max_leading_edge_angle"//&
+    &" must be <= 90.00")
   if (dif_leading_edge_angle < 10.d0) call my_stop("dif_leading_edge_angle"//  &
     &" should be >= 10, 20 is recommended.", "warn")
   if (min_te_angle < 0.d0) call my_stop("min_te_angle must be >= 0.")
@@ -1377,7 +1393,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
       if (pso_pop < 1) call my_stop("pso_pop must be > 0.")
       if (pso_tol <= 0.d0) call my_stop("pso_tol must be > 0.")
-      if (pso_maxit < 1) call my_stop("pso_maxit must be > 0.")  
+      if (pso_maxit < 1) call my_stop("pso_maxit must be > 0.")
+      if (pso_speed_limit <= 0.d0)                                             &
+        call my_stop("pso_speed_limit must be > 0.")
       if ( (trim(pso_convergence_profile) /= "quick") .and.                    &
            (trim(pso_convergence_profile) /= "exhaustive") )                   &
         call my_stop("pso_convergence_profile must be 'exhaustive' "//&

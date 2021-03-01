@@ -81,7 +81,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   double precision, dimension(size(x0,1)+1) :: objvals
   double precision, dimension(size(x0,1)) :: xcen, xr, xe, xc
   
-  character(100), dimension(size(x0,1)+1) :: messages
+  character(200), dimension(size(x0,1)+1) :: messages
   integer, dimension(size(x0,1)+1) :: message_codes
 
   double precision :: rho, xi, gam, sigma, fr, fe, fc, f0, mincurr, radius
@@ -495,7 +495,7 @@ subroutine simplex_write_restart(step, designcounter, dv, objvals, f0, fevals, &
   double precision, intent(in) :: f0
   integer, intent(in) :: time
   integer, dimension(:), intent(in) :: message_codes
-  character(100), dimension(:), intent(in) :: messages
+  character(200), dimension(:), intent(in) :: messages
 
   character(100) :: restfile
   integer :: iunit
@@ -547,7 +547,7 @@ subroutine simplex_read_restart(step, designcounter, dv, objvals, f0, fevals,  &
   double precision, intent(out) :: f0
   integer, intent(out) :: time
   integer, dimension(:), intent(inout) :: message_codes
-  character(100), dimension(:), intent(inout) :: messages
+  character(200), dimension(:), intent(inout) :: messages
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -606,7 +606,7 @@ subroutine simplex_write_dvs(step, dv, objval, message_codes, messages, x0, f0,&
   double precision, dimension(:), intent(in) ::  x0, xopt, objval
   double precision, dimension(:,:), intent(in) :: dv
   integer, dimension(:), intent(in) :: message_codes
-  character(100), dimension(:), intent(in) :: messages
+  character(200), dimension(:), intent(in) :: messages
 
   integer :: i,j
   

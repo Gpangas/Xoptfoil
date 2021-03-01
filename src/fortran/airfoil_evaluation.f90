@@ -112,7 +112,9 @@ function aero_objective_function(designvars, include_penalty)
   double precision :: penaltyval, penaltyvaltotal
   double precision :: tegap, growth1, growth2, maxgrowth, len1, len2
   double precision :: panang1, panang2, maxpanang, minpanang, heightfactor
-  integer, dimension(noppoint) :: checkpt_list, checkop
+  integer :: n_op
+  double precision, dimension(noppoint) :: op_list_value
+  integer, dimension(noppoint) :: checkpt_list, checkop, op_list
   character(7), dimension(noppoint) :: opm_check
   double precision, dimension(noppoint) :: opp_check, re_check, ma_check 
   double precision, dimension(noppoint) :: fd_check, ncrit_check
@@ -128,12 +130,13 @@ function aero_objective_function(designvars, include_penalty)
   double precision :: actual_x_flap, actual_tcTE
   double precision :: gapallow, maxthick, ffact, fxfact, tefact
   integer :: check_idx, flap_idx, flap_idi, dvcounter
+  double precision :: min_TE_failed, min_TE_cicle
   double precision, parameter :: epsexit = 1.0D-04
   double precision, parameter :: epsupdate = 1.0D-08
   double precision :: pi
   logical :: penalize, side
-  character(100) :: text, text1
-  character(100) :: message
+  character(200) :: text, text1
+  character(200) :: message
 
   pi = acos(-1.d0)
   nmodest = nparams_top
@@ -180,19 +183,21 @@ function aero_objective_function(designvars, include_penalty)
   
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
-    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    tefact = 1.d0/(max_tcTE - min_tcTE)
     actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
       int_tcTE_spec)/tefact + min_tcTE
-    penaltyval = penaltyval + max(0.d0,actual_tcTE-max_tcTE)
-    penaltyval = penaltyval + max(0.d0,min_tcTE-actual_tcTE)
+    penaltyval = penaltyval + max(0.d0,actual_tcTE-max_tcTE)/0.0001
+    penaltyval = penaltyval + max(0.d0,min_tcTE-actual_tcTE)/0.0001
   else
     actual_tcTE=tcTE
   end if
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F8.6)') actual_tcTE
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 1
-    aero_objective_function%message = ' failed, trailing edge out of bounds' 
+    aero_objective_function%message = ' failed, trailing edge out of bounds.'//&
+      &' Trailing edge thickness: '//trim(text)
     return
   end if
 
@@ -241,12 +246,14 @@ function aero_objective_function(designvars, include_penalty)
 
 ! Penalty for too large growth rate
 
-  penaltyval = penaltyval + max(0.d0,maxgrowth-growth_allowed)/1.d0
+  penaltyval = penaltyval + max(0.d0,maxgrowth-growth_allowed)/10.d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F7.2)') maxgrowth
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 2
-    aero_objective_function%message = ' failed, too large growth rate' 
+    aero_objective_function%message = ' failed, too large growth rate. '//     &
+      &'Growth rate: '//trim(text) 
     return
   end if
   
@@ -261,12 +268,15 @@ function aero_objective_function(designvars, include_penalty)
             180.d0/acos(-1.d0)
   maxpanang = max(panang2,panang1)
   minpanang = min(panang2,panang1)
-  penaltyval = penaltyval + max(0.d0,maxpanang-max_leading_edge_angle)/0.01d0
+  penaltyval = penaltyval + max(0.d0,maxpanang-max_leading_edge_angle)/10.d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F9.4)') panang1
+    write(text1,'(F9.4)') panang2
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 3
-    aero_objective_function%message = ' failed, too blunt leading edge' 
+    aero_objective_function%message = ' failed, too blunt leading edge. '//    &
+      &'Leading edge angle at Top: '//trim(text)//' Bot: '//trim(text1)
     return
   end if
   
@@ -275,12 +285,15 @@ function aero_objective_function(designvars, include_penalty)
   
 ! Penalty for too sharp leading edge
 
-  penaltyval = penaltyval + max(0.d0,min_leading_edge_angle-minpanang)/0.01d0
+  penaltyval = penaltyval + max(0.d0,min_leading_edge_angle-minpanang)/10.d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F9.4)') panang1
+    write(text1,'(F9.4)') panang2
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 4
-    aero_objective_function%message = ' failed, too sharp leading edge' 
+    aero_objective_function%message = ' failed, too sharp leading edge. '//    &
+      &'Leading edge angle at Top: '//trim(text)//' Bot: '//trim(text1)
     return
   end if
 
@@ -290,12 +303,15 @@ function aero_objective_function(designvars, include_penalty)
 ! Penalty for too disparate leading edge
 
   penaltyval = penaltyval + max(0.d0,abs(panang1-panang2)-                     &
-                                dif_leading_edge_angle)/5.d0
+                                dif_leading_edge_angle)/10.d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F9.4)') panang1
+    write(text1,'(F9.4)') panang2
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 5
-    aero_objective_function%message = ' failed, too disparate leading edge angle' 
+    aero_objective_function%message = ' failed, too disparate leading edge '// &
+      &'angle. Leading edge angle at Top: '//trim(text)//' Bot: '//trim(text1)
     return
   end if
 
@@ -325,7 +341,8 @@ function aero_objective_function(designvars, include_penalty)
   tegap = zt_new(nptt) - zb_new(nptb)
   maxthick = 0.d0
   heightfactor = tan(min_te_angle*acos(-1.d0)/180.d0/2.d0)
-
+  min_TE_failed = 2.0d0
+  
   do i = 2, nptint - 1
 
 !   Thickness array and max thickness
@@ -338,15 +355,20 @@ function aero_objective_function(designvars, include_penalty)
     if (xseedt(i) > te_angle_x_apply) then
       gapallow = tegap + 2.d0 * heightfactor * (x_interp(nptint) -             &
                                                 x_interp(i))
-      penaltyval = penaltyval + max(0.d0,gapallow-thickness(i))/0.1d0
+      min_TE_cicle = 2.0d0*( atan( (thickness(i) - tegap) /                 &
+                             (2.0d0 * (x_interp(nptint) - x_interp(i))) ) )
+      if (min_TE_cicle .LT. min_TE_failed) min_TE_failed = min_TE_cicle
+      penaltyval = penaltyval + max(0.d0,gapallow-thickness(i))/0.01d0
     end if
 
   end do
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F7.2)') min_TE_failed/pi*180.d0
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 6
-    aero_objective_function%message = ' failed, thinner than specified wedge angle on specified back of airfoil' 
+    aero_objective_function%message = ' failed, thinner than specified wedge'//&
+      &' angle on specified back of airfoil. Mininum wedge angle: '//trim(text)
     return
   end if
   
@@ -354,23 +376,33 @@ function aero_objective_function(designvars, include_penalty)
   penaltyval = 0.d0
   
 ! Check additional thickness constraints
-
+  n_op = 0
   if (naddthickconst > 0) then
     call spline_interp_t(curr_foil%npoint,curr_foil%x,curr_foil%z,             &
                          addthick_x(1:naddthickconst),add_thickvec)
-    !call interp_vector(x_interp, thickness,                                    &
+    !call interp_vector(x_interp, thickness,                                   &
     !                   addthick_x(1:naddthickconst), add_thickvec)
 
     do i = 1, naddthickconst
-      penaltyval = penaltyval + max(0.d0,addthick_min(i)-add_thickvec(i))/0.1d0
-      penaltyval = penaltyval + max(0.d0,add_thickvec(i)-addthick_max(i))/0.1d0
+      penaltyval = penaltyval + max(0.d0,addthick_min(i)-add_thickvec(i))/0.01d0
+      penaltyval = penaltyval + max(0.d0,add_thickvec(i)-addthick_max(i))/0.01d0
+      if ((addthick_min(i) .GT. add_thickvec(i)) .OR.                          &
+                                    (add_thickvec(i) .GT. addthick_max(i))) then
+        n_op = n_op + 1
+        op_list(n_op) = i
+        op_list_value(n_op) = add_thickvec(i)
+      end if
     end do
   end if
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(1000I4)') (op_list(i),i=1,n_op)
+    write(text1,'(1000F6.4)') (op_list_value(i),i=1,n_op)
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 7
-    aero_objective_function%message = ' failed, additional thickness constraints out of bounds' 
+    aero_objective_function%message = ' failed, additional thickness '//       &
+      &'constraints out of bounds. At '//trim(text)//' with thickness of '//   &
+      & trim(text1) 
     return
   end if
   
@@ -383,9 +415,11 @@ function aero_objective_function(designvars, include_penalty)
   penaltyval = penaltyval + max(0.d0,maxthick-max_thickness)/0.1d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F9.6)') maxthick
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 8
-    aero_objective_function%message = ' failed, thickness constraints out of bounds' 
+    aero_objective_function%message = ' failed, thickness constraints out of'//&
+      &' bounds. Max thickness: '//trim(text) 
     return
   end if
   
@@ -429,9 +463,12 @@ function aero_objective_function(designvars, include_penalty)
   end if
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(I3)') nreversalst
+    write(text1,'(I3)') nreversalsb
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 9
-    aero_objective_function%message = ' failed, curvature reversals out of bounds' 
+    aero_objective_function%message = ' failed, curvature reversals out of '// &
+      &'bounds. Top reversals: '//trim(text)//' Bot reversals: '//trim(text1) 
     return
   end if
   
@@ -453,24 +490,33 @@ function aero_objective_function(designvars, include_penalty)
   
 ! Get actual flap angles based on design variables
 ! Also add a penalty for flap deflections outside the specified bounds
-  
-  ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
+  n_op = 0
+  ffact = 1.d0/(max_flap_degrees - min_flap_degrees)
   actual_flap_degrees(1:noppoint) = flap_degrees(1:noppoint)
   dvcounter = dvbbnd2 + 1
   do i = 1, nflap_optimize
     flap_idx = flap_optimize_points(i)
-    actual_flap_degrees(flap_idx) = designvars(dvcounter)/ffact
+    actual_flap_degrees(flap_idx) = designvars(dvcounter)/ffact+min_flap_degrees
     penaltyval = penaltyval +                                                  &
                  max(0.d0,actual_flap_degrees(flap_idx)-max_flap_degrees)
     penaltyval = penaltyval +                                                  &
                  max(0.d0,min_flap_degrees-actual_flap_degrees(flap_idx))
     dvcounter = dvcounter + 1
+    if ((actual_flap_degrees(flap_idx) .GT. max_flap_degrees) .OR.             &
+                     (min_flap_degrees .GT. actual_flap_degrees(flap_idx))) then
+      n_op = n_op + 1
+      op_list(n_op) = flap_idx
+      op_list_value(n_op) = actual_flap_degrees(flap_idx)
+    end if
   end do
   
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(1000I4)') (op_list(i),i=1,n_op)
+    write(text1,'(1000F6.4)') (op_list_value(i),i=1,n_op)
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 10
-    aero_objective_function%message = ' failed, flap angles out of bounds' 
+    aero_objective_function%message = ' failed, flap angles out of bounds at'//&
+      &' '//trim(text)//' with angle of '//trim(text1)
     return
   end if
   
@@ -486,18 +532,20 @@ function aero_objective_function(designvars, include_penalty)
 ! Get actual flap hinge based on design variable
 ! Also add a penalty for flap hinge outside the specified bounds
   if (int_x_flap_spec == 1) then
-    fxfact = initial_perturb/(max_flap_x - min_flap_x)
+    fxfact = 1.d0/(max_flap_x - min_flap_x)
     actual_x_flap = designvars(dvcounter)/fxfact + min_flap_x
-    penaltyval = penaltyval + max(0.d0,actual_x_flap-max_flap_x)
-    penaltyval = penaltyval + max(0.d0,min_flap_x-actual_x_flap)
+    penaltyval = penaltyval + max(0.d0,actual_x_flap-max_flap_x)/0.1d0
+    penaltyval = penaltyval + max(0.d0,min_flap_x-actual_x_flap)/0.1d0
   else
     actual_x_flap=x_flap
   end if
   
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F9.6)') actual_x_flap
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 11
-    aero_objective_function%message = ' failed, flap hinge out of bounds' 
+    aero_objective_function%message = ' failed, flap hinge out of bounds. '//  &
+      &'Flap hinge: '//trim(text)
     return
   end if
   
@@ -542,12 +590,14 @@ function aero_objective_function(designvars, include_penalty)
   
 ! Add penalty for too large panel angles
 
-  penaltyval = penaltyval + max(0.0d0,AMAX-max_panel_angle)/5.d0
+  penaltyval = penaltyval + max(0.0d0,AMAX-max_panel_angle)/10.d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F7.2)') AMAX
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 13
-    aero_objective_function%message = ' failed, too large panel angles' 
+    aero_objective_function%message = ' failed, too large panel angles. '//    &
+      &'Max panel angle: '//trim(text) 
     return
   end if
   
@@ -560,9 +610,11 @@ function aero_objective_function(designvars, include_penalty)
   penaltyval = penaltyval + max(0.d0,min_camber-CAMBR)/0.025d0
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(F9.6)') CAMBR
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 14
-    aero_objective_function%message = ' failed, camber out of bounds' 
+    aero_objective_function%message = ' failed, camber out of bounds. '//      &
+      &'Max camber: '//trim(text)
     return
   end if
   
@@ -598,7 +650,7 @@ function aero_objective_function(designvars, include_penalty)
       if (trim(optimization_type(i)) == 'min-drag') then
         if (drag(i) < (1.d0 - drag_check_tol)*mindrag(i)) check = .true.
       else
-        if ((lift(i) > (1.d0 + lift_check_tol)*maxlift(i)) .or.                        &
+        if ((lift(i) > (1.d0 + lift_check_tol)*maxlift(i)) .or.                &
             (drag(i) < (1.d0 - drag_check_tol)*mindrag(i))) check = .true.
       end if
     end if
@@ -815,15 +867,23 @@ function aero_objective_function(designvars, include_penalty)
   end do
 
 ! Add penalty for unconverged points
-
+  n_op = 0
   do i = 1, noppoint
     penaltyval = penaltyval + max(0.d0,viscrms(i)-1.0D-04)/1.0D-04
+    if (viscrms(i) .GT. 1.0D-04) then
+      n_op = n_op + 1
+      op_list(n_op) = i
+    end if
   end do
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(1000I4)') (op_list(i),i=1,n_op)
     aero_objective_function%value = penaltyval*1.0D+06
+    if (aero_objective_function%value .GT. 10**18)                             &
+                                          aero_objective_function%value = 10**18
     aero_objective_function%message_code = 16
-    aero_objective_function%message = ' failed, unconverged points' 
+    aero_objective_function%message = ' failed, unconverged points at '//      &
+      & trim(text)
     return
   end if
   
@@ -831,17 +891,25 @@ function aero_objective_function(designvars, include_penalty)
   penaltyval = 0.d0
   
 ! Add penalty for too low moment
-
+  n_op = 0
   do i = 1, noppoint
     if (trim(moment_constraint_type(i)) /= 'none') then
       penaltyval = penaltyval + max(0.d0,min_moment(i)-moment(i))/0.1d0
     end if
+    if (min_moment(i) .GT. moment(i)) then
+      n_op = n_op + 1
+      op_list(n_op) = i
+      op_list_value(n_op) = moment(i)
+    end if
   end do
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(1000I4)') (op_list(i),i=1,n_op)
+    write(text1,'(1000F6.4)') (op_list_value(i),i=1,n_op)
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 17
-    aero_objective_function%message = ' failed, too low moment' 
+    aero_objective_function%message = ' failed, too low moment at '//          &
+      & trim(text)//' with moment of '//trim(text1)
     return
   end if
   
@@ -849,17 +917,25 @@ function aero_objective_function(designvars, include_penalty)
   penaltyval = 0.d0
   
 ! Add penalty for too low lift
-
+  n_op = 0
   do i = 1, noppoint
     if (trim(lift_constraint_type(i)) /= 'none') then
-      penaltyval = penaltyval + max(0.d0,min_lift(i)-lift(i))/0.1d0
+      penaltyval = penaltyval + max(0.d0,min_lift(i)-lift(i))/1d0
+    end if
+    if (min_lift(i) .GT. lift(i)) then
+      n_op = n_op + 1
+      op_list(n_op) = i
+      op_list_value(n_op) = lift(i)
     end if
   end do
 
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(1000I4)') (op_list(i),i=1,n_op)
+    write(text1,'(1000F6.4)') (op_list_value(i),i=1,n_op)
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 18
-    aero_objective_function%message = ' failed, too low lift' 
+    aero_objective_function%message = ' failed, too low lift at '//            &
+      & trim(text)//' with lift of '//trim(text1)
     return
   end if
   
@@ -867,17 +943,25 @@ function aero_objective_function(designvars, include_penalty)
   penaltyval = 0.d0
   
 ! Add penalty for too high drag
-
+  n_op = 0
   do i = 1, noppoint
     if (trim(drag_constraint_type(i)) /= 'none') then
-      penaltyval = penaltyval + max(0.d0,drag(i)-max_drag(i))/0.1d0
+      penaltyval = penaltyval + max(0.d0,drag(i)-max_drag(i))/0.01d0
+    end if
+    if (drag(i) .GT. max_drag(i)) then
+      n_op = n_op + 1
+      op_list(n_op) = i
+      op_list_value(n_op) = drag(i)
     end if
   end do
   
   if ( (penaltyval > epsexit) .and. penalize ) then
+    write(text,'(1000I4)') (op_list(i),i=1,n_op)
+    write(text1,'(1000F6.4)') (op_list_value(i),i=1,n_op)
     aero_objective_function%value = penaltyval*1.0D+06
     aero_objective_function%message_code = 19
-    aero_objective_function%message = ' failed, too high drag' 
+    aero_objective_function%message = ' failed, too high drag at '//           &
+      & trim(text)//' with drag of '//trim(text1)
     return
   end if
   
@@ -886,16 +970,16 @@ function aero_objective_function(designvars, include_penalty)
   
 ! Add all penalties to objective function, and make them very large
 
-  if (penalize) aero_objective_function%value =                                      &
-                aero_objective_function%value + penaltyvaltotal*1.0D+06
+  if (penalize) aero_objective_function%value =                                &
+                aero_objective_function%value + penaltyvaltotal
   write(text,'(F12.6)') penaltyvaltotal
   if (ncheckpt .EQ. 0) then
-    message = ' passed, penaltyvaltotal:'//trim(text)
+    message = ' passed, penaltyvaltotal: '//trim(text)
     aero_objective_function%message_code = 100
   else
     aero_objective_function%message_code = 200
     write(text1,'(1000I4)') (checkop(i),i=1,ncheckpt)
-    message = ' passed, penaltyvaltotal:'//trim(text)//' rechecked at: '//     &
+    message = ' passed, penaltyvaltotal: '//trim(text)//' rechecked at: '//    &
       trim(text1)
   end if
   aero_objective_function%message = message
@@ -951,7 +1035,7 @@ function matchfoil_objective_function(designvars)
 
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
-    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    tefact = 1.d0/(max_tcTE - min_tcTE)
     actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+         &
       int_tcTE_spec)/tefact + min_tcTE
   else
@@ -974,6 +1058,9 @@ function matchfoil_objective_function(designvars)
   matchfoil_objective_function%value = norm_2(zt_new(2:nptt-1) - zmatcht(2:nptt-1))
   matchfoil_objective_function%value = matchfoil_objective_function%value +                &
                                  norm_2(zb_new(2:nptb-1) - zmatchb(2:nptb-1))
+  
+  matchfoil_objective_function%message_code = 100
+  matchfoil_objective_function%message = ' ' 
 
 end function matchfoil_objective_function
 
@@ -1026,9 +1113,9 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   double precision :: actual_x_flap, actual_tcTE
   integer :: ndvs, flap_idx, flap_idi, dvcounter
  
-  character(100) :: foilfile, polarfile, text
+  character(100) :: foilfile, polarfile, text, variablesfile, textdv
   character(8) :: maxtchar, xmaxtchar, maxcchar, xmaxcchar
-  integer :: foilunit, polarunit
+  integer :: foilunit, polarunit, variablesunit
 
   nmodest = nparams_top
   nmodesb = nparams_bot
@@ -1060,7 +1147,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
-    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    tefact = 1.d0/(max_tcTE - min_tcTE)
     actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
       int_tcTE_spec)/tefact + min_tcTE
   else
@@ -1102,12 +1189,12 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   
 ! Get actual flap angles based on design variables
 
-  ffact = initial_perturb/(max_flap_degrees - min_flap_degrees)
+  ffact = 1.d0/(max_flap_degrees - min_flap_degrees)
   actual_flap_degrees(1:noppoint) = flap_degrees(1:noppoint)
   dvcounter = dvbbnd2 + 1
   do i = 1, nflap_optimize
     flap_idx = flap_optimize_points(i)
-    actual_flap_degrees(flap_idx) = designvars(dvcounter)/ffact
+    actual_flap_degrees(flap_idx) = designvars(dvcounter)/ffact+min_flap_degrees
     dvcounter = dvcounter + 1
   end do
   
@@ -1119,7 +1206,7 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   
 ! Get actual flap chord based on design variable
   if (int_x_flap_spec == 1) then
-    fxfact = initial_perturb/(max_flap_x - min_flap_x)
+    fxfact = 1.d0/(max_flap_x - min_flap_x)
     actual_x_flap = designvars(dvcounter)/fxfact + min_flap_x
   else
     actual_x_flap=x_flap
@@ -1177,9 +1264,11 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 
   foilfile = trim(output_prefix)//'_design_coordinates.dat'
   polarfile = trim(output_prefix)//'_design_polars.dat'
+  variablesfile = trim(output_prefix)//'_design_aifoil_variables.dat'
 
   foilunit = 13
   !polarunit = 14
+  variablesunit = 15
 
 ! Open files and write headers, if necessary
 
@@ -1252,6 +1341,32 @@ function write_airfoil_optimization_progress(designvars, designcounter)
   close(foilunit)
   !close(polarunit)
 
+  open(unit=variablesunit, file=variablesfile, status='replace')
+
+    write(variablesunit,'(A)') 'design aifoil variables'
+    do i=1, dvtbnd2-dvtbnd1+1
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(variablesunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+    do i=1, dvbbnd2-dvbbnd1+1
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(variablesunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+    if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no') 'te_thick'
+    write(variablesunit,'(A)') ' '
+  
+    do i = 1, size(designvars(dvtbnd1:dvtbnd2),1)
+      write(variablesunit,'(F12.8)', advance='no') designvars(dvtbnd1+i-1)
+    end do
+    do i = 1, size(designvars(dvbbnd1:dvbbnd2),1)
+      write(variablesunit,'(F12.8)', advance='no') designvars(dvbbnd1+i-1)
+    end do
+    if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no') actual_tcTE
+    write(variablesunit,'(A)') ' '
+    
+  close(variablesunit)
 ! Set return value (needed for compiler)
 
   write_airfoil_optimization_progress = 0
@@ -1290,8 +1405,8 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
   integer :: i, nmodest, nmodesb, nptt, nptb, dvtbnd, dvbbnd, ndvs_top, ndvs_bot
   double precision :: tefact, actual_tcTE
   
-  character(100) :: foilfile, text
-  integer :: foilunit
+  character(100) :: foilfile, text, textdv, variablesfile
+  integer :: foilunit, variablesunit
 
   nmodest = nparams_top
   nmodesb = nparams_bot
@@ -1307,7 +1422,7 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
 
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
-    tefact = initial_perturb/(max_tcTE - min_tcTE)
+    tefact = 1.d0/(max_tcTE - min_tcTE)
     actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+         &
       int_tcTE_spec)/tefact + min_tcTE
   else
@@ -1340,6 +1455,9 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
 ! Set output file names and identifiers
 
   foilfile = trim(output_prefix)//'_design_coordinates.dat'
+  variablesfile = trim(output_prefix)//'_design_aifoil_variables.dat'
+
+  variablesunit = 15  
   foilunit = 13
 
 ! Open file and write header, if necessary
@@ -1397,6 +1515,33 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
 
   close(foilunit)
 
+    open(unit=variablesunit, file=variablesfile, status='replace')
+
+    write(variablesunit,'(A)') 'design aifoil variables'
+    do i=1, dvtbnd-1+1
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(variablesunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+    do i=1, dvbbnd-(dvtbnd+1)+1
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(variablesunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+    if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no') 'te_thick'
+    write(variablesunit,'(A)') ' '
+
+    do i = 1, size(designvars(1:dvtbnd),1)
+      write(variablesunit,'(F12.8)', advance='no') designvars(1+i-1)
+    end do
+    do i = 1, size(designvars(dvtbnd+1:dvbbnd),1)
+      write(variablesunit,'(F12.8)', advance='no') designvars(dvtbnd+i)
+    end do
+    if (int_tcTE_spec .NE. 0) write(variablesunit,'(F12.8)', advance='no') actual_tcTE
+    write(variablesunit,'(A)') ' '
+    
+  close(variablesunit)
+  
 ! Set return value (needed for compiler)
 
   write_matchfoil_optimization_progress = 0

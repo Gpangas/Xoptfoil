@@ -52,7 +52,7 @@ program main
   integer, dimension(:), allocatable :: constrained_dvs
   double precision :: f0, fmin
   logical :: restart
-  integer :: iMaxThreads, NumThreads
+  integer :: iMaxThreads, NumThreads, i
   
   interface
     integer function OMP_GET_MAX_THREADS()
@@ -95,6 +95,15 @@ program main
 
   call get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, buffer_foil, &
                         xoffset, zoffset, foilscale, foilangle, tcTE_seed)
+  
+  ! Write seed foil to file
+  write(*,*) 'Writing seed airfoil in use to file: ', 'seed_'//airfoil_file
+  open(unit=100, file='seed_'//airfoil_file, status='replace')
+    write(100,'(A)') 'seed_airfoil'
+    do i = 1, buffer_foil%npoint
+      write(100,'(2F12.8)') buffer_foil%x(i), buffer_foil%z(i)
+    end do
+  close(100)
 
   ! Split up seed airfoil into upper and lower surfaces
 
@@ -157,15 +166,28 @@ program main
     write(*,*)
   end if
   
-  ! Get initial values for modes
-  allocate(modest_seed(nshapedvtop),modesb_seed(nshapedvbot))
-  write(*,*) "nshape", nshapedvtop, nshapedvbot
+  ! Get initial values for modes if not done already
+  if (.NOT. allocated(modest_seed)) then
+    allocate(modest_seed(nshapedvtop),modesb_seed(nshapedvbot))
   
-  modest_seed=0.0d0
-  modesb_seed=0.0d0
+    modest_seed=0.0d0
+    modesb_seed=0.0d0
 
-  call parametrization_new_seed(xseedt, xseedb, zseedt, zseedb, modest_seed,   &
-      modesb_seed, symmetrical, shape_functions)
+    call parametrization_new_seed(xseedt, xseedb, zseedt, zseedb, modest_seed, &
+        modesb_seed, symmetrical, shape_functions)
+  end if
+  
+  ! Write seed foil to file after parametrization
+  write(*,*) 'Writing airfoil after parametrization to file: ', 'param_seed_'//airfoil_file
+  open(unit=100, file='param_seed_'//airfoil_file, status='replace')
+    write(100,'(A)') 'param_seed_airfoil'
+    do i = 1, size(xseedt,1)
+      write(100,'(2F12.8)') xseedt(size(xseedt,1)-i+1), zseedt(size(xseedt,1)-i+1)
+    end do
+    do i = 1, size(xseedb,1)-1
+      write(100,'(2F12.8)') xseedb(i+1), zseedb(i+1)
+    end do
+  close(100)
   
   ! Make sure seed airfoil passes constraints, and get scaling factors for
   ! operating points
@@ -181,10 +203,6 @@ program main
     write(*,*) 'nconstrained', size(constrained_dvs, 1)
     write(*,*) 'constrained_dvs', constrained_dvs
   end if
-      
-  write(*,*)
-  write(*,*) 'Press Enter to continue'
-  read(*,*) 
       
   ! Optimize
   call optimize(search_type, global_search, local_search, constrained_dvs,     &
