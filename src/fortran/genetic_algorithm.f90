@@ -93,9 +93,10 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   integer, intent(out) :: step, fevals
 
   interface
-    type(objfunction_type) function objfunc(x)
+    type(objfunction_type) function objfunc(x,step)
       import :: objfunction_type
       double precision, dimension(:), intent(in) :: x
+      integer, intent(in) :: step
     end function
   end interface
 
@@ -162,7 +163,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   if (given_f0_ref) then
     f0 = f0_ref
   else
-    objfunction_return = objfunc(x0)
+    objfunction_return = objfunc(x0,0)
     f0 = objfunction_return%value
     f0_ref = f0
   end if
@@ -404,11 +405,11 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
       end do
 
 !     Evaluate objective function for offspring
-      objfunction_return = objfunc(child1)
+      objfunction_return = objfunc(child1, step)
       objchild1 = objfunction_return%value
       message_codes(ga_options%pop+2*(i-1)+1) = objfunction_return%message_code
       messages(ga_options%pop+2*(i-1)+1) = objfunction_return%message
-      objfunction_return = objfunc(child2)
+      objfunction_return = objfunc(child2, step)
       objchild2 = objfunction_return%value
       message_codes(ga_options%pop+2*i) = objfunction_return%message_code
       messages(ga_options%pop+2*i) = objfunction_return%message

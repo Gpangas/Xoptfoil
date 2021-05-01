@@ -201,6 +201,33 @@ end subroutine xfoil_apply_flap_deflection
 
 !=============================================================================80
 !
+! Subroutine to get the max panel angle in an airfoil using
+! Xfoil's CANG subroutine
+!
+!=============================================================================80
+subroutine get_max_panel_angle(foilin, panel_angle)
+
+  use vardef, only : airfoil_type
+
+  type(airfoil_type), intent(in) :: foilin
+  double precision, intent(out) :: panel_angle
+  
+  integer :: NB, INTMAX
+  double precision :: ANGMAX
+  double precision, dimension(foilin%npoint) :: XB, YB 
+  
+  NB = foilin%npoint
+  XB(1:NB) = foilin%x
+  YB(1:NB) = foilin%z
+  
+  CALL CANG(XB,YB,NB,0,INTMAX,ANGMAX)
+  
+  panel_angle = ANGMAX
+  
+end subroutine get_max_panel_angle
+
+!=============================================================================80
+!
 ! Subroutine to get Cl, Cd, Cm for an airfoil from Xfoil at given operating
 ! conditions.  Reynolds numbers and mach numbers should be specified for each
 ! operating point.  Additionally, op_mode determines whether each point is run

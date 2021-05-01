@@ -68,9 +68,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   double precision :: init_al0, init_cl0, init_initial_position
   character(30) :: init_type, init_dist
   
-  integer :: restart_write_freq, pso_pop, pso_maxit, simplex_maxit, bl_maxit,  &
-             npan, feasible_init_attempts
-  integer :: ga_pop, ga_maxit
+  integer :: restart_write_freq, pso_pop, bl_maxit, npan, feasible_init_attempts
+  integer :: ga_pop, simplex_maxit, ga_maxit, pso_maxit
   double precision :: maxt, xmaxt, maxc, xmaxc, design_cl, a, leidx
   double precision :: pso_tol, simplex_tol, ncrit, xtript, xtripb, vaccel
   double precision :: cvpar, cterat, ctrrat, xsref1, xsref2, xpref1, xpref2
@@ -89,7 +88,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   namelist /optimization_options/ search_type, global_search, local_search,    &
             seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
             nparameters_bot, flap_optimization_only, abs_initial_perturb,      &
-            rel_initial_perturb, min_bump_width, kulfan_bussoletti_LEM,        &
+            rel_initial_perturb, penalty_limit_initial, penalty_limit_end,     &
+            penalty_factor, allow_seed_penalties,  min_bump_width,             &
+            kulfan_bussoletti_LEM,                                             &
             b_spline_degree, b_spline_xtype, b_spline_distribution, restart,   &
             restart_write_freq, write_designs, write_cp_file, write_bl_file,   &
             write_dvs_file, number_threads
@@ -156,6 +157,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   flap_optimization_only = .false.
   abs_initial_perturb = 0.025d0
   rel_initial_perturb = 0.0d0
+  penalty_limit_initial = 1.0D-4
+  penalty_limit_end = 1.0D-4
+  penalty_factor = 1.0D0
+  allow_seed_penalties = .false.
   restart = .false.
   restart_write_freq = 20
   write_designs = .true.
@@ -380,6 +385,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
   simplex_tol = 1.0D-05
   simplex_maxit = 1000
+  
+  epsexit_linear = .true. 
 
   if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
       'global') then
@@ -405,7 +412,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       else
         pso_options%relative_fmin_report = .false.
       end if
-
+      maxit = pso_maxit
     else if (trim(global_search) == 'genetic_algorithm') then
 
 !     Read genetic algorithm options and put them into derived type
@@ -433,7 +440,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       else
         ga_options%relative_fmin_report = .false.
       end if
-
+      maxit = ga_options%maxit
     else
       call my_stop("Global search type '"//trim(global_search)//               &
                    "' is not available.")
@@ -458,7 +465,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       else
         ds_options%relative_fmin_report = .false.
       end if
-
+      if (trim(search_type) == 'local') maxit = ds_options%maxit
     else
       call my_stop("Local search type '"//trim(local_search)//   &
                    "' is not available.")
@@ -642,6 +649,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " flap_optimization_only = ", flap_optimization_only  
   write(*,*) " abs_initial_perturb = ", abs_initial_perturb
   write(*,*) " rel_initial_perturb = ", rel_initial_perturb
+  write(*,*) " penalty_limit_initial = ", penalty_limit_initial
+  write(*,*) " penalty_limit_end = ", penalty_limit_end
+  write(*,*) " penalty_factor = ", penalty_factor
+  write(*,*) " allow_seed_penalties = ", allow_seed_penalties
   write(*,*) " restart = ", restart
   write(*,*) " restart_write_freq = ", restart_write_freq
   write(*,*) " write_designs = ", write_designs
@@ -898,6 +909,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(100,*) " flap_optimization_only = ", flap_optimization_only  
   write(100,*) " abs_initial_perturb = ", abs_initial_perturb
   write(100,*) " rel_initial_perturb = ", rel_initial_perturb
+  write(100,*) " penalty_limit_initial = ", penalty_limit_initial
+  write(100,*) " penalty_limit_end = ", penalty_limit_end
+  write(100,*) " penalty_factor = ", penalty_factor
+  write(100,*) " allow_seed_penalties = ", allow_seed_penalties
   write(100,*) " restart = ", restart
   write(100,*) " restart_write_freq = ", restart_write_freq
   write(100,*) " write_designs = ", write_designs
@@ -1160,8 +1175,14 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("nparameters_bot must be >= 0.")
   if (abs_initial_perturb <= 0.d0)                                             &
     call my_stop("abs_initial_perturb must be > 0.")
-  if (rel_initial_perturb <= 0.d0)                                             &
-    call my_stop("rel_initial_perturb must be > 0.")
+  if (rel_initial_perturb < 0.d0)                                             &
+    call my_stop("rel_initial_perturb must be >= 0.")
+  if (penalty_limit_initial < 0.d0)                                             &
+    call my_stop("penalty_limit_initial must be >= 0.")
+  if (penalty_limit_end < 0.d0)                                             &
+    call my_stop("penalty_limit_end must be >= 0.")
+  if (penalty_factor < 0.d0)                                             &
+    call my_stop("penalty_factor must be >= 0.")
   if (min_bump_width <= 0.d0)                                                  &
     call my_stop("min_bump_width must be > 0.")
   if (b_spline_degree < 2)                                                     &
@@ -1354,6 +1375,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   do i = 1, naddthickconst
     if (addthick_x(i) <= 0.d0) call my_stop("addthick_x must be > 0.")
     if (addthick_x(i) >= 1.d0) call my_stop("addthick_x must be < 1.")
+    if (addthick_min(i) <= 0.d0) call my_stop("addthick_min must be > 0.")
+    if (addthick_max(i) <= 0.d0) call my_stop("addthick_max must be > 0.")
     if (addthick_min(i) >= addthick_max(i))                                    &
       call my_stop("addthick_min must be < addthick_max.")
   end do

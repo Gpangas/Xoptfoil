@@ -116,9 +116,10 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
   integer :: CHUNK = 1
 
   interface
-    type(objfunction_type) function objfunc(x)
+    type(objfunction_type) function objfunc(x,step)
       import :: objfunction_type
       double precision, dimension(:), intent(in) :: x
+      integer, intent(in) :: step
     end function
   end interface
 
@@ -154,14 +155,14 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
 
   if (use_x0) then
     dv(:,1) = x0
-    objfunction_return = objfunc(x0)
+    objfunction_return = objfunc(x0,1)
     objval(1) = objfunction_return%value
     message_codes(1) = objfunction_return%message_code
     messages(1) = objfunction_return%message
 !$omp do SCHEDULE(DYNAMIC,CHUNK)
     do i = 2, pop
       dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
-      objfunction_return = objfunc(dv(:,i))
+      objfunction_return = objfunc(dv(:,i),1)
       objval(i) = objfunction_return%value
       message_codes(i) = objfunction_return%message_code
       messages(i) = objfunction_return%message
@@ -171,7 +172,7 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
 !$omp do SCHEDULE(DYNAMIC,CHUNK)
     do i = 1, pop
       dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
-      objfunction_return = objfunc(dv(:,i))
+      objfunction_return = objfunc(dv(:,i),1)
       objval(i) = objfunction_return%value
       message_codes(i) = objfunction_return%message_code
       messages(i) = objfunction_return%message
@@ -206,7 +207,7 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
                (objval(i) >= feasible_limit))
         call random_number(randvec1)
         dv(:,i) = (xmax - xmin)*randvec1 + xmin
-        objfunction_return = objfunc(dv(:,i))
+        objfunction_return = objfunc(dv(:,i),1)
         objval(i) = objfunction_return%value
         message_codes(i) = objfunction_return%message_code
         messages(i) = objfunction_return%message

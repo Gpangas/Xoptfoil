@@ -254,7 +254,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   write(*,*) 'message: ', message
   
 ! Compute with penalty
-  objfunction_return = objective_function(x0) 
+  objfunction_return = objective_function(x0,0) 
   f0_penalty = objfunction_return%value
   message = objfunction_return%message
   

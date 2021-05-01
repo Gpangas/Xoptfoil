@@ -56,9 +56,10 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   integer, intent(out) :: step, fevals
 
   interface
-    type(objfunction_type) function objfunc(x)
+    type(objfunction_type) function objfunc(x,step)
       import :: objfunction_type
       double precision, dimension(:), intent(in) :: x
+      integer, intent(in) :: step
     end function
   end interface
 
@@ -117,7 +118,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     if (given_f0_ref) then
       f0 = f0_ref
     else
-      objfunction_return = objfunc(x0)
+      objfunction_return = objfunc(x0,0)
       f0 = objfunction_return%value
       f0_ref = f0
     end if
@@ -137,7 +138,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
           dv(i,j) = x0(i)
         end if
       end do
-      objfunction_return = objfunc(dv(:,j))
+      objfunction_return = objfunc(dv(:,j),1)
       objvals(j) = objfunction_return%value
       messages(j) = objfunction_return%message
       message_codes(j) = objfunction_return%message_code
@@ -145,7 +146,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     end do
 
     dv(:,nvars+1) = x0
-    objfunction_return = objfunc(x0)
+    objfunction_return = objfunc(x0,0)
     objvals(nvars+1) = objfunction_return%value
     messages(nvars+1) = objfunction_return%message
     message_codes(nvars+1) = objfunction_return%message_code
@@ -350,7 +351,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !   Compute the reflection point and evaluate its objective function value
 
     xr = (1.d0 + rho)*xcen - rho*dv(:,nvars+1)
-    objfunction_return = objfunc(xr)
+    objfunction_return = objfunc(xr, step)
     fr = objfunction_return%value
     fevals = fevals + 1
 
@@ -369,7 +370,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !     Expand
 
       xe = (1.d0 + rho*xi)*xcen - rho*xi*dv(:,nvars+1)
-      objfunction_return = objfunc(xe)
+      objfunction_return = objfunc(xe, step)
       fe = objfunction_return%value
       fevals = fevals + 1
       if (fe < fr) then
@@ -390,7 +391,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
         contraction: if (fr < objvals(nvars+1)) then
 
           xc = (1.d0 + rho*gam)*xcen - rho*gam*dv(:,nvars+1)
-          objfunction_return = objfunc(xc)
+          objfunction_return = objfunc(xc, step)
           fc = objfunction_return%value
           fevals = fevals + 1
 
@@ -409,7 +410,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
         else
 
           xc = (1.d0 - gam)*xcen + gam*dv(:,nvars+1)
-          objfunction_return = objfunc(xc)
+          objfunction_return = objfunc(xc, step)
           fc = objfunction_return%value
           fevals = fevals + 1
 
@@ -431,7 +432,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
           do i = 2, nvars + 1
             dv(:,i) = dv(:,1) + sigma*(dv(:,i) - dv(:,1))
-            objfunction_return = objfunc(dv(:,i))
+            objfunction_return = objfunc(dv(:,i), step)
             objvals(i) = objfunction_return%value
             messages(i) = objfunction_return%message
             message_codes(i) = objfunction_return%message_code

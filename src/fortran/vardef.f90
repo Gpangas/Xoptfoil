@@ -111,16 +111,18 @@ module vardef
   double precision, dimension(:), allocatable :: modesb_seed
   
   double precision :: abs_initial_perturb, rel_initial_perturb, tcTE_seed
+  double precision :: penalty_limit_initial, penalty_limit_end, penalty_factor
   double precision :: min_bump_width
-  logical :: kulfan_bussoletti_LEM
+  logical :: kulfan_bussoletti_LEM, epsexit_linear
   integer :: int_kulfan_bussoletti_LEM
   integer :: b_spline_degree, b_spline_xtype, b_spline_distribution
   double precision, dimension(:), allocatable :: upointst, upointsb, xcontrolt,&
                                                  xcontrolb
-  logical ::  first_run_xfoil
+  logical ::  first_run_xfoil, allow_seed_penalties
   character(80) :: output_prefix
 
   integer :: naddthickconst
+  integer :: maxit
   integer, parameter :: max_addthickconst = 10 ! remove limit?
   double precision, dimension(max_addthickconst) :: addthick_x, addthick_min,  &
                                                     addthick_max

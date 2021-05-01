@@ -71,9 +71,10 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   integer, intent(out) :: step, fevals
 
   interface
-    type(objfunction_type) function objfunc(x)
+    type(objfunction_type) function objfunc(x,step)
       import :: objfunction_type
       double precision, dimension(:), intent(in) :: x
+      integer, intent(in) :: step
     end function
   end interface
                          
@@ -156,7 +157,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   if (given_f0_ref) then
     f0 = f0_ref
   else 
-    objfunction_return = objfunc(x0)
+    objfunction_return = objfunc(x0,0)
     f0 = objfunction_return%value
     f0_ref = f0
   end if
@@ -398,7 +399,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
       end do
 
 !     Evaluate objective function and update local best design if appropriate
-      objfunction_return = objfunc(dv(:,i))
+      objfunction_return = objfunc(dv(:,i), step)
       objval(i) = objfunction_return%value
       message_codes(i) = objfunction_return%message_code
       messages(i) = objfunction_return%message
