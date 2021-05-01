@@ -220,8 +220,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   if (step + prevsteps .EQ. 0 ) then
     ! Display initial value
     write(*,'(A12,I5)')   ' Iteration: ', 0
-    write(*,'(A27,F9.6)') '   Objective function:    ', f0
-    if (ds_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+    write(*,'(A27,F12.6)') '   Objective function:    ', f0
+    if (ds_options%relative_fmin_report) write(*,'(A27,F12.6,A1)')             &
                         '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
   end if
   
@@ -264,10 +264,10 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 !   Display progress
 
     write(*,'(A12,I5)')   ' Iteration: ', step + prevsteps
-    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
-    if (ds_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')              &
+    write(*,'(A27,F12.6)') '   Objective function:    ', fmin
+    if (ds_options%relative_fmin_report) write(*,'(A27,F12.6,A1)')              &
                         '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
-    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+    write(*,'(A27,ES13.3)') '   Design radius:         ', radius
 
 !   Write design to file if requested
 !   converterfunc is an optional function supplied to convert design variables

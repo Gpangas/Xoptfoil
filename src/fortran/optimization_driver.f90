@@ -608,10 +608,10 @@ subroutine write_final_design(optdesign, f0, fmin, shapetype)
     end do
 
     write(*,*)
-    write(*,'(A43F8.4A1)') " Objective function improvement over seed: ",      &
+    write(*,'(A43F10.4A1)') " Objective function improvement over seed: ",      &
                            (f0 - fmin)/f0*100.d0, "%" 
     write(iunit,*)
-    write(iunit,'(A43F8.4A1)') " Objective function improvement over seed: ",  &
+    write(iunit,'(A43F10.4A1)') " Objective function improvement over seed: ",  &
                            (f0 - fmin)/f0*100.d0, "%" 
 
     close(iunit)

@@ -272,18 +272,18 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   
     ! Display initial value
     write(*,'(A12,I5)')   ' Iteration: ', 0
-    write(*,'(A27,F9.6)') '   Objective function:    ', f0
-    if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+    write(*,'(A27,F12.6)') '   Objective function:    ', f0
+    if (pso_options%relative_fmin_report) write(*,'(A27,F12.6,A1)')             &
                         '   Improvement over seed: ', (f0 - f0)/f0*100.d0, '%'
   
     !   Display progress 
 
     radius = design_radius(dv,xmax,xmin)
     write(*,'(A12,I5)')   ' Iteration: ', step
-    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
-    if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+    write(*,'(A27,F12.6)') '   Objective function:    ', fmin
+    if (pso_options%relative_fmin_report) write(*,'(A27,F12.6,A1)')             &
                         '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
-    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+    write(*,'(A27,ES13.3)') '   Design radius:         ', radius
 
 
     if (pso_options%write_designs) then
@@ -350,10 +350,10 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
     radius = design_radius(dv,xmax,xmin)
     write(*,'(A17,I5)')   ' Last Iteration: ', step
-    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
-    if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+    write(*,'(A27,F12.6)') '   Objective function:    ', fmin
+    if (pso_options%relative_fmin_report) write(*,'(A27,F12.6,A1)')             &
                         '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
-    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+    write(*,'(A27,ES13.3)') '   Design radius:         ', radius
   end if
 !$omp end master
 !$omp barrier
@@ -453,10 +453,10 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
 
     radius = design_radius(dv,xmax,xmin)
     write(*,'(A12,I5)')   ' Iteration: ', step
-    write(*,'(A27,F9.6)') '   Objective function:    ', fmin
-    if (pso_options%relative_fmin_report) write(*,'(A27,F9.6,A1)')             &
+    write(*,'(A27,F12.6)') '   Objective function:    ', fmin
+    if (pso_options%relative_fmin_report) write(*,'(A27,F12.6,A1)')             &
                         '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
-    write(*,'(A27,ES10.3)') '   Design radius:         ', radius
+    write(*,'(A27,ES13.3)') '   Design radius:         ', radius
 
 !   Write design to file if requested
 !   converterfunc is an optional function supplied to convert design variables
