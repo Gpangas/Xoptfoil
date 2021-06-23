@@ -219,7 +219,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   moment_constraint_type(:) = 'none'
   min_moment(:) = -1.d0
   lift_constraint_type(:) = 'none'
-  min_lift(:) = 0.d0
+  min_lift(:) = -1.d0
   drag_constraint_type(:) = 'none'
   max_drag(:) = 1.d0
   max_growth_seed_mult = 2.0 
@@ -587,6 +587,39 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   int_kulfan_bussoletti_LEM = 0
   if (kulfan_bussoletti_LEM) int_kulfan_bussoletti_LEM = 1
   
+! Store number and identification of operating points restricted by moment 
+  nmoment_constrain = 0
+  if (.not. match_foils) then
+    do i = 1, noppoint
+      if (trim(moment_constraint_type(i)) /= 'none') then
+        nmoment_constrain = nmoment_constrain + 1
+        moment_constrain_points(nmoment_constrain) = i
+      end if
+    end do
+  end if
+  
+! Store number and identification of operating points restricted by drag 
+  ndrag_constrain = 0
+  if (.not. match_foils) then
+    do i = 1, noppoint
+      if (trim(drag_constraint_type(i)) /= 'none') then
+        ndrag_constrain = ndrag_constrain + 1
+        drag_constrain_points(ndrag_constrain) = i
+      end if
+    end do
+  end if
+  
+! Store number and identification of operating points restricted by lift 
+  nlift_constrain = 0
+  if (.not. match_foils) then
+    do i = 1, noppoint
+      if (trim(lift_constraint_type(i)) /= 'none') then
+        nlift_constrain = nlift_constrain + 1
+        lift_constrain_points(nlift_constrain) = i
+      end if
+    end do
+  end if
+  
 ! Store operating points where flap setting will be optimized
   nflap_optimize = 0
   if ((use_flap) .and. (.not. match_foils)) then
@@ -623,6 +656,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   else
     int_tcTE_spec = 0
   end if  
+  
+  contrain_number = 1+nflap_optimize+3+naddthickconst+10+                      &
+                               nmoment_constrain+nlift_constrain+ndrag_constrain
   
 ! Echo namelist options for checking purposes
 

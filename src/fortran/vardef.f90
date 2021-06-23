@@ -48,8 +48,14 @@ module vardef
     double precision :: value
     integer :: message_code
     character(200) :: message
+    double precision, dimension(:), allocatable :: constrains_data
     
   end type objfunction_type
+  
+  type test_type
+    double precision :: value
+    type(objfunction_type) :: obj
+  end type test_type
   
 ! Global variables (mainly needed to preserve generality of optimization
 ! routines)
@@ -72,11 +78,13 @@ module vardef
   character(20) :: flap_connection, connection_apply 
   character(15), dimension(max_op_points) :: optimization_type
   integer, dimension(6) :: dvs_for_type
-  integer :: nflap_optimize, nflap_identical
+  integer :: nflap_optimize, nflap_identical, nmoment_constrain,               &
+             ndrag_constrain, nlift_constrain, contrain_number
                                      ! Number of operating points where flap 
                                      !   setting will be optimized or identical
   integer, dimension(max_op_points) :: flap_optimize_points,                   &
-                                       flap_identical_points
+                                       flap_identical_points,                  &
+           moment_constrain_points, drag_constrain_points, lift_constrain_points
   double precision :: xoffset, zoffset, foilscale, foilangle
 
   type(airfoil_type) :: curr_foil, match_foil

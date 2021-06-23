@@ -172,7 +172,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
                     restart_write_freq, optdesign, f0_ref, fmin, steps, fevals)
 
   use vardef,             only : output_prefix, global_search_stat,            &
-                                 local_search_stat, restart_stat, objfunction_type
+                                 local_search_stat, restart_stat, objfunction_type,&
+                                 contrain_number
   use particle_swarm,     only : pso_options_type, particleswarm, pso_read_step
   use genetic_algorithm,  only : ga_options_type, geneticalgorithm, ga_read_step
   use simplex_search,     only : ds_options_type, simplexsearch
@@ -201,6 +202,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   character(14) :: stop_reason
   double precision :: f0_penalty
   character(200) :: message
+  double precision, dimension(contrain_number) :: constrain_vector
+  double precision, dimension(2,contrain_number) :: constrain_matrix
 
   ! Set search types
   
@@ -248,10 +251,13 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   objfunction_return = objective_function_nopenalty(x0) 
   f0_ref = objfunction_return%value
   message = objfunction_return%message
-  
+  constrain_vector = objfunction_return%constrains_data
+ 
   write(*,*)
   write(*,*) 'f0_ref:     ', f0_ref
   write(*,*) 'message: ', message
+  
+  write(*,*) 'constrain_vector', constrain_vector
   
 ! Compute with penalty
   objfunction_return = objective_function(x0,0) 
@@ -261,6 +267,8 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   write(*,*)
   write(*,*) 'f0_penalty: ', f0_penalty
   write(*,*) 'message: ', message
+  constrain_matrix(1,:) = objfunction_return%constrains_data
+  write(*,*) 'constrain_matrix', constrain_matrix(1,:)
   
 ! Wait for user to check information
   write(*,*)

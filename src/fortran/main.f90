@@ -54,10 +54,10 @@ program main
   logical :: restart
   integer :: iMaxThreads, NumThreads, i
   
-  interface
-    integer function OMP_GET_MAX_THREADS()
-    end function
-  end interface
+  !interface
+  !  integer function OMP_GET_MAX_THREADS()
+  !  end function
+  !end interface
   ! Set default names and read command line arguments
 
   input_file = 'inputs.txt'
@@ -77,19 +77,19 @@ program main
   
   ! Set thread number
   
-  iMaxThreads = OMP_GET_MAX_THREADS()	
-  if ((abs(number_threads).eq.0).or.(abs(number_threads).gt.iMaxThreads)) then
-    NumThreads = iMaxThreads
-  else
-    NumThreads = abs(number_threads)
-  end if
-  
-  write(*,*)
-  write(*,*) 'Maximum number of threads is : ', iMaxThreads 
-  write(*,*) 'Number of threads used is :    ', NumThreads 
-  write(*,*)
-  
-  call OMP_SET_NUM_THREADS(NumThreads)
+  !iMaxThreads = OMP_GET_MAX_THREADS()	
+  !if ((abs(number_threads).eq.0).or.(abs(number_threads).gt.iMaxThreads)) then
+  !  NumThreads = iMaxThreads
+  !else
+  !  NumThreads = abs(number_threads)
+  !end if
+  !
+  !write(*,*)
+  !write(*,*) 'Maximum number of threads is : ', iMaxThreads 
+  !write(*,*) 'Number of threads used is :    ', NumThreads 
+  !write(*,*)
+  !
+  !call OMP_SET_NUM_THREADS(NumThreads)
   
   ! Load seed airfoil into memory, including transformations and smoothing
 

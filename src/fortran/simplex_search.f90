@@ -49,7 +49,8 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   use optimization_util, only : bubble_sort, design_radius_simplex, write_design,      &
                                 read_run_control, bubble_sort_plus
 
-  use vardef, only : output_prefix, objfunction_type, write_dvs_file
+  use vardef, only : output_prefix, objfunction_type, write_dvs_file,          &
+                     contrain_number
 
   double precision, dimension(:), intent(inout) :: xopt
   double precision, intent(out) :: fmin
