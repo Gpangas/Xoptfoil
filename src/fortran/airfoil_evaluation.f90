@@ -118,6 +118,7 @@ function aero_objective_function(designvars, step, include_penalty)
   double precision, dimension(noppoint) :: op_list_value
   integer, dimension(noppoint) :: checkpt_list, checkop, op_list
   character(7), dimension(noppoint) :: opm_check
+  logical, dimension(noppoint) :: opm_previous_op
   double precision, dimension(noppoint) :: opp_check, re_check, ma_check 
   double precision, dimension(noppoint) :: fd_check, ncrit_check
   double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
@@ -146,6 +147,13 @@ function aero_objective_function(designvars, step, include_penalty)
   nmodesb = nparams_bot
   nptt = size(xseedt,1)
   nptb = size(xseedb,1)
+  
+  ! Check for nan
+  do i=1, size(designvars,1)
+    if (isnan(designvars(i))) then
+      write(*,*) "Nan in designvars"
+    end if
+  end do
   
   ! Compute penalty limit epsexit
   
@@ -303,8 +311,8 @@ function aero_objective_function(designvars, step, include_penalty)
   if (int_x_flap_spec == 1) then
     fxfact = 1.d0/(max_flap_x - min_flap_x)
     actual_x_flap = designvars(dvcounter)/fxfact + min_flap_x
-    penaltyval = penaltyval + max(0.d0,actual_x_flap-max_flap_x) / max_flap_x
-    penaltyval = penaltyval + max(0.d0,min_flap_x-actual_x_flap) / min_flap_x
+    penaltyval = penaltyval + max(0.d0,actual_x_flap-max_flap_x) / (max_flap_x+1.E-12)
+    penaltyval = penaltyval + max(0.d0,min_flap_x-actual_x_flap) / (min_flap_x+1.E-12)
   else
     actual_x_flap=x_flap
   end if
@@ -333,6 +341,20 @@ function aero_objective_function(designvars, step, include_penalty)
     call create_airfoil(xseedt, zseedt, xseedb, zseedb,                        &
                       designvars(dvtbnd1:dvtbnd2), designvars(dvbbnd1:dvbbnd2),&
                       zt_new, zb_new, shape_functions, symmetrical, actual_tcTE)
+    ! Check for nan
+    do i=1, size(zt_new,1)
+      if (isnan(zt_new(i))) then
+        write(*,*) "Nan in top surface"
+        zt_new(i) = 0.0d0
+      end if
+    end do
+    do i=1, size(zt_new,1)
+      if (isnan(zb_new(i))) then
+        write(*,*) "Nan in botton surface"
+        zb_new(i) = 0.0d0
+      end if
+    end do
+    
   else
     zt_new=zseedt
     zb_new=zseedb
@@ -410,7 +432,7 @@ function aero_objective_function(designvars, step, include_penalty)
       !                       (2.0d0 * (x_interp(nptint) - x_interp(i))) ) )
       !if (min_TE_cicle .LT. min_TE_failed) min_TE_failed = min_TE_cicle
       !penaltyval = penaltyval + max(0.d0,gapallow-thickness(i))/0.01d0
-      TE_angle = atan((thickness(i) - tegap) / (x_interp(nptint) - x_interp(i)))
+      TE_angle = atan((thickness(i) - tegap) / (x_interp(nptint) - x_interp(i))+1.E-12)
       if (TE_angle .LT. actual_min_TE_angle) actual_min_TE_angle = TE_angle
     end if
 
@@ -436,8 +458,8 @@ function aero_objective_function(designvars, step, include_penalty)
   
 ! Penalties for max thickness too low or high
 
-  penaltyval = penaltyval + max(0.d0,min_thickness-maxthick)/min_thickness
-  penaltyval = penaltyval + max(0.d0,maxthick-max_thickness)/max_thickness
+  penaltyval = penaltyval + max(0.d0,min_thickness-maxthick)/(min_thickness+1.E-12)
+  penaltyval = penaltyval + max(0.d0,maxthick-max_thickness)/(max_thickness+1.E-12)
   constrains_vector(1+nflap_optimize+3) = maxthick
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -462,8 +484,8 @@ function aero_objective_function(designvars, step, include_penalty)
     !                   addthick_x(1:naddthickconst), add_thickvec)
 
     do i = 1, naddthickconst
-      penaltyval = penaltyval + max(0.d0,addthick_min(i)-add_thickvec(i))/addthick_min(i)
-      penaltyval = penaltyval + max(0.d0,add_thickvec(i)-addthick_max(i))/addthick_max(i)
+      penaltyval = penaltyval + max(0.d0,addthick_min(i)-add_thickvec(i))/(addthick_min(i)+1.E-12)
+      penaltyval = penaltyval + max(0.d0,add_thickvec(i)-addthick_max(i))/(addthick_max(i)+1.E-12)
       constrains_vector(1+nflap_optimize+3+i) = add_thickvec(i)
       if ((addthick_min(i) .GT. add_thickvec(i)) .OR.                          &
                                     (add_thickvec(i) .GT. addthick_max(i))) then
@@ -557,7 +579,7 @@ function aero_objective_function(designvars, step, include_penalty)
   
   ! Penalty for too sharp leading edge
 
-  penaltyval = penaltyval + max(0.d0,min_leading_edge_angle-minpanang)/(90.d0-min_leading_edge_angle)
+  penaltyval = penaltyval + max(0.d0,min_leading_edge_angle-minpanang)/(90.d0-min_leading_edge_angle+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+4) = minpanang
   
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -577,7 +599,7 @@ function aero_objective_function(designvars, step, include_penalty)
   ! Penalty for too disparate leading edge
 
   penaltyval = penaltyval + max(0.d0,abs(panang1-panang2)-                     &
-                                dif_leading_edge_angle)/dif_leading_edge_angle
+                                dif_leading_edge_angle)/(dif_leading_edge_angle+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+5) = abs(panang1-panang2)
   
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -649,7 +671,7 @@ function aero_objective_function(designvars, step, include_penalty)
 
   call get_max_panel_angle(curr_foil, panel_angle)
   
-  penaltyval = penaltyval + max(0.0d0,panel_angle-max_panel_angle)/max_panel_angle
+  penaltyval = penaltyval + max(0.0d0,panel_angle-max_panel_angle)/(max_panel_angle+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+8) = panel_angle
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -683,7 +705,7 @@ function aero_objective_function(designvars, step, include_penalty)
 
 ! Penalty for too large growth rate
 
-  penaltyval = penaltyval + max(0.d0,maxgrowth-growth_allowed)/growth_allowed
+  penaltyval = penaltyval + max(0.d0,maxgrowth-growth_allowed)/(growth_allowed+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+9) = maxgrowth
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -733,7 +755,8 @@ function aero_objective_function(designvars, step, include_penalty)
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
-                 op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
+                 op_mode(1:noppoint), op_search, use_previous_op(1:noppoint),  &
+                 reynolds(1:noppoint),                                         &
                  mach(1:noppoint), use_flap, actual_x_flap, y_flap,            &
                  y_flap_spec, actual_flap_degrees(1:noppoint), xfoil_options,  &
                  file_options, lift, drag, moment, viscrms, alpha, xtrt, xtrb, &
@@ -775,6 +798,7 @@ function aero_objective_function(designvars, step, include_penalty)
       checkpt_list(i) = ncheckpt
       checkop(ncheckpt) = i
       opm_check(ncheckpt) = op_mode(i)
+      opm_previous_op(ncheckpt) = use_previous_op(i)
       opp_check(ncheckpt) = op_point(i)
       ma_check(ncheckpt) = mach(i)
       fd_check(ncheckpt) = actual_flap_degrees(i)
@@ -794,7 +818,8 @@ function aero_objective_function(designvars, step, include_penalty)
   anychecked: if (ncheckpt > 0) then
 
     call run_xfoil(curr_foil, xfoil_geom_options, opp_check(1:ncheckpt),       & 
-                   opm_check(1:ncheckpt), op_search, re_check(1:ncheckpt),     &
+                   opm_check(1:ncheckpt), op_search, opm_previous_op(1:noppoint), &
+                   re_check(1:ncheckpt),     &
                    ma_check(1:ncheckpt), use_flap, actual_x_flap, y_flap,      &
                    y_flap_spec, fd_check(1:ncheckpt), xfoil_options,           &
                    file_options, clcheck, cdcheck, cmcheck, rmscheck, alcheck, &
@@ -1049,7 +1074,7 @@ function aero_objective_function(designvars, step, include_penalty)
     const_idx = lift_constrain_points(i)
     
     penaltyval = penaltyval + max(0.d0,min_lift(const_idx)-lift(const_idx))&
-                                                          /min_lift(const_idx)
+                                                          /(min_lift(const_idx)+1.E-12)
     constrains_vector(1+nflap_optimize+3+naddthickconst+10+nmoment_constrain+i) = lift(const_idx)
     
     if (min_lift(const_idx) .GT. lift(const_idx)) then
@@ -1079,7 +1104,7 @@ function aero_objective_function(designvars, step, include_penalty)
     const_idx = drag_constrain_points(i)
 
     penaltyval = penaltyval + max(0.d0,drag(const_idx)-max_drag(const_idx))&
-                                                          /max_drag(const_idx)
+                                                          /(max_drag(const_idx)+1.E-12)
     constrains_vector(1+nflap_optimize+3+naddthickconst+10+nmoment_constrain+nlift_constrain+i) = drag(const_idx)
     
     if (max_drag(const_idx) .LT. drag(const_idx)) then
@@ -1131,7 +1156,8 @@ function aero_objective_function(designvars, step, include_penalty)
     do i = 1, noppoint
       !$omp critical
       if (lift(i) > maxlift(i)) maxlift(i) = lift(i)
-      if (drag(i) < mindrag(i)) write(*,*) 'new drag', drag(i)
+      !if (lift(i) > maxlift(i)) write(*,*) 'new lift', lift(i)
+      !if (drag(i) < mindrag(i)) write(*,*) 'new drag', drag(i)
       if (drag(i) < mindrag(i)) mindrag(i) = drag(i)
       !$omp end critical
     end do
@@ -1380,7 +1406,8 @@ function write_airfoil_optimization_progress(designvars, designcounter)
 ! Analyze airfoil at requested operating conditions with Xfoil
 
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
-                 op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
+                 op_mode(1:noppoint), op_search, use_previous_op(1:noppoint),  &
+                 reynolds(1:noppoint),                                         &
                  mach(1:noppoint), use_flap, actual_x_flap, y_flap,            &
                  y_flap_spec, actual_flap_degrees(1:noppoint), xfoil_options,  &
                  file_options, lift, drag, moment, viscrms, alpha, xtrt, xtrb, &

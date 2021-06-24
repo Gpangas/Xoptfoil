@@ -77,6 +77,7 @@ module vardef
   logical :: use_flap, flap_optimization_only
   character(20) :: flap_connection, connection_apply 
   character(15), dimension(max_op_points) :: optimization_type
+  logical, dimension(max_op_points) :: use_previous_op
   integer, dimension(6) :: dvs_for_type
   integer :: nflap_optimize, nflap_identical, nmoment_constrain,               &
              ndrag_constrain, nlift_constrain, contrain_number

@@ -240,6 +240,7 @@ end subroutine get_max_panel_angle
 !
 !=============================================================================80
 subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
+                     use_previous_op,                                          &
                      reynolds_numbers, mach_numbers, use_flap, x_flap, y_flap, &
                      y_flap_spec, flap_degrees, xfoil_options, file_options,   &
                      lift, drag, moment, viscrms, alpha, xtrt, xtrb,           &
@@ -253,6 +254,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
   double precision, dimension(:), intent(in) :: operating_points,              &
                                                 reynolds_numbers, mach_numbers,&
                                                 flap_degrees
+  logical, dimension(:), intent(in) :: use_previous_op
   double precision, intent(in) :: x_flap, y_flap
   character(3), intent(in) :: y_flap_spec
   logical, intent(in) :: use_flap
@@ -329,6 +331,21 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
   
   run_oppoints: do i = 1, noppoint
 
+    if (use_previous_op(i)) then
+      j = i - 1
+      lift(i)=lift(j)
+      drag(i)=drag(j)
+      moment(i)=moment(j)
+      alpha(i)=alpha(j)
+      xtrt(i)=xtrt(j)
+      xtrb(i)=xtrb(j)
+      viscrms(i) = viscrms(j)
+      point_converged(i) = point_converged(j)
+      point_fixed(i) = point_fixed(j)
+      
+      go to 800
+    end if
+    
     ! Reset airfoil, smooth paneling, and apply flap deflection
     
     if (use_flap) then
@@ -677,7 +694,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
       k=0
       lift(i)=0.0d0
       do j = 1, naddpoints
-        if (.not. isnan(addlift(j))) then
+        if (.not. isnan(addlift(j)) .and. addviscrms(j) .LT. 1.0D-04) then
           if (addlift(j) .GT. lift(i)) then
             lift(i)=addlift(j)
             drag(i)=adddrag(j)
@@ -728,6 +745,8 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
     
     end if
 
+800 continue
+    
     if (file_options%polar) call write_polar(i, file_options%design_number,    &
       x_flap, flap_degrees(i))
     if (file_options%cp) call write_polar_cp(i, file_options%design_number,    &
@@ -735,8 +754,8 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
     if (file_options%bl) call write_polar_bl(i, file_options%design_number,    &
       x_flap, flap_degrees(i))
   end do run_oppoints
-
-  ! Final check for NaNs
+    
+    ! Final check for NaNs
 
   do i = 1, noppoint
     if (isnan(lift(i))) then

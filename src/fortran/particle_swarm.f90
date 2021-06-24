@@ -401,11 +401,17 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
       end do
 
 !     Evaluate objective function and update local best design if appropriate
+      write(*,'(I5)', advance='no') i
+      write(*,'(A22)', advance='no') 'Start function, '
       objfunction_return = objfunc(dv(:,i), step)
+      write(*,'(I5)', advance='no') i
+      write(*,'(A22)', advance='no') 'end the function, '
       objval(i) = objfunction_return%value
       message_codes(i) = objfunction_return%message_code
       messages(i) = objfunction_return%message
       constrain_matrix(i,:) = objfunction_return%constrains_data
+      write(*,'(I5)', advance='no') i
+      write(*,*) 'assign values.'
       if (objval(i) < minvals(i)) then
         minvals(i) = objval(i)
         bestdesigns(:,i) = dv(:,i)
@@ -990,6 +996,9 @@ subroutine pso_write_dvs(step, dv, objval, message_codes, messages,            &
   close(iunit)
 
   ! Status notification
+
+  write(*,*) '  Successfully wrote PSO log data.'
+  write(*,*)
   
   return
   

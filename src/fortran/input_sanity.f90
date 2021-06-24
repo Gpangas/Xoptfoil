@@ -424,7 +424,8 @@ subroutine check_seed()
   
   first_run_xfoil=.true.
   call run_xfoil(curr_foil, xfoil_geom_options, op_point(1:noppoint),          &
-                 op_mode(1:noppoint), op_search, reynolds(1:noppoint),         &
+                 op_mode(1:noppoint), op_search, use_previous_op(1:noppoint),  &
+                 reynolds(1:noppoint),                                         &
                  mach(1:noppoint), use_flap, x_flap, y_flap, y_flap_spec,      &
                  actual_flap_degrees(1:noppoint), xfoil_options, file_options, &
                  lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)

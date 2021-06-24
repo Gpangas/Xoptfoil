@@ -83,8 +83,8 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
                             restart, restart_write_freq, designcounter,        &
                             stop_reason, converterfunc)
 
-  use optimization_util, only : init_random_seed, initial_designs,             &
-                                design_radius, write_design, bubble_sort_plus, &
+  use optimization_util, only : init_random_seed, initial_designs_mul,             &
+                                design_radius, write_design, bubble_sort_plus_2, &
                                 read_run_control
   use vardef, only : output_prefix, write_dvs_file, objfunction_type,          &
                      contrain_number
@@ -131,6 +131,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   double precision, dimension(:), allocatable :: stackobjval
   integer, dimension(:), allocatable :: message_codes
   character(200), dimension(:), allocatable :: messages
+  double precision, dimension(:,:), allocatable :: constrain_matrix
   type(objfunction_type) :: objfunction_return
   logical :: use_x0, converged, signal_progress, new_history_file
   integer :: stepstart, steptime, restarttime
@@ -154,6 +155,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
   allocate(stackobjval(ga_options%pop+nparents))
   allocate(message_codes(ga_options%pop+nparents))
   allocate(messages(ga_options%pop+nparents))
+  allocate(constrain_matrix(ga_options%pop+nparents,contrain_number))
 
 ! Difference between max and min
 
@@ -179,11 +181,12 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 ! Set up initial designs
   use_x0 = .true.
   if (.not. restart) then
-    call initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0, x0,  &
+    call initial_designs_mul(dv, objval, fevals, objfunc, xmin, xmax, use_x0, x0,  &
                          ga_options%feasible_init, ga_options%feasible_limit,  &
                          ga_options%feasible_init_attempts,                    &
                          message_codes(1:ga_options%pop),                      &
-                         messages(1:ga_options%pop))
+                         messages(1:ga_options%pop),                           &
+                         constrain_matrix(1:ga_options%pop,1:contrain_number))
   end if
 
 !$omp master
@@ -211,7 +214,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 !   Read restart data from file
 
     call ga_read_restart(step, designcounter, dv, objval, fmin, xopt,          &
-                         restarttime, message_codes, messages)
+                         restarttime, message_codes, messages, constrain_matrix)
     mincurr = minval(objval,1)
 
   end if
@@ -322,13 +325,15 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
     
     if (write_dvs_file) then
       call ga_write_dvs(step, dv, objval, message_codes(1:ga_options%pop),     &
-                        messages(1:ga_options%pop), x0, f0, xopt, fmin)
+                        messages(1:ga_options%pop),                            &
+                        constrain_matrix(1:ga_options%pop,1:contrain_number),  &
+                        x0, f0, xopt, fmin)
     end if
   
     !   Write restart file if appropriate and update restart counter
 
     call ga_write_restart(step, designcounter, dv, objval, fmin, xopt,         &
-      (steptime-stepstart)+restarttime, message_codes, messages)
+      (steptime-stepstart)+restarttime, message_codes, messages, constrain_matrix)
   
     restartcounter = restartcounter + 1
   else
@@ -410,10 +415,13 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
       objchild1 = objfunction_return%value
       message_codes(ga_options%pop+2*(i-1)+1) = objfunction_return%message_code
       messages(ga_options%pop+2*(i-1)+1) = objfunction_return%message
+      constrain_matrix(ga_options%pop+2*(i-1)+1,:) = objfunction_return%constrains_data
+      
       objfunction_return = objfunc(child2, step)
       objchild2 = objfunction_return%value
       message_codes(ga_options%pop+2*i) = objfunction_return%message_code
       messages(ga_options%pop+2*i) = objfunction_return%message
+      constrain_matrix(ga_options%pop+2*i,:) = objfunction_return%constrains_data
 
 !     Add children at back of stacked arrays
 
@@ -432,7 +440,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 
 !   Sort stacked arrays to put worst designs at the back
 
-    call bubble_sort_plus(stackdv, stackobjval, message_codes, messages)
+    call bubble_sort_plus_2(stackdv, stackobjval, message_codes, messages, constrain_matrix)
 
 !   Replace population with best designs from this generation
 
@@ -510,7 +518,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 !   Write dvs file if asked
     
     if (write_dvs_file) then
-      call ga_write_dvs(step, stackdv, stackobjval, message_codes, messages,   &
+      call ga_write_dvs(step, stackdv, stackobjval, message_codes, messages, constrain_matrix,   &
                         x0, f0, xopt, fmin)
     end if
     
@@ -518,7 +526,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 
     if (restartcounter == restart_write_freq) then
       call ga_write_restart(step, designcounter, dv, objval, fmin, xopt,       &
-        (steptime-stepstart)+restarttime, message_codes, messages)
+        (steptime-stepstart)+restarttime, message_codes, messages, constrain_matrix)
       restartcounter = 1
     else
       restartcounter = restartcounter + 1
@@ -560,7 +568,7 @@ subroutine geneticalgorithm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax, &
 
   if (restartcounter /= 1)                                                     &
     call ga_write_restart(step, designcounter, dv, objval, fmin, xopt,         &
-    (steptime-stepstart)+restarttime, message_codes, messages)
+    (steptime-stepstart)+restarttime, message_codes, messages, constrain_matrix)
 
 end subroutine geneticalgorithm
 
@@ -852,7 +860,7 @@ end subroutine mutate
 !
 !=============================================================================80
 subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time, &
-                            message_codes, messages)
+                            message_codes, messages, constrain_matrix)
 
   use vardef, only : output_prefix
 
@@ -863,6 +871,7 @@ subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time, &
   integer, intent(in) :: time
   integer, dimension(:), intent(in) :: message_codes
   character(200), dimension(:), intent(in) :: messages
+  double precision, dimension(:,:), intent(inout) :: constrain_matrix
 
   character(100) :: restfile
   integer :: iunit
@@ -889,6 +898,7 @@ subroutine ga_write_restart(step, designcounter, dv, objval, fmin, xopt, time, &
   write(iunit) time
   write(iunit) message_codes
   write(iunit) messages
+  write(iunit) constrain_matrix
   
 
 ! Close restart file
@@ -907,7 +917,7 @@ end subroutine ga_write_restart
 !
 !=============================================================================80
 subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time,  &
-                           message_codes, messages)
+                           message_codes, messages, constrain_matrix)
 
   use vardef, only : output_prefix
 
@@ -918,6 +928,7 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time,  &
   integer, intent(out) :: time
   integer, dimension(:), intent(inout) :: message_codes
   character(200), dimension(:), intent(inout) :: messages
+  double precision, dimension(:,:), intent(inout) :: constrain_matrix
 
   character(100) :: restfile
   integer :: iunit, ioerr
@@ -950,6 +961,7 @@ subroutine ga_read_restart(step, designcounter, dv, objval, fmin, xopt, time,  &
   read(iunit) time
   read(iunit) message_codes
   read(iunit) messages
+  read(iunit) constrain_matrix
 
 ! Close restart file
 
@@ -1012,10 +1024,11 @@ end subroutine ga_read_step
 ! Genetic algorithm dvs write routine
 !
 !=============================================================================80
-subroutine ga_write_dvs(step, dv, objval, message_codes, messages, x0, f0,     &
+subroutine ga_write_dvs(step, dv, objval, message_codes, messages, constrain_matrix, x0, f0,     &
                          xopt, fmin)
 
-  use vardef, only : output_prefix, dvs_for_type
+  use vardef, only : output_prefix, dvs_for_type, naddthickconst,              &
+                     ndrag_constrain, nmoment_constrain, nlift_constrain
 
   integer, intent(in) :: step
   double precision, intent(in) :: fmin, f0
@@ -1023,16 +1036,18 @@ subroutine ga_write_dvs(step, dv, objval, message_codes, messages, x0, f0,     &
   double precision, dimension(:,:), intent(in) :: dv
   integer, dimension(:), intent(in) :: message_codes
   character(200), dimension(:), intent(in) :: messages
+  double precision, dimension(:,:), intent(in) :: constrain_matrix
 
   integer :: i,j
   
-  character(100) :: dvsfile, text, textdv
+  character(100) :: dvsfile, constfile, text, textdv
   integer :: iunit
   
   ! Status notification
 
   dvsfile = 'dvs_ga_'//trim(output_prefix)//'.dat'
-  write(*,*) '  Writing GA dvs data to file '//trim(dvsfile)//' ...'
+  constfile = 'constrain_ga_'//trim(output_prefix)//'.dat'
+  write(*,*) '  Writing GA log data to files '//trim(dvsfile)//' and '//trim(constfile)//' ...'
   iunit = 13
 
   ! Open files and write headers, if necessary
@@ -1166,6 +1181,102 @@ subroutine ga_write_dvs(step, dv, objval, message_codes, messages, x0, f0,     &
   close(iunit)
 
   ! Status notification
+  
+  
+  ! Constrains file
+  ! Open files and write headers, if necessary
+  iunit = 14
+  write(text,*) step
+  text = adjustl(text)
+  
+  if (step == 1) then
+
+    !   Header for Constrains file
+
+    open(unit=iunit, file=constfile, status='replace')
+    write(iunit,'(A)') 'title="Constrains file"'
+    write(iunit,'(A)') 'variables="constrains", "objval", "message_code", "message"'
+    
+  else
+
+    !   Open dvs file and write zone header
+
+    open(unit=iunit, file=constfile, status='old', position='append', err=900)
+
+  end if
+
+  ! Write coordinates to file
+  write(iunit,'(A)') 'step = '//trim(text)//': dvs '
+  write(iunit,'(A14)', advance='no') 'tcTE'
+  write(iunit,'(A14)', advance='no') 'flap_deg'
+  write(iunit,'(A14)', advance='no') 'flap_hinge'
+  write(iunit,'(A14)', advance='no') 'minthick'
+  write(iunit,'(A14)', advance='no') 'maxthick'
+    
+  if (naddthickconst .NE. 0) then
+    do i=1, naddthickconst
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A14)', advance='no') 'addthickconst - '//trim(textdv)
+    end do
+  end if
+    
+  write(iunit,'(A14)', advance='no') 'TE_angle'
+  write(iunit,'(A14)', advance='no') 'maxcamb'
+  write(iunit,'(A14)', advance='no') 'maxpang'
+  write(iunit,'(A14)', advance='no') 'minang'
+  write(iunit,'(A14)', advance='no') 'difang'
+  write(iunit,'(A14)', advance='no') 'rev_t'
+  write(iunit,'(A14)', advance='no') 'rev_b'
+  write(iunit,'(A14)', advance='no') 'pan_ang'
+  write(iunit,'(A14)', advance='no') 'maxgrowth'
+  write(iunit,'(A14)', advance='no') 'n_unconv'
+    
+  if (nmoment_constrain .NE. 0) then
+    do i=1, nmoment_constrain
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A14)', advance='no') 'moment - '//trim(textdv)
+    end do
+  end if
+  if (nlift_constrain .NE. 0) then
+    do i=1, nlift_constrain
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A14)', advance='no') 'lift - '//trim(textdv)
+    end do
+  end if
+      if (ndrag_constrain .NE. 0) then
+    do i=1, ndrag_constrain
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A14)', advance='no') 'drag - '//trim(textdv)
+    end do
+  end if
+  write(iunit,'(A30)', advance='no') 'objval'
+  write(iunit,'(A14)', advance='no') 'message_code'
+  write(iunit,'(A)', advance='no') ' message'
+  write(iunit,'(A)') ' '
+  
+  do i = 1, size(constrain_matrix,1)
+    do j = 1, size(constrain_matrix,2)
+      write(iunit,'(F14.8)', advance='no') constrain_matrix(i,j)
+    end do
+    write(iunit,'(F30.8)', advance='no') objval(i)
+    write(iunit,'(I14)', advance='no') message_codes(i)
+    write(iunit,'(A)', advance='no') messages(i)
+    write(iunit,'(A)') ' '
+  end do
+
+  ! Close output files
+
+  close(iunit)
+
+  ! Status notification
+
+  write(*,*) '  Successfully wrote GA log data.'
+  write(*,*)
+
   
   return
   

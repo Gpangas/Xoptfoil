@@ -99,7 +99,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             flap_connection, connection_apply, connection_radius, x_flap_spec, &
             y_flap, y_flap_spec, TE_spec, tcTE, xltTE, flap_selection,         &
             flap_identical_op, flap_degrees, weighting, optimization_type,     &
-            target_value, ncrit_pt
+            use_previous_op, target_value, ncrit_pt
   namelist /constraints/ min_thickness, max_thickness, moment_constraint_type, &
                          min_moment, lift_constraint_type,                     &
                          min_lift, drag_constraint_type,                       &
@@ -199,6 +199,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   
   op_mode(:) = 'spec-cl'
   optimization_type(:) = 'min-drag'
+  use_previous_op(:) = .false.
   op_point(:) = 1.0d0
   op_point_start(:) = 1.0d0
   op_point_end(:) = 1.0d0
@@ -255,6 +256,27 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   rewind(iunit)
   read(iunit, iostat=iostat1, nml=constraints)
   call namelist_check('constraints', iostat1, 'stop')
+  
+! use_previous_op set all op options to previous if true
+  
+  do i=2, noppoint
+    if(use_previous_op(i)) then
+      !optimization_type stays the same
+      op_mode(i) = op_mode(i-1)
+      op_point(i) = op_point(i-1)
+      op_point_start(i) = op_point_start(i-1)
+      op_point_end(i) = op_point_end(i-1)
+      op_point_step(i) = op_point_step(i-1)
+      target_value(i) = target_value(i-1)
+      reynolds(i) = reynolds(i-1)
+      mach(i) = mach(i-1)
+      flap_selection(i) = flap_selection(i-1)
+      flap_identical_op(i) = flap_identical_op(i-1) 
+      flap_degrees(i) = flap_degrees(i-1)
+      !weighting stays the same
+      ncrit_pt(i) = ncrit_pt(i-1)
+    end if
+  end do
   
 ! Set Search variable   
   
@@ -722,6 +744,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                trim(optimization_type(i))//"'"
     write(*,*) " op_mode("//trim(text)//") = '"//trim(op_mode(i))//"'"
     write(*,*) " op_point("//trim(text)//") = ", op_point(i)
+    write(*,*) " use_previous_op("//trim(text)//") = ", use_previous_op(i)
     write(*,*) " op_point_start("//trim(text)//") = ", op_point_start(i)
     write(*,*) " op_point_end("//trim(text)//") = ", op_point_end(i)
     write(*,*) " op_point_step("//trim(text)//") = ", op_point_step(i)
@@ -982,6 +1005,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                trim(optimization_type(i))//"'"
     write(100,*) " op_mode("//trim(text)//") = '"//trim(op_mode(i))//"'"
     write(100,*) " op_point("//trim(text)//") = ", op_point(i)
+    write(100,*) " use_previous_op("//trim(text)//") = ", use_previous_op(i)
     write(100,*) " op_point_start("//trim(text)//") = ", op_point_start(i)
     write(100,*) " op_point_end("//trim(text)//") = ", op_point_end(i)
     write(100,*) " op_point_step("//trim(text)//") = ", op_point_step(i)
@@ -1284,6 +1308,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   if (xltTE < 0.0) call my_stop("xltTE must be > 0.")
   if (xltTE >= 1.0) call my_stop("xltTE must be < 1")
   
+  if (use_previous_op(1)) call my_stop("op 1 can not have a previous op.")
   do i = 1, noppoint
     if (trim(op_mode(i)) /= 'spec-cl' .and. trim(op_mode(i)) /= 'spec-al')     &
       call my_stop("op_mode must be 'spec-al' or 'spec-cl'.")
