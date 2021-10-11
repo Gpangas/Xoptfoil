@@ -43,11 +43,6 @@ module parametrization_constr
   nl=size(Wu,1)-1-int_kulfan_bussoletti_LEM
   nPointst=size(Xu_seed,1)
   nPointsb=size(Xl_seed,1)
-  !write(*,*) nu, nl
-  !write(*,*)
-  !do i=1,size(wu,1)
-  !  write(*,*) wu(i), wl(i)
-  !end do
   
   ! Calculates the Z coordinate of the airfoil
   do i=1,nPointst
@@ -126,12 +121,6 @@ subroutine KBP_init(Xu, Zu, Xl, Zl, Wu, Wl)
   call KBParameterization_fitting(ml,Xl,Zl,nl,-tTE/2.0d0,                      &
                                                    int_kulfan_bussoletti_LEM,Wl)
 
-  !write(*,*) nu, nl
-  !write(*,*) size(wu,1), size(wl,1)
-  !write(*,*)
-  !do i=1,size(wu,1)
-  !  write(*,*) wu(i), wl(i)
-  !end do
 end subroutine KBP_init
 
 ! ----------------------------------------------------------------------------80
@@ -233,14 +222,14 @@ symmetrical , tTE)
   
   real*8, dimension(size(xt_seed,1)) :: xt_new
   real*8, dimension(size(xb_seed,1)) :: xb_new
-  integer :: i, nPointst, nPointsb, nmodest, nmodesb
+  integer :: nPointst, nPointsb, nmodest, nmodesb
   real*8, dimension(:), allocatable :: zmodest_use
   real*8, dimension(:), allocatable :: zmodesb_use
   real*8, dimension(:), allocatable :: xmodest_use
   real*8, dimension(:), allocatable :: xmodesb_use
   real*8, dimension(size(xt_seed,1)) :: ut_use
   real*8, dimension(size(xb_seed,1)) :: ub_use
-  real*8:: v
+
   nmodest=size(xmodest,1)
   nmodesb=size(xmodesb,1)
   
@@ -428,14 +417,12 @@ subroutine BSpline_C2A_b_matrix(n_cp,xin,yin,n_p,BMATRIX,xspline,yspline)
   real*8, dimension(n_p), intent(out)  :: yspline    ! y coordinate of spline
 
   ! Local variables.
-  integer ::i,j,k        ! counters
   real*8, dimension(n_cp) :: x! x-coordinate of control points
   real*8, dimension(n_cp) :: y! y-coordinate of control points
   
   ! Determine control points vector
   x(:)        = xin
   y(:)        = yin
-
 
   ! Compute the b-spline.
   
@@ -591,25 +578,16 @@ z,BMATRIX)
   real*8, intent(out) :: x(n_cp)! x-coordinate of control points
   real*8, intent(out) :: z(n_cp)! z-coordinate of control points
   real*8, intent(out):: BMATRIX(nspline,n_cp)
-  ! Local variables
-  integer :: i
-  real*8:: v
   
   ! Get x control points
   x(1)=0.0d0
   call SetDistribution(option,n_cp-1,x(2:n_cp))
 
   !call SetDistribution(option,n_cp,x)
-  !write(*,*) x
 
   ! Get u from x control points and x airfoil coordinates
 
   call GET_U_NEWTON(n,n_cp,x,nspline,xspline,uspline)
-  !write(*,*) 'GET_U_NEWTON test'
-  !do i=1,nspline
-  !  call B_Spline_Single(n,n_cp,x,uspline(i),v)
-  !  write(*,*) uspline(i),v, xspline(i),v-xspline(i)
-  !end do
 
   call GET_Z_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BMATRIX)
   
@@ -699,8 +677,6 @@ subroutine GET_U_NEWTON(n,n_cp,x,nspline,xspline,u)
         !mann sheme (Iterative Algorithms)
         beta=(1.d0/dble(j))**0.5 !just a divergent series
         u(i)=(dble(1)-beta)*u(i)+(beta)*u_dummy
-        !write(*,*) i,j, u(i),abs(xspline(i)-x_new)/abs(xspline(i)), beta
-        !write(*,*) u(i)
         j=j+1
       end do
     end if
@@ -755,54 +731,29 @@ subroutine GET_Z_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   pcontrol(1)=pspline(1)
   pcontrol(n_cp)=pspline(nspline)
   
-  !write(*,*) pcontrol(1), pcontrol(n_cp)
-  
   ! Create BSPLINE
   BSPLINE_FULL=0.d0
   j=1
   do i=1,nspline
-    !write(*,*) i,j
     if(.NOT. uspline(i).LE.t(j+n+1)) j=j+1
-    !write(*,*) t(j+n),uspline(i),t(j+n+1)
     call d_BSpline(t,n,j+n,uspline(i),B_DUMMY)
-    !write(*,*) i, j, j+n
     BSPLINE_FULL(i,j:j+n)=B_DUMMY
   end do
-  !do i=1,nspline
-  ! write(*,*) (BSPLINE_FULL(i,j), j=1,n_cp)
-  !end do
-  !
-  !do i=2,nspline-1
-  ! write(*,*) pcontrol(n_cp)*BSPLINE_FULL(i,n_cp)
-  !end do
-  !
-  !write(*,*) pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
   
   !Create other matrixes
   BSPLINE=BSPLINE_FULL(2:nspline-1,2:n_cp-1)
   BSPLINE_T=transpose(BSPLINE)
   A=matmul(BSPLINE_T,BSPLINE)
-  !do i=1,n_cp
-  ! write(*,*) (A(i,j), j=1,n_cp)
-  !end do
+
   P_FULL=pspline
   p=P_FULL(2:nspline-1)-pcontrol(1)*BSPLINE_FULL(2:nspline-1,1) &
                        -pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
   B=matmul(BSPLINE_T,p)
-  !do i=1,n_cp
-  ! write(*,*) B(i)
-  !end do
-  !write(*,*) 'B'
-  !do i=1,n_cp-2
-  ! write(*,*) B(i)
-  !end do
+
   !Solve A.X=B
   call Solve_SVD(n_cp-2,real(A,4),real(B,4),X)
   pcontrol(2:n_cp-1)         = real(X,8)
-  !write(*,*) 'pcontrol'
-  !do i=1,n_cp
-  ! write(*,*) pcontrol(i)
-  !end do
+
 end subroutine GET_Z_MINSQUARES
 
 !--------------------------------------------------------------------
@@ -859,49 +810,26 @@ subroutine GET_X_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   BSPLINE_FULL=0.d0
   j=1
   do i=1,nspline
-    !write(*,*) i,j
     if(.NOT. uspline(i).LE.t(j+n+1)) j=j+1
-    !write(*,*) t(j+n),uspline(i),t(j+n+1)
     call d_BSpline(t,n,j+n,uspline(i),B_DUMMY)
-    !write(*,*) i, j, j+n
     BSPLINE_FULL(i,j:j+n)=B_DUMMY
   end do
-  !do i=1,nspline
-  ! write(*,*) (BSPLINE_FULL(i,j), j=1,n_cp)
-  !end do
-  !
-  !do i=2,nspline-1
-  ! write(*,*) pcontrol(n_cp)*BSPLINE_FULL(i,n_cp)
-  !end do
-  !
-  !write(*,*) pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
   
   !Create other matrixes
   BSPLINE=BSPLINE_FULL(3:nspline-1,3:n_cp-1)
   BSPLINE_T=transpose(BSPLINE)
   A=matmul(BSPLINE_T,BSPLINE)
-  !do i=1,n_cp
-  ! write(*,*) (A(i,j), j=1,n_cp)
-  !end do
+
   P_FULL=pspline
   p=P_FULL(3:nspline-1)-pcontrol(1)*BSPLINE_FULL(3:nspline-1,1) &
                        -pcontrol(2)*BSPLINE_FULL(3:nspline-1,2) &
                        -pcontrol(n_cp)*BSPLINE_FULL(3:nspline-1,n_cp)
   B=matmul(BSPLINE_T,p)
-  !do i=1,n_cp
-  ! write(*,*) B(i)
-  !end do
-  !write(*,*) 'B'
-  !do i=1,n_cp-2
-  ! write(*,*) B(i)
-  !end do
+
   !Solve A.X=B
   call Solve_SVD(n_cp-3,real(A,4),real(B,4),X)
   pcontrol(3:n_cp-1)         = real(X,8)
-  !write(*,*) 'pcontrol'
-  !do i=1,n_cp
-  ! write(*,*) pcontrol(i)
-  !end do
+
 end subroutine GET_X_MINSQUARES
 
 !***************************************************************
@@ -946,19 +874,15 @@ subroutine B_Spline_Single(n,n_cp,xin,uspline,xspline)
     end if
   end do
 
-  !write(*,*) 't'
-  !write(*,*) t
   ! Determine control points vector
   x(:)        = xin
 
   ! Compute the b-spline
   spline=0.d0
   mainloop: do i=n+1,n_cp
-    !write(*,*) t(i), uspline, t(i+1)
     if((t(i).LE.uspline).AND.(uspline.LE.t(i+1))) then
       call d_BSpline(t,n,i,uspline,b)
       do k=1,n+1
-        !write(*,*) k, b(k)
         spline=spline+b(k)*x(i-n-1+k)
       end do
       exit mainloop
@@ -1011,8 +935,6 @@ subroutine B_Spline_Single_d(n,n_cp,xin,uspline,xspline)
     end if
   end do
 
-  !write(*,*) 't'
-  !write(*,*) t
   ! Determine control points vector
   x(:)        = xin
 
@@ -1023,7 +945,6 @@ subroutine B_Spline_Single_d(n,n_cp,xin,uspline,xspline)
     if((t(i).LE.uspline).AND.(uspline.LE.t(i+1))) then
       call d_BSpline(t,n-1,i,uspline,b)
       do k=1,n
-        !write(*,*) k, b(k)
         spline=spline+b(k)*(x(i-n+1+k)-x(i-n+k))*(n-1)
       end do
       exit mainloop
@@ -1152,16 +1073,15 @@ end subroutine deallocate_b_matrix
 
 ! ----------------------------------------------------------------------------
 ! Subroutine that implements the Bezier-PARSEC Parameterization, weights to coordinates.
-subroutine BPP_airfoil( xPt, zPt, xPb, zPb, modest, modesb, zPt_new, zPb_new, tTE)
+subroutine BPP_airfoil( xPt, xPb, modest, modesb, zPt_new, zPb_new, tTE)
 
   implicit none
 
   real*8, dimension(:), intent (in) :: modest, modesb
 
   real*8, intent(in) ::    xPt(:),xPb(:)                     ! x values of data points
-  real*8, intent(in) ::    zPt(size(xPt,1)),zPb(size(xPb,1)) ! z values of data points
   real*8, intent(in) ::    tTE
-  real*8, intent(out) ::   zPt_new(size(xPt,1)),zPb_new(size(xPb,1)) ! z values of data points
+  real*8, intent(out) ::   zPt_new(size(xPt,1)), zPb_new(size(xPb,1)) ! z values of data points
   
   integer ::               nPt, nPb                          ! no. of data points
   
@@ -1244,7 +1164,7 @@ subroutine SetThicknessControlPoints(Xt_le, Xt_te, Yt_le, Yt_te,               &
   Xt_le(4)=Xt_max
 
   !! Check the validity of the control points' values.
-  !call BPPCheckControlPoints(Xt_le,0.0d0,Xt_max,1,error)
+  call BPPCheckControlPoints(Xt_le,0.0d0,Xt_max,error)
 
   if (error /= 0) error_code=error
   
@@ -1253,7 +1173,7 @@ subroutine SetThicknessControlPoints(Xt_le, Xt_te, Yt_le, Yt_te,               &
   Yt_le(3)=Yt_max
   Yt_le(4)=Yt_max
 
-  !call BPPCheckControlPoints(Yt_le,0.0d0,Yt_max,2,error)
+  call BPPCheckControlPoints(Yt_le,0.0d0,Yt_max,error)
 
   if (error /= 0) error_code=error
   
@@ -1264,7 +1184,7 @@ subroutine SetThicknessControlPoints(Xt_le, Xt_te, Yt_le, Yt_te,               &
                                                               1.0d0/tan(Beta_te)
   Xt_te(4)=1.0d0
 
-  !call BPPCheckControlPoints(Xt_te,Xt_max,1.0d0,3,error)
+  call BPPCheckControlPoints(Xt_te,Xt_max,1.0d0,error)
 
   if (error /= 0) error_code=error
   
@@ -1273,7 +1193,7 @@ subroutine SetThicknessControlPoints(Xt_le, Xt_te, Yt_le, Yt_te,               &
   Yt_te(3)=3.0d0*Kt_max*(Xt_max-Rt)**2/2.0d0+Yt_max
   Yt_te(4)=dZte
 
-  !call BPPCheckControlPoints(Yt_te,Yt_max,0.0d0,4,error)
+  call BPPCheckControlPoints(Yt_te,Yt_max,0.0d0,error)
 
   if (error /= 0) error_code=error
   
@@ -1308,7 +1228,7 @@ subroutine SetCamberControlPoints(Xc_le, Xc_te, Yc_le, Yc_te,                  &
   Xc_le(3)=Xc_max-(2.0d0*(Rc-Yc_max)/(3.0d0*Kc_max))**0.5
   Xc_le(4)=Xc_max
 
-  !call BPPCheckControlPoints(Xc_le,0.0d0,Xc_max,5,error)
+  call BPPCheckControlPoints(Xc_le,0.0d0,Xc_max,error)
 
   if (error /= 0) error_code=error
   
@@ -1317,7 +1237,7 @@ subroutine SetCamberControlPoints(Xc_le, Xc_te, Yc_le, Yc_te,                  &
   Yc_le(3)=Yc_max
   Yc_le(4)=Yc_max
 
-  !call BPPCheckControlPoints(Yc_le,0.0d0,Yc_max,6,error)
+  call BPPCheckControlPoints(Yc_le,0.0d0,Yc_max,error)
 
   if (error /= 0) error_code=error
   
@@ -1327,7 +1247,7 @@ subroutine SetCamberControlPoints(Xc_le, Xc_te, Yc_le, Yc_te,                  &
   Xc_te(3)=1.0d0+(Zte-Rc)/(tan(Alpha_te))
   Xc_te(4)=1.0d0
 
-  !call BPPCheckControlPoints(Xc_te,Xc_max,1.0d0,7,error)
+  call BPPCheckControlPoints(Xc_te,Xc_max,1.0d0,error)
 
   if (error /= 0) error_code=error
   
@@ -1336,7 +1256,7 @@ subroutine SetCamberControlPoints(Xc_le, Xc_te, Yc_le, Yc_te,                  &
   Yc_te(3)=Rc
   Yc_te(4)=Zte
 
-  !call BPPCheckControlPoints(Yc_te,Yc_max,0.0d0,8,error)
+  call BPPCheckControlPoints(Yc_te,Yc_max,0.0d0,error)
 
   if (error /= 0) error_code=error
   
@@ -1382,16 +1302,8 @@ subroutine Rt_calc(Rt, Kt_max, Xt_max, Yt_max, Rle, error_code)
     end if
   end do
   
-  !do i=1,4
-  !  write(*,*) X_root(i)
-  !end do
-  !
-  !write(*,*)
-  !write(*,*) Xt_max-(-2.0d0*Yt_max/(3.0d0*Kt_max))**0.5
   
   if(Rt.GE.Xt_max) then
-    !write(*,*) "No valid root found"
-    !write(*,*) 'error_code=1'
     error_code=1
     !Rt=huge(1)
     Rt=Xt_max*Rand()
@@ -1430,13 +1342,8 @@ subroutine Rc_calc(Rc,Kc_max,Gamma_le,Alpha_te,Zte,Yc_max,error_code)
     elseif (Yc_max.EQ.0) then
         Rc=0
     else
-      !write(*,*) "Error calculating Rc parameter"
-      !if (Aux4.LT.0.0d0) write(*,*) "Non real root"
       Rc=Yc_max*Rand()
       !Rc=-1
-      !write(*,*) Aux2
-      !write(*,*) Aux1
-      !write(*,*) 'error_code=2'
       error_code=2
   end if
 
@@ -1466,8 +1373,8 @@ subroutine BPP_Get_z(Xt_le,Xt_te,Yt_le,Yt_te,Xc_le,Xc_te,Yc_le,Yc_te,          &
 
   do i=1,nPoints      
     call BPP_Get_t(Xt_le,Xt_te,Xc_le,Xc_te,LEte_identifier,t,X(i))
-    call BPP_Calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,X(i),Z(i),       &
-      nPoints,UpperLower_identifier)
+    call BPP_Calc_z(Yt_le,Yt_te,Yc_le,Yc_te,LEte_identifier,t,Z(i),       &
+      UpperLower_identifier)
   end do
 
 end subroutine BPP_Get_z
@@ -1571,15 +1478,13 @@ end subroutine BPP_Get_t
 
 ! -------------------------------------------------------------------
 subroutine BPP_calc_z(Yt_le,Yt_te,Yc_le,Yc_te,                                 &
-                      LEte_identifier,t,X,Z,nPoints,UpperLower_identifier)
+                      LEte_identifier,t,Z,UpperLower_identifier)
 
   implicit none
 
   Real*8, dimension(4), intent(in) :: Yt_le, Yt_te, Yc_le, Yc_te
   integer, dimension(2), intent(in) :: LEte_identifier
   real*8, dimension(2), intent(in) :: t
-  real*8, intent(in) :: X
-  integer, intent(in) :: nPoints
   real*8, intent(inout) :: Z
   integer, intent(in) :: UpperLower_identifier
   real*8 :: Z_thickness, Z_camber                     !Partial values of Z
@@ -1617,13 +1522,12 @@ subroutine BPP_calc_z(Yt_le,Yt_te,Yc_le,Yc_te,                                 &
 end subroutine BPP_calc_z
 
 ! -------------------------------------------------------------------
-subroutine BPPCheckControlPoints(Vec,Min_ini,Max_ini,identifier,error)
+subroutine BPPCheckControlPoints(Vec,Min_ini,Max_ini,error)
 
   implicit none
 
   Real*8, dimension(4), intent(inout) :: Vec      ! Input vector with the control points variables
   real*8, intent(in) :: Min_ini, Max_ini          ! Minimum and maximum of the interval
-  integer, intent(in) :: identifier               ! Input value to specify which control points are being checked
   integer, intent(out) :: error
   
   Real*8 :: Min, Max
@@ -1649,25 +1553,6 @@ subroutine BPPCheckControlPoints(Vec,Min_ini,Max_ini,identifier,error)
     if (abs(Vec(i)).GT.1.0d0.OR.Vec(i).NE.Vec(i)) then      ! Vec(i).NE.Vec(i) checks for NaN
       error=1
       Vec(i)=Min+(Max-Min)*(i-1)/3
-      !write(*,*) "Altered Control Point"
-      !select case (identifier)
-      !case(1)
-      !  write(*,*) "Xt_le"
-      !case(2)
-      !  write(*,*) "Yt_le"
-      !case(3)
-      !  write(*,*) "Xt_te"
-      !case(4)
-      !  write(*,*) "Yt_te"
-      !case(5)
-      !  write(*,*) "Xc_le"
-      !case(6)
-      !  write(*,*) "Yc_le"
-      !case(7)
-      !  write(*,*) "Xc_te"
-      !case(8)
-      !  write(*,*) "Yc_te"
-      !end select
     end if
   end do
 
@@ -1681,7 +1566,7 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
 
   real*8, intent(in) :: xseedt(:), xseedb(:), zseedt(:), zseedb(:)
   
-  real*8, intent(out) :: modest(6) ! Xt_max, Yt_max, Kt_max, Rle     , Beta_te
+  real*8, intent(out) :: modest(5) ! Xt_max, Yt_max, Kt_max, Rle     , Beta_te
   real*8, intent(out) :: modesb(5) ! Xc_max, Yc_max, Kc_max, Gamma_le, Alpha_te
 
   real*8:: xBPP(12)               ! Xt_max,Yt_max,Kt_max, Xc_max,Yc_max,Kc_max,&
@@ -1691,8 +1576,8 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   
   real*8, dimension(size(xseedt,1)) :: zthick, zcamber, curvaturethick,        &
     curvaturecamber, first_derivative_thick, first_derivative_camber 
-  real*8, dimension(size(xseedt,1)+size(xseedb,1)-1) :: xspline, zspline, curvaturespline
-  integer :: i, counter
+  real*8, dimension(size(xseedt,1)+size(xseedb,1)-1) :: xspline, zspline
+  integer :: i
   
   nPt=size(xseedt,1)
   nPb=size(xseedb,1)
@@ -1704,15 +1589,6 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   
   zthick=zseedt-zseedb_interpolated
   zcamber=(zseedt+zseedb_interpolated)/2.0d0
-
-  !do i=1,nPt
-  !  write(*,*) xseedt(i), zthick(i)
-  !end do
-  ! 
-  !do i=1,nPt
-  !  write(*,*) xseedt(i), zcamber(i)
-  !end do
-  !write(*,*)
   
   do i=1,nPt
     xspline(i)=xseedt(nPt+1-i)
@@ -1799,7 +1675,7 @@ subroutine BPP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
   modest(1:3)=xBPP(1:3)
   modest(4)=xBPP(7)
   modest(5)=xBPP(10)
-  modest(6)=xBPP(12)
+  !modest(6)=xBPP(12)
   
   modesb(1:3)=xBPP(4:6)
   modesb(4:5)=xBPP(8:9)
@@ -1914,7 +1790,6 @@ function der1_spline(N, X, Y)
  ! Local variables.
   integer :: I
   real*8, dimension(N) :: S, XP, YP
-  real*8 :: SBREF
 
   interface
     double precision function DEVAL(SS,X,XS,S,N)

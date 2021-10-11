@@ -72,12 +72,12 @@ program main
 
   call read_inputs(input_file, search_type, global_search, local_search,       &
                    seed_airfoil, nparams_top, nparams_bot,       &
-                   restart, restart_write_freq, constrained_dvs, naca_options, &
+                   restart, restart_write_freq, naca_options, &
                    pso_options, ga_options, ds_options, matchfoil_file)
   
   ! Set thread number
   
-  iMaxThreads = OMP_GET_MAX_THREADS()	
+  iMaxThreads = OMP_GET_MAX_THREADS()
   if ((abs(number_threads).eq.0).or.(abs(number_threads).gt.iMaxThreads)) then
     NumThreads = iMaxThreads
   else
@@ -175,23 +175,26 @@ program main
 
     call parametrization_new_seed(xseedt, xseedb, zseedt, zseedb, modest_seed, &
         modesb_seed, symmetrical, shape_functions)
+                         
   end if
-  
+
   ! Write seed foil to file after parametrization
   write(*,*) 'Writing airfoil after parametrization to file: ', 'param_seed_'//airfoil_file
-  open(unit=100, file='param_seed_'//airfoil_file, status='replace')
-    write(100,'(A)') 'param_seed_airfoil'
+  open(unit=200, file='param_seed_'//airfoil_file, status='replace')
+    write(200,'(A)') 'param_seed_airfoil'
     do i = 1, size(xseedt,1)
-      write(100,'(2F12.8)') xseedt(size(xseedt,1)-i+1), zseedt(size(xseedt,1)-i+1)
+      write(200,'(2F12.8)') xseedt(size(xseedt,1)-i+1), zseedt(size(xseedt,1)-i+1)
     end do
     do i = 1, size(xseedb,1)-1
-      write(100,'(2F12.8)') xseedb(i+1), zseedb(i+1)
+      write(200,'(2F12.8)') xseedb(i+1), zseedb(i+1)
     end do
-  close(100)
+  close(200)
   
   ! Make sure seed airfoil passes constraints, and get scaling factors for
   ! operating points
-  call check_seed()
+  if (.NOT. match_foils) then
+    call check_seed()
+  end if
   
   if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
       'global') then
@@ -217,7 +220,7 @@ program main
 
   ! Write final design and summary
 
-  call write_final_design(optdesign, f0, fmin, shape_functions)
+  call write_final_design(optdesign, f0, fmin)
 
   ! Deallocate memory
 

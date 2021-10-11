@@ -35,7 +35,7 @@ module input_output
 subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                        seed_airfoil, nparameters_top,             &
                        nparameters_bot, restart, restart_write_freq,            &
-                       constrained_dvs, naca_options, pso_options, ga_options, &
+                       naca_options, pso_options, ga_options, &
                        ds_options, matchfoil_file)
 
   use vardef
@@ -52,7 +52,6 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   character(80), intent(out) :: search_type, global_search, local_search,      &
                                 seed_airfoil, matchfoil_file
   integer, intent(out) :: nparameters_top, nparameters_bot
-  integer, dimension(:), allocatable, intent(inout) :: constrained_dvs
   integer, dimension(max_addthickconst) :: sort_idxs
   double precision, dimension(max_addthickconst) :: temp_thickmin, temp_thickmax
   double precision, dimension(max_op_points) :: op_point_start, op_point_end,  &
@@ -66,7 +65,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
              reinitialize, restart, write_designs, reflexed
   integer :: init_number_points
   double precision :: init_al0, init_cl0, init_initial_position
-  character(30) :: init_type, init_dist
+  character(20) :: init_type, init_dist
   
   integer :: restart_write_freq, pso_pop, bl_maxit, npan, feasible_init_attempts
   integer :: ga_pop, simplex_maxit, ga_maxit, pso_maxit
@@ -78,12 +77,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                       tournament_fraction, crossover_range_factor,             &
                       mutant_probability, chromosome_mutation_rate,            &
                       mutation_range_factor
-  integer :: nbot_actual, nmoment_constraint, nxtr_opt
+  integer :: nmoment_constraint, nxtr_opt
   integer :: i, j, iunit, ioerr, iostat1
   character(30) :: text
   character(3) :: family
   character(10) :: pso_convergence_profile, parents_selection_method
-  character :: choice
+  character :: choice = 'n'
 
   namelist /optimization_options/ search_type, global_search, local_search,    &
             seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
@@ -270,8 +269,13 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       target_value(i) = target_value(i-1)
       reynolds(i) = reynolds(i-1)
       mach(i) = mach(i-1)
-      flap_selection(i) = flap_selection(i-1)
-      flap_identical_op(i) = flap_identical_op(i-1) 
+      if(flap_selection(i-1) .EQ. 'identical') then
+        flap_selection(i) = flap_selection(i-1)
+        flap_identical_op(i) = flap_identical_op(i-1)
+      else
+        flap_selection(i) = 'identical'
+        flap_identical_op(i) = i-1
+      end if
       flap_degrees(i) = flap_degrees(i-1)
       !weighting stays the same
       ncrit_pt(i) = ncrit_pt(i-1)
@@ -320,7 +324,6 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       if (trim(moment_constraint_type(i)) /= 'none')                           &
         nmoment_constraint = nmoment_constraint + 1
     end do
-    
     if (nmoment_constraint > 0) choice = ask_moment_constraints()
     if (choice == 'y') moment_constraint_type(:) = 'none'
   end if
@@ -652,7 +655,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       end if
     end do
   end if
-  !write(*,*) 'nflap_optimize', nflap_optimize, match_foils
+
 ! Store operating points where flap setting will be identical
   nflap_identical = 0
   if (use_flap .and. (.not. match_foils)) then
@@ -679,8 +682,12 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     int_tcTE_spec = 0
   end if  
   
-  contrain_number = 1+nflap_optimize+3+naddthickconst+10+                      &
+  if (.not. match_foils) then
+    contrain_number = 1+nflap_optimize+3+naddthickconst+10+                    &
                                nmoment_constrain+nlift_constrain+ndrag_constrain
+  else
+    contrain_number = 1
+  end if
   
 ! Echo namelist options for checking purposes
 
@@ -1481,9 +1488,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       if (pso_speed_limit <= 0.d0)                                             &
         call my_stop("pso_speed_limit must be > 0.")
       if ( (trim(pso_convergence_profile) /= "quick") .and.                    &
-           (trim(pso_convergence_profile) /= "exhaustive") )                   &
+           (trim(pso_convergence_profile) /= "exhaustive") .and.               &
+           (trim(pso_convergence_profile) /= "standard") )                     &
         call my_stop("pso_convergence_profile must be 'exhaustive' "//&
-                     "or 'quick'.")
+                     "or 'quick' or 'standard'.")
 
     else if (trim(global_search) == 'genetic_algorithm') then
 

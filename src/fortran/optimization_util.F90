@@ -265,6 +265,184 @@ subroutine initial_designs_mul(dv, objval, fevals, objfunc, xmin, xmax, use_x0,&
   deallocate(designstore)
 
 end subroutine initial_designs_mul
+
+!=============================================================================80
+!
+! Creates initial designs and tries to make them feasible, if desired
+!
+!=============================================================================80
+subroutine initial_designs_mul_2(dv, objval, fevals, objfunc, xmin, xmax, use_x0,&
+                           x0, feasible_init, feasible_limit, attempts,        &
+                           message_codes, messages, constrain_matrix, aero_matrix)
+  use vardef, only : objfunction_type
+    
+  double precision, dimension(:,:), intent(inout) :: dv
+  double precision, dimension(:), intent(inout) :: objval
+  integer, intent(out) :: fevals
+  double precision, dimension(:), intent(in) :: xmin, xmax, x0
+  logical, intent(in) :: use_x0, feasible_init
+  double precision, intent(in) :: feasible_limit
+  integer, intent(in) :: attempts
+  integer, dimension(:), intent(inout) :: message_codes
+  character(200), dimension(:), intent(inout) :: messages
+  double precision, dimension(:,:), intent(inout) :: constrain_matrix
+  double precision, dimension(:,:), intent(inout) :: aero_matrix
+  integer :: CHUNK = 1
+
+  interface
+    type(objfunction_type) function objfunc(x,step)
+      import :: objfunction_type
+      double precision, dimension(:), intent(in) :: x
+      integer, intent(in) :: step
+    end function
+  end interface
+
+  integer :: i, pop, nvars, initcount
+  character(30) :: text1, text2, text3
+  double precision, dimension(:), allocatable :: randvec1, designstore
+  double precision :: minstore
+  type(objfunction_type) :: objfunction_return
+
+! Initial settings and memory allocation
+
+  nvars = size(dv,1)
+  pop = size(dv,2)
+  allocate(randvec1(nvars))
+  allocate(designstore(nvars))
+
+!$omp master
+
+  fevals = pop
+
+! Set up matrix of random numbers for initial designs
+  
+  call random_number(dv)
+
+! Initial population of designs set between xmin and xmax
+  
+  write(*,*)
+  write(*,*) 'Generating and evaluating initial designs ...'
+  write(*,*)
+  
+!$omp end master
+!$omp barrier
+
+  if (use_x0) then
+    dv(:,1) = x0
+    objfunction_return = objfunc(x0,1)
+    objval(1) = objfunction_return%value
+    message_codes(1) = objfunction_return%message_code
+    messages(1) = objfunction_return%message
+    constrain_matrix(1,:) = objfunction_return%constrains_data
+    aero_matrix(1,:) = objfunction_return%aero_data
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
+    do i = 2, pop
+      dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
+      objfunction_return = objfunc(dv(:,i),1)
+      objval(i) = objfunction_return%value
+      message_codes(i) = objfunction_return%message_code
+      messages(i) = objfunction_return%message
+      constrain_matrix(i,:) = objfunction_return%constrains_data
+      aero_matrix(i,:) = objfunction_return%aero_data
+    end do
+!$omp end do
+  else
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
+    do i = 1, pop
+      dv(:,i) = (xmax - xmin)*dv(:,i) + xmin
+      objfunction_return = objfunc(dv(:,i),1)
+      objval(i) = objfunction_return%value
+      message_codes(i) = objfunction_return%message_code
+      messages(i) = objfunction_return%message
+      constrain_matrix(i,:) = objfunction_return%constrains_data
+      aero_matrix(i,:) = objfunction_return%aero_data
+    end do
+!$omp end do
+  end if
+
+! Enforce initially feasible designs
+
+  if (feasible_init) then
+
+    write(text1,*) attempts
+    text1 = adjustl(text1)
+!$omp master
+    write(*,*) 'Checking initial designs for feasibility ...'
+    write(*,*) '  (using a max of '//trim(text1)//' initialization attempts)'
+    write(*,*)
+!$omp end master
+
+!$omp do SCHEDULE(DYNAMIC,CHUNK)
+    do i = 1, pop 
+
+      write(text2,*) i
+      text2 = adjustl(text2)
+      initcount = 0
+      minstore = objval(i)
+      designstore = dv(:,i)
+
+!     Take a number of tries to fix infeasible designs
+
+      do while ((initcount <= attempts) .and.                                  &
+               (objval(i) >= feasible_limit))
+        call random_number(randvec1)
+        dv(:,i) = (xmax - xmin)*randvec1 + xmin
+        objfunction_return = objfunc(dv(:,i),1)
+        objval(i) = objfunction_return%value
+        message_codes(i) = objfunction_return%message_code
+        messages(i) = objfunction_return%message
+        constrain_matrix(i,:) = objfunction_return%constrains_data
+        aero_matrix(i,:) = objfunction_return%aero_data
+        if (objval(i) < minstore) then
+          minstore = objval(i)
+          designstore = dv(:,i)
+        end if
+        initcount = initcount + 1
+!$omp critical
+        fevals = fevals + 1
+!$omp end critical
+      end do
+
+!     Pick the best design tested if a feasible design was not found
+
+      if ((initcount > attempts) .and. (objval(i) >= feasible_limit)) then
+        dv(:,i) = designstore
+        objval(i) = minstore
+      end if
+
+!     Write a message about the feasibility of initial designs
+
+      if ((initcount > attempts) .and. (objval(i) >= feasible_limit)) then
+        write(*,*) ' Design '//trim(text2)//' is infeasible and was not'//     &
+                   ' fixed within '//trim(text1)//' reinitialization attempts.'
+      elseif ((initcount <= attempts) .and. (initcount > 0) .and.              &
+              (objval(i) < feasible_limit)) then
+        write(text3,*) initcount
+        text3 = adjustl(text3)
+        write(*,*) ' Design '//trim(text2)//' was initially infeasible but'//  &
+                   ' was fixed after '//trim(text3)//                          &
+                   ' reinitialization attempts.'
+      else
+        write(*,*) ' Design '//trim(text2)//' is feasible.' 
+      end if
+
+    end do
+
+!$omp end do
+
+!$omp master
+    write(*,*)
+!$omp end master
+
+  end if
+
+! Memory deallocation
+
+  deallocate(randvec1)
+  deallocate(designstore)
+
+end subroutine initial_designs_mul_2
+  
   
 !=============================================================================80
 !
@@ -658,10 +836,10 @@ function design_radius(dv, xmax, xmin)
   
   design_radius = 0.d0
   do i = 1, ndesigns
-    radius = norm_2(dv_scaled(:,i) - design_centroid) / size(dv,1)
+    radius = norm_2(dv_scaled(:,i) - design_centroid) / dble(size(dv,1))
     design_radius = design_radius + radius
   end do
-  design_radius = design_radius / ndesigns
+  design_radius = design_radius / dble(ndesigns)
 end function
 
 !=============================================================================80
@@ -874,6 +1052,88 @@ subroutine bubble_sort_plus_2(dv, objvals, message_codes, messages, constrain_ma
   constrain_matrix = tempconstrain_matrix
 
 end subroutine bubble_sort_plus_2
+
+!=============================================================================80
+!
+! Sorts a set of designs according to their objective function value
+! while keeping the message and code
+!
+!=============================================================================80
+subroutine bubble_sort_plus_3(dv, objvals, message_codes, messages,            &
+  constrain_matrix, aero_matrix)
+
+  double precision, dimension(:,:), intent(inout) :: dv
+  double precision, dimension(:), intent(inout) :: objvals
+  integer, dimension(:), intent(inout) :: message_codes
+  character(200), dimension(:), intent(inout) :: messages
+  double precision, dimension(:,:), intent(inout) :: constrain_matrix
+  double precision, dimension(:,:), intent(inout) :: aero_matrix
+
+  double precision, dimension(size(dv,1),size(dv,2)) :: tempdv
+  double precision, dimension(size(dv,2)) :: tempvals
+  integer, dimension(size(dv,2)) :: tempmessage_codes
+  character(200), dimension(size(dv,2)) :: tempmessages
+  double precision, dimension(size(dv,2),size(constrain_matrix,2)) :: tempconstrain_matrix
+  double precision, dimension(size(dv,2),size(aero_matrix,2)) :: tempaero_matrix
+  integer, dimension(size(dv,2)) :: finalorder, temporder
+  integer :: nvars, ndesigns, i, sortcounter
+  logical :: sorted
+
+  nvars = size(dv,1)
+  ndesigns = size(dv,2)
+
+! Set up indexing array
+
+  do i = 1, ndesigns
+    finalorder(i) = i
+  end do
+  temporder = finalorder
+
+! Bubble sorting algorithm
+
+  sorted = .false.
+  tempvals = objvals
+  do while (.not. sorted)
+
+    sortcounter = 0
+    do i = 1, ndesigns - 1
+      if (objvals(i+1) < objvals(i)) then
+
+!       Flip the order of these elements. temp arrays are to preserve values.
+
+        tempvals(i) = objvals(i+1)
+        tempvals(i+1) = objvals(i)
+        temporder(i) = finalorder(i+1)
+        temporder(i+1) = finalorder(i)
+        finalorder(i) = temporder(i)
+        finalorder(i+1) = temporder(i+1)
+        objvals(i) = tempvals(i)
+        objvals(i+1) = tempvals(i+1)
+        sortcounter = sortcounter + 1
+
+      end if
+    end do
+    if (sortcounter == 0) sorted = .true.
+    
+  end do
+
+! Use indexing array to rearrange order of designs
+
+  do i = 1, ndesigns
+    tempdv(:,i) = dv(:,finalorder(i))
+    tempmessage_codes(i) = message_codes(finalorder(i))
+    tempmessages(i) = messages(finalorder(i))
+    tempconstrain_matrix(i,:) = constrain_matrix(finalorder(i),:)
+    tempaero_matrix(i,:) = aero_matrix(finalorder(i),:)
+  end do
+  dv = tempdv
+  message_codes = tempmessage_codes
+  messages = tempmessages
+  constrain_matrix = tempconstrain_matrix
+  aero_matrix = tempaero_matrix
+
+end subroutine bubble_sort_plus_3
+  
   
 
 !=============================================================================80
@@ -986,6 +1246,8 @@ end subroutine write_design
 !
 !=============================================================================80
 subroutine read_run_control(commands, ncommands)
+  
+  use vardef, only : output_prefix  
 
   character(80), dimension(:), intent(inout) :: commands
   integer, intent(out) :: ncommands
@@ -997,7 +1259,7 @@ subroutine read_run_control(commands, ncommands)
   ncommands = 0
 
   rcunit = 18
-  open(unit=rcunit, file='run_control', status='old', iostat=ioerr, err=501)
+  open(unit=rcunit, file='run_control_'//trim(output_prefix), status='old', iostat=ioerr, err=501)
   if (ioerr /= 0) then
     return
   else
@@ -1018,7 +1280,7 @@ subroutine read_run_control(commands, ncommands)
   return
 501 close(rcunit)
 
-  open(unit=rcunit, file='run_control', status='replace', err=502)
+  open(unit=rcunit, file='run_control_'//trim(output_prefix), status='replace', err=502)
   do i = 1, ncommands
     write(rcunit,'(A)') commands(ncommands)
   end do

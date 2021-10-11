@@ -192,7 +192,7 @@ subroutine NACA_shape(x, modes, shape_function)
 
   do i = 1, nmodes
     dvscale = 1.d0/abs(maxval(shape_function(i,:)))
-    shape_function(i,:) = shape_function(i,:)*dvscale
+    shape_function(i,:) = shape_function(i,:)*dvscale*modes(i)
   end do
 
 end subroutine NACA_shape

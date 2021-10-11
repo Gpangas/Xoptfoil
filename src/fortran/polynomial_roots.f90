@@ -45,7 +45,7 @@ MODULE PolynomialRoots
 
   PRIVATE:: CubeRoot
   PUBLIC:: LinearRoot
-  PRIVATE:: OneLargeTwoSmall
+  !PRIVATE:: OneLargeTwoSmall
   PUBLIC:: QuadraticRoots
   PUBLIC:: CubicRoots
   PUBLIC:: QuarticRoots
@@ -94,31 +94,31 @@ SUBROUTINE LinearRoot(a, z)
   RETURN
 END Subroutine LinearRoot   ! -----------------------------------------------
 
-!+
-SUBROUTINE OneLargeTwoSmall(a1,a2,a4,w, z)
-! ---------------------------------------------------------------------------
-! PURPOSE - Compute the roots of a cubic when one root, w, is known to be
-!   much larger in magnitude than the other two
-
-  REAL(DP),INTENT(IN):: a1,a2,a4
-  REAL(DP),INTENT(IN):: w
-  COMPLEX(DP),INTENT(OUT),DIMENSION(:):: z
-
-
-  REAL(DP),DIMENSION(3):: aq
-!----------------------------------------------------------------------------
-  aq(1)=a1
-  aq(2)=a2+a1/w
-  aq(3)=-a4*w
-  CALL QuadraticRoots(aq, z)
-  z(3)=CMPLX(w,ZERO,DP)
-  
-  IF (AIMAG(z(1)) == ZERO) RETURN
-  z(3)=z(2)
-  z(2)=z(1)
-  z(1)=CMPLX(w,ZERO,DP)
-  RETURN
-END Subroutine OneLargeTwoSmall   ! -----------------------------------------
+!!+
+!SUBROUTINE OneLargeTwoSmall(a1,a2,a4,w, z)
+!! ---------------------------------------------------------------------------
+!! PURPOSE - Compute the roots of a cubic when one root, w, is known to be
+!!   much larger in magnitude than the other two
+!
+!  REAL(DP),INTENT(IN):: a1,a2,a4
+!  REAL(DP),INTENT(IN):: w
+!  COMPLEX(DP),INTENT(OUT),DIMENSION(:):: z
+!
+!
+!  REAL(DP),DIMENSION(3):: aq
+!!----------------------------------------------------------------------------
+!  aq(1)=a1
+!  aq(2)=a2+a1/w
+!  aq(3)=-a4*w
+!  CALL QuadraticRoots(aq, z)
+!  z(3)=CMPLX(w,ZERO,DP)
+!  
+!  IF (AIMAG(z(1)) == ZERO) RETURN
+!  z(3)=z(2)
+!  z(2)=z(1)
+!  z(1)=CMPLX(w,ZERO,DP)
+!  RETURN
+!END Subroutine OneLargeTwoSmall   ! -----------------------------------------
 
 !+
 SUBROUTINE QuadraticRoots(a, z)

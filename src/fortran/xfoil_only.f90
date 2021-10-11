@@ -42,13 +42,12 @@ program xfoil_only
   type(pso_options_type) :: pso_options
   type(ga_options_type) :: ga_options
   type(ds_options_type) :: ds_options
-  integer, dimension(:), allocatable :: constrained_dvs
   integer :: restart_write_freq, i
   logical :: restart
   double precision, dimension(:), allocatable :: alpha, lift, drag, moment,    &
                                                  viscrms, xtrt, xtrb
   double precision :: maxt, xmaxt, maxc, xmaxc
-  character(100) :: text, text1, text2, text3
+  character(100) :: text, text1
 
 ! Set default names and read command line arguments
 
@@ -60,7 +59,7 @@ program xfoil_only
 
   call read_inputs(input_file, search_type, global_search, local_search,       &
                    seed_airfoil, nparams_top, nparams_bot,       &
-                   restart, restart_write_freq, constrained_dvs, naca_options, &
+                   restart, restart_write_freq, naca_options, &
                    pso_options, ga_options, ds_options, matchfoil_file)
 
 ! Allocate some things

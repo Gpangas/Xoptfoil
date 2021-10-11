@@ -67,7 +67,8 @@ subroutine allocate_airfoil_data()
 
   use xfoil_driver,       only : xfoil_init
   use vardef,             only : nparams_top, nparams_bot, shape_functions,    &
-                                 xseedt, xseedb, curr_foil
+                                 xseedt, xseedb, curr_foil, objfunction_return,&
+                                 contrain_number, noppoint
   use parametrization,    only : create_shape_functions, parametrization_dvs
 
   double precision, dimension(:), allocatable :: modest, modesb
@@ -96,6 +97,10 @@ subroutine allocate_airfoil_data()
 
   curr_foil%npoint = size(xseedt,1) + size(xseedb,1) - 1
   call allocate_airfoil(curr_foil)
+  
+! allocate objfunction_return
+  allocate(objfunction_return%constrains_data(contrain_number))
+  allocate(objfunction_return%aero_data(3*noppoint+1))
 
 ! Allocate memory for xfoil
 
@@ -118,13 +123,16 @@ end subroutine allocate_airfoil_data
 subroutine deallocate_airfoil_data()
 
   use parametrization,    only : deallocate_parametrization
-  use vardef,             only : curr_foil
+  use vardef,             only : curr_foil, objfunction_return
   use xfoil_driver,       only : xfoil_cleanup
 
 !$omp parallel default(shared)
 
   call deallocate_parametrization()
   call deallocate_airfoil(curr_foil)
+  ! deallocate objfunction_return
+  deallocate(objfunction_return%constrains_data)
+  deallocate(objfunction_return%aero_data)
   call xfoil_cleanup()
 
 !$omp end parallel

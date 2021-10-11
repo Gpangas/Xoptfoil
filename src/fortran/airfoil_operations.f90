@@ -101,11 +101,6 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
   ! Translate and scale
 
     call transform_airfoil(foil, xoffset_i, zoffset_i, foilscale_i, foilangle_i)
-  
-    !write(*,*) '  xoffset_i   =', xoffset_i
-    !write(*,*) '  zoffset_i   =', zoffset_i
-    !write(*,*) '  foilangle_i = ', foilangle_i*180.d0/acos(-1.d0)
-    !write(*,*) '  foilscale_i =', foilscale_i
     
     xoffset = xoffset + xoffset_i
     zoffset = zoffset + zoffset_i
@@ -122,23 +117,15 @@ subroutine get_seed_airfoil(seed_airfoil, airfoil_file, naca_options, foil,    &
     foil%x(foil%npoint)=1.0d0
     foil%z(foil%npoint)=zobot
   
-    !write(*,*) (foil%z(foil%npoint)+foil%z(1))/2.0d0
     if ((foil%z(foil%npoint)+foil%z(1))/2.0d0 .LT. 1.E-12) exit
     
   end do
-  
-  !write(*,*)
-  !do i = 1, foil%npoint
-  !  write(*,*) foil%x(i), foil%z(i)
-  !end do
-  !write(*,*)
   
   write(*,*) 'Changes on airffoil:'
   write(*,*) '  xoffset   =', xoffset
   write(*,*) '  zoffset   =', zoffset
   write(*,*) '  foilangle = ', foilangle*180.d0/acos(-1.d0)
   write(*,*) '  foilscale =', foilscale
-  write(*,*) !(foil%z(foil%npoint)+foil%z(1))/2.0d0
   
   TE_thick = foil%z(1) - foil%z(foil%npoint)
   

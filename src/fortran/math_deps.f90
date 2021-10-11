@@ -945,7 +945,6 @@ SUBROUTINE foil_interp(N,X,Y,xitop,zotop,xibot,zobot)
   real*8, dimension(N) :: XP,YP,S
   real*8 :: SLE, SINTERP
   logical :: SILENT_MODE, INDICATOR
-  integer :: i
     
   ! create the spline 
   SILENT_MODE=.true.
@@ -961,14 +960,14 @@ SUBROUTINE foil_interp(N,X,Y,xitop,zotop,xibot,zobot)
 
  INDICATOR = .TRUE.
  
-  call XINTERPS(SINTERP, xitop, INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+  call XINTERPS(SINTERP, xitop, INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
   zotop = SEVAL(SINTERP,Y,YP,S,N)
 
   ! interpolate bot
 
   INDICATOR = .FALSE.
 
-  call XINTERPS(SINTERP, xibot, INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+  call XINTERPS(SINTERP, xibot, INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
   zobot = SEVAL(SINTERP,Y,YP,S,N)
 
 END SUBROUTINE foil_interp
@@ -1011,7 +1010,7 @@ SUBROUTINE spline_interp_z(N,X,Y,xi,zo,INDICATOR)
   
   ! interpolate
   do i = 1, size(xi,1)
-    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
     zo(i) = SEVAL(SINTERP,Y,YP,S,N)
   end do
   
@@ -1056,10 +1055,10 @@ SUBROUTINE spline_interp_t(N,X,Y,xi,thicko)
   ! interpolate
   do i = 1, size(xi,1)
     INDICATOR = .TRUE.
-    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
     zt = SEVAL(SINTERP,Y,YP,S,N)
     INDICATOR = .FALSE.
-    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    call XINTERPS(SINTERP, xi(i), INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
     zb = SEVAL(SINTERP,Y,YP,S,N)
     thicko(i) = zt - zb
   end do
@@ -1121,7 +1120,7 @@ SUBROUTINE spline_interp(ntop,xtop,ztop, nbot,xbot,zbot,                  &
 
   INDICATOR = .TRUE.
   do i = 1, nitop
-    call XINTERPS(SINTERP, xitop(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    call XINTERPS(SINTERP, xitop(i), INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
     zotop(i) = SEVAL(SINTERP,Y,YP,S,N)
   end do
 
@@ -1129,7 +1128,7 @@ SUBROUTINE spline_interp(ntop,xtop,ztop, nbot,xbot,zbot,                  &
 
   INDICATOR = .FALSE.
   do i = 1, nibot
-    call XINTERPS(SINTERP, xibot(i), INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+    call XINTERPS(SINTERP, xibot(i), INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
     zobot(i) = SEVAL(SINTERP,Y,YP,S,N)
   end do
   
@@ -1142,10 +1141,10 @@ END SUBROUTINE spline_interp
 !     of point XI
 !
 !=============================================================================80
-SUBROUTINE XINTERPS(SINTERP, XI, INDICATOR, X,XP,Y,YP,S,N, SLE, SILENT_MODE)
+SUBROUTINE XINTERPS(SINTERP, XI, INDICATOR, X,XP,Y,S,N, SLE, SILENT_MODE)
     
   integer, intent(in) :: N
-  real*8, dimension(N), intent(in) :: X,XP,Y,YP,S
+  real*8, dimension(N), intent(in) :: X,XP,Y,S
   real*8, intent(in) :: XI
   logical, intent(inout) :: INDICATOR ! true = 'top' or  false = 'bot'
   real*8, intent(in) :: SLE

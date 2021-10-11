@@ -145,8 +145,7 @@ end subroutine create_shape_functions
 !=============================================================================80
 subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
              zt_new, zb_new, shapetype, symmetrical, thick_TE)
-  use vardef, only : b_spline_degree,b_spline_xtype,b_spline_distribution,&
-    upointst, upointsb, xcontrolt, xcontrolb, TE_spec, xltTE, tcTE_seed
+  use vardef, only : upointst, upointsb, xcontrolt, xcontrolb, TE_spec, xltTE, tcTE_seed
 
   double precision, dimension(:), intent(in) :: xt_seed, zt_seed, xb_seed,     &
                                                 zb_seed
@@ -156,11 +155,9 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   character(*), intent(in) :: shapetype
   logical, intent(in) :: symmetrical
   
-  double precision, dimension(size(xt_seed,1)) :: xt_new
-  double precision, dimension(size(xb_seed,1)) :: xb_new
   integer :: i
   double precision :: symm
-    
+  
   if (trim(shapetype) == 'naca') then
     
     call NACA_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,      &
@@ -204,7 +201,6 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
                           zt_new, zb_new, symmetrical, thick_TE)
 
   elseif (trim(shapetype) == 'b-spline') then
-    !write(*,*) size(xcontrolt,1), size(xcontrolb,1), size(modest,1), size(modesb,1)
     call BSP_airfoil(upointst, xt_seed, zt_seed, upointsb, xb_seed, zb_seed,   &
       xcontrolt, xcontrolb, modest, modesb, zt_new, zb_new,    &
       symmetrical, thick_TE)
@@ -212,7 +208,7 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
   elseif (trim(shapetype) == 'bezier-parsec') then
     symm = 1.0d0
     if (symmetrical) symm=0.d0 ! no camber
-    call BPP_airfoil( xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb*symm, &
+    call BPP_airfoil( xt_seed, xb_seed, modest, modesb*symm, &
       zt_new, zb_new, thick_TE)
     
   else
@@ -223,21 +219,6 @@ subroutine create_airfoil(xt_seed, zt_seed, xb_seed, zb_seed, modest, modesb,  &
     stop
   end if
 
-  !write(*,*) 't'
-  !do i = 1,size(zt_new,1)
-  !  write(*,*) zt_new(i), zt_seed(i), zt_new(i)-zt_seed(i)
-  !end do
-  !write(*,*) 'b'
-  !do i = 1,size(zb_new,1)
-  !  write(*,*) zb_new(i), zb_seed(i), zb_new(i)-zb_seed(i)
-  !end do
-  !write(*,*) 'thick_TE', thick_TE
-  !do i=1,size(zt_new,1)
-  !  write(*,*) xt_seed(size(xt_seed,1)-i+1), zt_new(size(zt_new,1)-i+1)
-  !end do
-  !do i=2,size(zb_new,1)
-  !  write(*,*) xb_seed(i), zb_new(i)
-  !end do
 end subroutine create_airfoil
 
 
@@ -408,14 +389,14 @@ end subroutine parametrization_constrained_dvs
 subroutine parametrization_init(optdesign, x0)
 
   use vardef,             only : shape_functions, nflap_optimize,              &
-                                 abs_initial_perturb, rel_initial_perturb,     &
+                                 abs_initial_perturb,                          &
                                  min_flap_degrees, max_flap_degrees,           &
                                  flap_degrees, x_flap, int_x_flap_spec,        &
                                  min_flap_x, max_flap_x, int_tcTE_spec,        &
                                  min_tcTE, max_tcTE, tcTE,                     &
                                  flap_optimize_points, min_bump_width,         &
-                                 xseedt, xseedb, zseedt, zseedb, nshapedvtop,  &
-                                 nshapedvbot, modest_seed, modesb_seed,        &
+                                 nshapedvtop,                                  &
+                                 modest_seed, modesb_seed,                     &
                                  flap_optimization_only
 
   double precision, dimension(:), intent(inout) :: optdesign
@@ -546,8 +527,6 @@ subroutine parametrization_init(optdesign, x0)
       
   end if
 
-  !write(*,*) 'X0'
-  !write(*,*) X0
 end subroutine parametrization_init
 
 
@@ -557,27 +536,24 @@ end subroutine parametrization_init
 ! Set xmax and xmin before optimization
 !
 !=============================================================================80
-subroutine parametrization_maxmin(optdesign, x0, xmin, xmax)
+subroutine parametrization_maxmin(optdesign, xmin, xmax)
 
   use vardef,             only : shape_functions, nflap_optimize,              &
                                  abs_initial_perturb, rel_initial_perturb,     &
                                  min_flap_degrees, max_flap_degrees,           &
-                                 nshapedvtop, nshapedvbot,                     &  
+                                 nshapedvtop,                                  &  
                                  int_x_flap_spec, min_flap_x, max_flap_x,      &
-                                 int_tcTE_spec, min_tcTE, max_tcTE, tcTE,      &
+                                 int_tcTE_spec, min_tcTE, max_tcTE      ,      &
                                  min_bump_width, modest_seed, modesb_seed,     &
                                  flap_optimization_only
   
   double precision, dimension(:), intent(in) :: optdesign
-  double precision, dimension(size(optdesign,1)), intent(in) :: x0
   double precision, dimension(size(optdesign,1)), intent(out) :: xmin, xmax
 
   integer :: i, counter, nfuncs, ndv
   double precision :: t1fact, t2fact, ffact, fxfact, tefact
   
   ndv = size(optdesign,1)
-  !write(*,*) 'ndv'
-  !write(*,*) ndv
   
   t1fact = abs_initial_perturb/(1.d0 - 0.001d0)
   t2fact = abs_initial_perturb/(10.d0 - min_bump_width)
@@ -743,10 +719,6 @@ subroutine parametrization_maxmin(optdesign, x0, xmin, xmax)
       
   end if
   
-  !write(*,*) 'xmin'
-  !write(*,*) xmin
-  !write(*,*) 'xmax'
-  !write(*,*) xmax
 end subroutine parametrization_maxmin
 
 !=============================================================================80
@@ -769,7 +741,7 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   
   double precision, dimension(size(xseedt,1)) :: zseedt_new
   double precision, dimension(size(xseedb,1)) :: zseedb_new
-  double precision :: sum, sum_w,w
+  double precision :: sum, sum_w,w, max_dif,local_dif
   integer :: i
   
   ! Set Trailing edge
@@ -795,7 +767,8 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   write(*,*) '    Trailing Edge of seed foil = ', tcTE_seed
   write(*,*) 'New Trailing Edge of seed foil = ', tcTE
   write(*,*)
-  
+  ! set updated value of tcTE_seed
+  tcTE_seed = tcTE
     ! Write seed foil to file after TE
   write(*,*) 'Writing airfoil after TE to file: ', 'TE_seed_'//airfoil_file
   open(unit=100, file='TE_seed_'//airfoil_file, status='replace')
@@ -832,9 +805,18 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
     
   elseif (trim(shape_functions) == 'bezier-parsec') then
     call BPP_init(xseedt, xseedb, zseedt, zseedb, modest_seed, modesb_seed)
-    
+    !modest_seed(1)=0.2!Xt_max
+    !modest_seed(2)=0.1!Yt_max
+    !modest_seed(3)=-1.7!Kt_max
+    !modesb_seed(1)=0.5!Xc_max
+    !modesb_seed(2)=0.08!Yc_max
+    !modesb_seed(3)=-0.3!Kc_max       
+    !modest_seed(4)=-0.08!Rle                              
+    !modesb_seed(4)=23/180.0*3.14!Gamma_le
+    !modesb_seed(5)=20/180.0*3.14!Alpha_te                
+    !modest_seed(5)=6/180.0*3.14!Beta_te  
     if (symmetrical) modesb_seed=modesb_seed*0.d0 ! no camber
-    call BPP_airfoil(xseedt, zseedt, xseedb, zseedb, modest_seed, modesb_seed, &
+    call BPP_airfoil(xseedt, xseedb, modest_seed, modesb_seed, &
       zseedt_new, zseedb_new, tcTE)
     if (ALL(zseedt_new .EQ. 0.0d0) .OR. ALL(zseedb_new .EQ. 0.0d0)) then
       call my_stop("Bezier-PARSEC failed parametrization of inicial foil!")
@@ -849,12 +831,15 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   
   sum=0.d0
   sum_w=0.d0
+  max_dif=0.d0
   do i = 1, size(zseedt,1)
     if (xseedt(i) .LT. 0.2d0) then
       w=2.0d0
     else
       w=1.0d0
     end if
+    local_dif=abs(zseedt(i)-zseedt_new(i))
+    if (local_dif .GT. max_dif) max_dif = local_dif
     sum=sum+(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
     sum_w=sum_w+w*(zseedt(i)-zseedt_new(i))**2./real(size(zseedt,1),8)
   end do
@@ -865,14 +850,20 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   write(*,*)
   Write(*,*) ' Mean Weighted Difference Squared of upper surface'
   Write(*,*) sum_w
+  write(*,*)
+  Write(*,*) ' Max Difference of upper surface'
+  Write(*,*) max_dif
   sum=0.d0
   sum_w=0.d0
+  max_dif=0.d0
   do i = 1, size(zseedb,1)
     if (xseedb(i) .LT. 0.2d0) then
       w=2.0d0
     else
       w=1.0d0
     end if
+    local_dif=abs(zseedb(i)-zseedb_new(i))
+    if (local_dif .GT. max_dif) max_dif = local_dif
     sum=sum+(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
     sum_w=sum_w+w*(zseedb(i)-zseedb_new(i))**2./real(size(zseedb,1),8)
   end do
@@ -883,35 +874,14 @@ subroutine parametrization_new_seed(xseedt, xseedb, zseedt, zseedb,            &
   write(*,*)
   Write(*,*) ' Mean Weighted Difference Squared of lower surface'
   Write(*,*) sum_w
-  !
-  !write(*,*) 'zseedt'
-  !write(*,*)
-  !do i=1,size(zseedt,1)
-  !  write(*,*) xseedt(size(zseedt,1)-i+1), zseedt(size(zseedt,1)-i+1)
-  !end do
-  !!write(*,*) 'zseedb'
-  !do i=2,size(zseedb,1)
-  !  write(*,*) xseedb(i), zseedb(i)
-  !end do
+  write(*,*)
+  Write(*,*) ' Max Difference of lower surface'
+  Write(*,*) max_dif
   write(*,*)
   
   zseedt=zseedt_new
   zseedb=zseedb_new
-  
-  !write(*,*) 'tcTE', tcTE
-  !write(*,*) 'zseedt'
-  !write(*,*)
-  !do i=1,size(zseedt,1)
-  !  write(*,*) xseedt(size(zseedt,1)-i+1), zseedt(size(zseedt,1)-i+1)
-  !end do
-  !!write(*,*) 'zseedb'
-  !do i=2,size(zseedb,1)
-  !  write(*,*) xseedb(i), zseedb(i)
-  !end do
-  !write(*,*)
-  !call BPP_init(xseedt, xseedb, zseedt, zseedb, modest_seed, modesb_seed)
-  !stop
-  !
+
 end subroutine parametrization_new_seed
   
 !=============================================================================80

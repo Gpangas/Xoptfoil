@@ -47,8 +47,6 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   double precision, dimension(:), allocatable :: zttmp, zbtmp
   double precision :: xoffmatch, zoffmatch, scale_match, angle_match, tcTE_match
   double precision ::TE_seed, TE_match, TE_ratio, TE_dif
-  character :: choice
-  logical :: valid_choice
   
   write(*,*) 'Note: using the optimizer to match the seed airfoil to the '
   write(*,*) 'airfoil about to be loaded.'
@@ -130,15 +128,6 @@ subroutine matchfoils_preprocessing(matchfoil_file)
   xmatchb = xseedb
   zmatcht = zttmp
   zmatchb = zbtmp
-  
-  !write(*,*)
-  !do i = 1, pointst
-  !  write(*,*) xmatcht(pointst+1-i), zmatcht(pointst+1-i)
-  !end do
-  !do i = 1, pointsb
-  !  write(*,*) xmatchb(i), zmatchb(i)
-  !end do
-  !write(*,*)
 
   deallocate(match_foil%x,match_foil%z)
   allocate(match_foil%x(pointst+pointsb+1),match_foil%z(pointst+pointsb+1))
@@ -173,7 +162,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
   use vardef,             only : output_prefix, global_search_stat,            &
                                  local_search_stat, restart_stat, objfunction_type,&
-                                 contrain_number
+                                 contrain_number, objfunction_return, noppoint
   use particle_swarm,     only : pso_options_type, particleswarm, pso_read_step
   use genetic_algorithm,  only : ga_options_type, geneticalgorithm, ga_read_step
   use simplex_search,     only : ds_options_type, simplexsearch
@@ -192,7 +181,6 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   integer, dimension(:), intent(in) :: constrained_dvs
   integer, intent(out) :: steps, fevals
   logical, intent(in) :: restart
-  type(objfunction_type) :: objfunction_return
 
   double precision, dimension(size(optdesign,1)) :: xmin, xmax, x0
   logical :: restart_temp, write_designs
@@ -203,7 +191,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   double precision :: f0_penalty
   character(200) :: message
   double precision, dimension(contrain_number) :: constrain_vector
-  double precision, dimension(2,contrain_number) :: constrain_matrix
+  double precision, dimension(3*noppoint+1) :: aero_vector
 
   ! Set search types
   
@@ -213,7 +201,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 ! Delete existing run_control file and rewrite it
 
   iunit = 23
-  open(unit=iunit, file='run_control', status='replace')
+  open(unit=iunit, file='run_control_'//trim(output_prefix), status='replace')
   close(iunit)
 
 ! Restart status file setup
@@ -239,7 +227,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   
 ! Set up mins and maxes
   
-  call parametrization_maxmin(optdesign, x0, xmin, xmax)
+  call parametrization_maxmin(optdesign, xmin, xmax)
   
   write(*,*)
   write(*,*) 'xmin: '
@@ -252,23 +240,27 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
   f0_ref = objfunction_return%value
   message = objfunction_return%message
   constrain_vector = objfunction_return%constrains_data
+  aero_vector = objfunction_return%aero_data
  
   write(*,*)
   write(*,*) 'f0_ref:     ', f0_ref
   write(*,*) 'message: ', message
   
-  write(*,*) 'constrain_vector', constrain_vector
+  !write(*,*) 'constrain_vector', constrain_vector
+  !write(*,*) 'aero_vector', aero_vector
   
 ! Compute with penalty
   objfunction_return = objective_function(x0,0) 
   f0_penalty = objfunction_return%value
   message = objfunction_return%message
+  constrain_vector = objfunction_return%constrains_data
+  aero_vector = objfunction_return%aero_data
   
   write(*,*)
   write(*,*) 'f0_penalty: ', f0_penalty
   write(*,*) 'message: ', message
-  constrain_matrix(1,:) = objfunction_return%constrains_data
-  write(*,*) 'constrain_matrix', constrain_matrix(1,:)
+  write(*,*) 'constrain_vector', constrain_vector
+  write(*,*) 'aero_vector', aero_vector
   
 ! Wait for user to check information
   write(*,*)
@@ -341,7 +333,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 
 !     Analyze and write seed airfoil
   
-      stat = write_function(x0, 0) 
+      stat = write_function(x0, 0, .false.) 
 
     else
 
@@ -434,7 +426,7 @@ subroutine optimize(search_type, global_search, local_search, constrained_dvs, &
 ! Write stop_monitoring command to run_control file
 
   iunit = 23
-  open(unit=iunit, file='run_control', status='old', position='append',        &
+  open(unit=iunit, file='run_control_'//trim(output_prefix), status='old', position='append',        &
        iostat=ioerr)
   if (ioerr /= 0) open(unit=iunit, file='run_control', status='new')
   write(iunit,'(A)') "stop_monitoring"
@@ -447,23 +439,19 @@ end subroutine optimize
 ! Writes final airfoil design to a file 
 !
 !=============================================================================80
-subroutine write_final_design(optdesign, f0, fmin, shapetype)
+subroutine write_final_design(optdesign, f0, fmin)
 
   use vardef
   use memory_util,        only : allocate_airfoil, deallocate_airfoil
   use airfoil_operations, only : airfoil_write
   use parametrization,    only : parametrization_dvs
-  use airfoil_evaluation, only : xfoil_geom_options, xfoil_options,            &
-                                 get_last_design_parameters, get_last_airfoil
+  use airfoil_evaluation, only : get_last_design_parameters, get_last_airfoil
   use xfoil_driver,       only : run_xfoil
 
   double precision, dimension(:), intent(in) :: optdesign
-  character(*), intent(in) :: shapetype
   double precision, intent(in) :: f0, fmin
 
-  double precision, dimension(size(xseedt,1)) :: zt_new
-  double precision, dimension(size(xseedb,1)) :: zb_new
-  double precision, dimension(noppoint) :: alpha, lift, drag, moment, viscrms, &
+  double precision, dimension(noppoint) :: alpha, lift, drag, moment, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: ffact, fxfact, actual_x_flap, tefact, actual_tcTE

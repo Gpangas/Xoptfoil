@@ -49,6 +49,7 @@ module vardef
     integer :: message_code
     character(200) :: message
     double precision, dimension(:), allocatable :: constrains_data
+    double precision, dimension(:), allocatable :: aero_data
     
   end type objfunction_type
   
@@ -57,9 +58,13 @@ module vardef
     type(objfunction_type) :: obj
   end type test_type
   
+! Main return variable for all optimizations
+  type(objfunction_type) :: objfunction_return
+  !$omp threadprivate(objfunction_return)
+  
 ! Global variables (mainly needed to preserve generality of optimization
 ! routines)
-
+  
   integer :: noppoint
   integer, parameter :: max_op_points = 100
   double precision, dimension(:), allocatable :: xseedt, xseedb, zseedt, zseedb

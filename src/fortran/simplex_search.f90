@@ -73,9 +73,10 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
 
   optional :: converterfunc
   interface
-    integer function converterfunc(x, designcounter)
+    integer function converterfunc(x, designcounter, laststep)
       double precision, dimension(:), intent(in) :: x
       integer, intent(in) :: designcounter
+      logical, intent(in) :: laststep
     end function
   end interface
 
@@ -284,7 +285,7 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
     if ( (signal_progress) .and. (ds_options%write_designs) ) then
       designcounter = designcounter + 1
       if (present(converterfunc)) then
-        stat = converterfunc(dv(:,1), designcounter)
+        stat = converterfunc(dv(:,1), designcounter, .false.)
       else
         call write_design('simplex_designs.dat', filestat, dv(:,1),            &
                           designcounter)
@@ -456,6 +457,12 @@ subroutine simplexsearch(xopt, fmin, step, fevals, objfunc, x0, given_f0_ref,  &
   call bubble_sort(dv, objvals)
   xopt = dv(:,1)
   fmin = objvals(1)
+  
+!    Write airfoils for each op
+    
+  if (present(converterfunc)) then
+    stat = converterfunc(xopt, designcounter, .true.)
+  end if
 
 ! Check for convergence one more time
 

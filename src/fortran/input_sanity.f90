@@ -34,9 +34,10 @@ subroutine check_seed()
   use math_deps,          only : interp_vector, nu_curvature, derv1f1, derv1b1,&
                                  spline_interp_z, spline_interp_t
   use xfoil_driver,       only : run_xfoil, get_max_panel_angle
-  use xfoil_inc,          only : AMAX, CAMBR
   use airfoil_evaluation, only : xfoil_options, xfoil_geom_options, file_options
 
+  double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
+                                           xtrt, xtrb
   double precision, dimension(:), allocatable :: x_interp, thickness, camber
   double precision, dimension(:), allocatable :: zt_interp, zb_interp
   double precision, dimension(size(xseedt,1)) :: curvt
@@ -45,14 +46,12 @@ subroutine check_seed()
   double precision :: penaltyval, tegap, gapallow, maxthick, heightfactor, maxcamb, panel_angle
   double precision :: panang1, panang2, maxpanang, minpanang, curv1, curv2
   double precision :: checkval, len1, len2, growth1, growth2, xtrans, ztrans
-  double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
-                                           xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: pi, te_angle, actual_min_te_angle, max_growth_top,       &
                       max_growth_bot
   integer :: i, nptt, nptb, nreversalst, nreversalsb, nptint, flap_idi
   character(30) :: text, text2
-  character(14) :: opt_type
+  character(15) :: opt_type
   logical :: addthick_violation, side
 
   penaltyval = 0.d0
@@ -431,32 +430,7 @@ subroutine check_seed()
                  lift, drag, moment, viscrms, alpha, xtrt, xtrb, ncrit_pt)
   first_run_xfoil=.false.
   write(*,*)
-  
-!! Camber too high or too low
-!
-!  write(text,'(F8.4)') CAMBR
-!  text = adjustl(text)
-!  write(*,*) "   Max Camber: "//trim(text)
-!  
-!  if (CAMBR > max_camber) then
-!    call ask_stop("Seed airfoil violates max_camber constraint.")
-!  end if
-!
-!  if (CAMBR < min_camber) then
-!    call ask_stop("Seed airfoil violates min_camber constraint.")
-!  end if
-!
-!  ! Penalty for too large panel angles
-!  
-!  write(text,'(F8.4)') AMAX
-!  text = adjustl(text)
-!  write(*,*) "   Max panel angle: "//trim(text)
-!  
-!  if (AMAX > max_panel_angle) then
-!    call ask_stop("Seed airfoil panel angles are too large. Try adjusting "//&
-!                  "xfoil_paneling_options.")
-!  end if
-  
+    
 ! Check for unconverged points
 
   do i = 1, noppoint
