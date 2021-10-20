@@ -7,9 +7,9 @@
   global_search = 'particle_swarm'
                            !'particle_swarm' or 'genetic_algorithm'
   local_search = 'simplex' !'simplex' is currently the only option
-  seed_airfoil = 'from_file'
+  seed_airfoil = 'naca'
                            !Either 'from_file' or 'naca' or 'from_variables'
-  airfoil_file = 'NewACC2017.dat'
+  airfoil_file = 'NACA 6411.dat'
                            !File name for reading seed airfoil (only if
                            !  seed_airfoil = 'from_file').  Airfoils must be
                            !  in xfoil format: closed loop starting and
@@ -286,10 +286,10 @@
 
   family  = '4'     ! '4', '4M', '5', '63', '64', '65', '66', '67', '63A',
                      !   '64A', or '65A'
-  maxt = 0.12        ! Max thickness/chord
-  xmaxt = 0.40       ! Location of maxt. Only for 4M.
-  maxc = 0.02        ! Max camber/chord. Only for 4 and 4M.
-  xmaxc = 0.30       ! Location of maxc. All except for 6 and 6A.
+  maxt = 0.11        ! Max thickness/chord
+  xmaxt = 0.30       ! Location of maxt. Only for 4M.
+  maxc = 0.06        ! Max camber/chord. Only for 4 and 4M.
+  xmaxc = 0.40       ! Location of maxc. All except for 6 and 6A.
   design_cl = 0.3    ! Design Cl. Only for 5, 6, and 6A.
   a = 0.5            ! Extent of constant load in x/c. Only for 6.
   leidx = 6.0        ! Leading edge index. Only for 4M.
@@ -419,7 +419,6 @@
 ! shape functions, etc.
 
   match_foils = .false.
-  !matchfoil_file = 'NACA 6411.dat'
-  matchfoil_file = 'mars_ACC2017.dat'
+  matchfoil_file = 'NACA 6411.dat'
 
 /
