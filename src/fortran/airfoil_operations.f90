@@ -13,7 +13,7 @@
 !  You should have received a copy of the GNU General Public License
 !  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
 
-!  Copyright (C) 2017-2019 Daniel Prosser
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
 
 module airfoil_operations
 
@@ -364,6 +364,9 @@ subroutine d_variables(filename, pointsmcl, foil)
                                                              ndvs_top, ndvs_bot)
   ndvs = ndvs_top + ndvs_bot + int_tcTE_spec
   
+  write(*,*) 'Number of design variables expected:'
+  write(*,*) ndvs
+  
   allocate(vars(ndvs))
   
 ! Read variables from file
@@ -413,7 +416,6 @@ subroutine d_variables(filename, pointsmcl, foil)
   write(*,*)
   
 ! Create seed distributions
-
   call cosine_spacing(x, pointsmcl, 0.d0, 1.d0)
   
   xu = x

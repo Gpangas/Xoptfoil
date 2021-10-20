@@ -5,12 +5,14 @@
   seed_airfoil = 'naca'
   shape_functions = 'hicks-henne'
   min_bump_width = 0.1
-  nfunctions_top = 4
-  nfunctions_bot = 4
-  initial_perturb = 0.025
+  nparameters_top = 4
+  nparameters_bot = 4
+  abs_initial_perturb = 0.025
   restart = .false.
   restart_write_freq = 30
   write_designs = .true.
+  write_dvs_file = .true.
+  number_threads = 2
 /  
 
 &operating_conditions
@@ -43,7 +45,7 @@
 
   op_mode(5) = 'spec-cl'
   op_point(5) = 1.2
-  optimization_type(4) = 'min-drag'
+  optimization_type(5) = 'min-drag'
   reynolds(5) = 7.0E+04
   mach(5) = 0.03
 /
@@ -103,8 +105,14 @@
   silent_mode = .true.
   bl_maxit = 100
   vaccel = 0.01
-  fix_unconverged = .true.
   reinitialize = .true.
+  init_type = 'unconverged'
+  init_number_points = 	5
+  init_al0 = 2.0
+  init_cl0 = 0.5
+  init_initial_position = 0.7
+  init_dist = 'sine'
+  
 /
 
 &xfoil_paneling_options

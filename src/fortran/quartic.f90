@@ -1,3 +1,5 @@
+!  This file is part of quartic (https://www.pdas.com/quartic.html)
+  
 MODULE PolynomialRoots
 ! ---------------------------------------------------------------------------
 ! PURPOSE - Solve for the roots of a polynomial equation with real

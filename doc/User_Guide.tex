@@ -12,7 +12,7 @@
 
 \begin{document}
 
-\title{Xoptfoil Version 1.11.1 User Guide}
+\title{Xoptfoil Version 2.01.0 User Guide}
 \date{\today}
 \maketitle
 
@@ -28,7 +28,8 @@ provided for convenience. CMake version 2.8.8 or later is required, as are gcc, 
 gfortran. Your distribution should have packages for all of these, so locate and install
 them first through the package manager.
 
-Once the requirements are installed, all that is necessary is to run the build script.
+Once the requirements are installed, all that is necessary should be to run the build script. 
+(The build script may not be up to date. If it fails, please report the bug.)
 Navigate to the top-level Xoptfoil directory and open a terminal window there. Then, run
 the build script using the following command:
 
@@ -65,10 +66,10 @@ then be installed in /usr/local/bin, which should already be in the PATH.
 \subsection{Windows}\label{sec:install_windows}
 
 The Windows release includes precompiled binaries of Xoptfoil and its related tools. There
-are both 64-bit and 32-bit binaries. Both should work on a 64-bit operating system, but
-only the 32-bit binaries will work on a 32-bit operating system.  The release also
+are 64-bit binaries. And only should work on a 64-bit operating system.  The release also
 includes some required libraries so that the user does not have to install compilers just
-to run Xoptfoil. As of Xoptfoil 1.11.0, parallel processing is supported in the
+to run Xoptfoil. (The required libraries may not be up to date. If it fails, please report the bug.)
+As of Xoptfoil 1.11.0, parallel processing is supported in the
 precompiled versions; it is not necessary to compile the code manually to benefit from
 this feature.
 
@@ -93,7 +94,7 @@ the Xoptfoil bin directory. Make sure you do not overwrite any existing entries.
 \begin{figure}
 \centering
   \includegraphics[width=0.85\textwidth]{User_Guide_figs/set_path.png}
-\caption{Adding Xoptfoil to the PATH environment variable in Windows.}
+\caption{Adding Xoptfoil to the PATH environment \%variable in Windows.}
 \label{fig:set_path}
 \end{figure}
 
@@ -106,7 +107,7 @@ environment variable on your version of Windows.
 
 \subsubsection{Optional: compiling}
 
-It is not necessary to compile Xoptfoil on Windows, but you are free to do so if desired
+It is not necessary to compile Xoptfoil on Windows 64-bit, but you are free to do so if desired
 (or if you want to make changes to the code). There are a couple prerequesites for
 compiling on Windows:
 
@@ -127,7 +128,9 @@ pthreads packages (on MinGW32, these are called mingw32-pthreads-w32). The preco
 binaries have been built with GCC version 6.3.0 on MinGW32 and 5.4.0 on MinGW64, so these
 versions are known to work. MinGW64 can be downloaded at
 \url{https://sourceforge.net/projects/mingw-w64/files/mingw-w64/}. However, if your
-operating system in 64-bit, MinGW32 will also work fine; you do not need to use MinGW64.
+operating system in 64-bit, MinGW32 should also work fine; you do not need to use MinGW64.
+(If MinGW32 fails, please report the bug.)
+
 
 At this point, everything you need to compile Xoptfoil should be installed. A build script
 is provided in the top-level Xoptfoil directory. Though you can run it by double-clicking,
@@ -221,16 +224,16 @@ xoptfoil -i test.txt -o my_airfoil
 
 \section{Controlling an ongoing optimization}\label{sec:run_control}
 
-When Xoptfoil starts an begins an optimization, it creates an empty file called
-``run\_control.'' The user can enter commands in this file to control an ongoing
+When Xoptfoil starts an optimization, it creates an empty file called
+``run\_control\_\{prefix\}.'' The user can enter commands in this file to control an ongoing
 optimization. The currently available commands are:
 
 \begin{itemize}
 \item{\textbf{stop}: Write restart data and stop the optimization at the end of the
 current iteration. Also writes a stop\_monitoring command, which is described in the next
 point.}
-\item{\textbf{stop\_monitoring}: In xoptfoil\_visualizer, stop monitoring the current
-optimization and return to the main menu. See Section \ref{sec:xoptfoil_visualizer} for
+\item{\textbf{stop\_monitoring}: In xoptfoil\_visualizer\_V2, stop monitoring the current
+optimization and return to the main menu. See Section \ref{sec:xoptfoil_visualizer_V2} for
 more information.}
 \end{itemize}
 
@@ -256,12 +259,15 @@ Each namelist begins with a `\&' character followed immediately by the title, an
 a '/' character.  Variables for each namelist are then listed with their respective
 values.  To change an input, simply change the value to the right of the `=' sign.  Note
 that text-based inputs (for example, the name of the seed airfoil file) need to be
-surrounded by single or double quotes.  The inputs for each of the Xoptfoil namelists,
+surrounded by single or double quotes. The inputs for each of the Xoptfoil namelists,
 stored in `inputs.txt,' are explained in the following sections. A sample input file
 called `all\_inputs.txt' is included with Xoptfoil. This file contains all possible
 inputs with comments. Many of the inputs are not required, however, and default values
 will be used if they are absent. Any absent required inputs will result in an error when
-Xoptfoil is run.
+Xoptfoil is run. Any absent namelists will result in an error when Xoptfoil is run.
+While running the program, the file echo\_\{prefix\}.txt is created with 
+all the options used by Xoptfoil, see Section \ref{sec:output_files} for more information on the
+output files generated.
 
 \subsection{optimization\_options namelist}
 
@@ -284,117 +290,241 @@ only available option is `simplex'.}
 \item{\textbf{seed\_airfoil}: Defines how to set the seed airfoil.  Available options are
 (1) `from\_file', whereby the seed airfoil is read from a file, or (2) `naca', where a
 NACA seed airfoil is generated by Xoptfoil. If `naca' is selected, the parameters for
-generating the airfoil must be set in the naca\_airfoil namelist.}
+generating the airfoil must be set in the naca\_airfoil namelist. Or (3) `from\_variables',
+in which the airfoil is created from the design variables in `airfoil\_file'. It is only available
+for `kulfan-bussoletti' and `bezier-parsec' shape functions.}
+
 \item{\textbf{airfoil\_file}: File name for the seed airfoil, which is used if
 seed\_airfoil = `from\_file'.  The file must be formatted in Xfoil format; it may have a
 label on the first line (though it does not need to) and then the coordinates must be
 arranged in two columns for x and y, forming a closed loop beginning and ending at the
 trailing edge. There should be no blank lines, and you should also not include the number
-of points or any other information besides a header and then the data.  If the file is not 
-in the working directory, you must include the full or relative path.}
+of points or any other information besides a header and then the data.  The file must be
+in the working directory. Alternatively, if 
+seed\_airfoil = `from\_variables', the file must have 3 lines. Two for an header and on 
+the third the variables, which must be separated by spaces.}
 \item{\textbf{shape\_functions}: Identifier for the shape functions used to parameterize
-airfoils in the optimization.  This may be `naca' or `hicks-henne'.  A user-defined number
-of these shape functions are added to the top and bottom surfaces of the seed airfoil to
-create new shapes.  `naca' functions are a family of functions which, when combined in a
-weighted sum, can reproduce many of the NACA airfoils, including four-digit and transonic
-airfoils.  `hicks-henne' are a more general class of functions which place a ``bump'' of
-variable width and location on the airfoil surface.  Each Hicks-Henne shape function,
-therefore, has a strength and also a width and location, whereas each NACA function only
-has a strength.}
+airfoils in the optimization. A user-defined number of these shape functions are added 
+to the top and bottom surfaces of the seed airfoil to create new shapes. These may be:
+\begin{enumerate}
+	\item `naca', `naca' functions are a family of functions which, when combined in a
+	weighted sum, can reproduce many of the NACA airfoils, including four-digit and transonic
+	airfoils, on top of the seed airfoil.
+	\item `hicks-henne', `hicks-henne' are a more general class of functions which place a ``bump'' of
+	variable width and location on the seed airfoil surface.  Each Hicks-Henne shape function,
+	therefore, has a strength, a width and a location.
+	\item `b-spline', `b-spline' method generates the airfoil solely from the design variables which
+	are the coordinates of the control points defining the spline. Two implementations are 
+	available, in the first the x coordinate is fixed while on the second it is free, meaning it
+	is a design variable. The degree of the spline, the x coordinate distribution and the 
+	number of control points must be defined.
+	\item `kulfan-bussoletti', `kulfan-bussoletti' also known as class shape functions also
+	generates the airfoil solely from the design variables. In this method the design variables
+	are the strengths of the functions. An extra strength is available through kulfan\_bussoletti\_LEM.
+	\item `bezier-parsec', `bezier-parsec' is similar to the `parsec' parametrization, in here
+	the design variables are geometric properties of the airfoil and defined it completely. For 
+	this method nfunctions\_top and nfunctions\_bot do nothing since it always has the same number
+	of parameters. In order, these are the position of the maximum thickness, the maximum thickness and its curvature,
+	the leading edge radius and the trailing edge angle on the thickness. Followed by the the position of the maximum camber, the maximum camber and its curvature, the leading edge camber angle and the trailing edge angle on the camber. 
+\end{enumerate}}
+\item{\textbf{nparameters\_top}: The number of shape functions used to parameterize the top
+	surface of the airfoil.  Note that this number may not correspond to the number of design variables (ndv\_top)
+	on the top surface. Instead for:
+	\begin{enumerate}
+		\item  `naca', nparameters\_top is the number of function therefore $ndv\_top=nparameters\_top$.
+		\item `hicks-henne', nparameters\_top is the number of functions therefore $ndv\_top=3 \cdot nparameters\_top$.
+		\item `b-spline', nparameters\_top is the number of control points therefore $ndv\_top=nparameters\_top - 2$ if x is fixed or $ndv\_top=2 \cdot nparameters\_top - 5$ if x is free.
+		\item `kulfan-bussoletti', nparameters\_top is the order or the degree plus 1, $ndv\_top=nparameters\_top$ without kulfan\_bussoletti\_LEM and $ndv\_top=nparameters\_top + 1$ with it.
+		\item `bezier-parsec', nparameters\_top has no meaning and $ndv\_top=5$. 
+	\end{enumerate}}
+\item{\textbf{nparameters\_bot}: The number of shape functions used to parameterize the
+	bottom surface of the airfoil.  See the note on nparameters\_top regarding differences
+	between the different shape\_functions.}
+\item{\textbf{flap\_optimization\_only}: Whether to optimize only the flap design variables,
+	the flap hinge position in x and the flap deflection.}
+\item{\textbf{abs\_initial\_perturb}: Generating the initial designs variables requires a maximum and minimum
+	value. 
+	
+	$DV_{max} = DV_{seed} + abs\_initial\_perturb + rel\_initial\_perturb \cdot |DV_{seed}|$
+	
+	$DV_{min} = DV_{seed} - abs\_initial\_perturb - rel\_initial\_perturb \cdot |DV_{seed}|$
+	
+	abs\_initial\_perturb controls the absolute increment.}
+\item{\textbf{rel\_initial\_perturb}: Generating the initial designs variables requires a maximum and minimum
+	value.
+	
+	$DV_{max} = DV_{seed} + abs\_initial\_perturb + rel\_initial\_perturb \cdot |DV_{seed}|$
+	
+	$DV_{min} = DV_{seed} - abs\_initial\_perturb - rel\_initial\_perturb \cdot |DV_{seed}|$
+	
+	rel\_initial\_perturb controls the relative increment.}
+\item{\textbf{fla\_optimization\_only}: Whether to optimize only the flap design variables,
+	the flap hinge position in x and the flap deflection.}
+\item{\textbf{penalty\_limit\_initial}: Initial value of the initial penalty limit. The penalty limit
+	controls the maximum penalty value allowed for airfoil evaluation.}
+\item{\textbf{penalty\_limit\_end}: End value of the initial penalty limit, the penalty limit follows
+	a linear function between initial and end values.}
+\item{\textbf{penalty\_factor}: Penalty multipler on objective function.}
+\item{\textbf{allow\_seed\_penalties}: Whether the seed airfoil allows for penalties.}
 \item{\textbf{min\_bump\_width}: Minimum width of Hicks-Henne bump function.  Too small a
-value is more likely to result in a final design with small ``bumps'' present.  Default
-value is 0.1 (10\% chord).}
-\item{\textbf{nfunctions\_top}: The number of shape functions used to parameterize the top
-surface of the airfoil.  Note that if you are using Hicks-Henne functions, 1/3 the
-number of shape functions will give the same number of design variables and a similar range of
-possible shapes as the NACA functions.  For example, you may use 4 Hicks-Henne functions
-instead of 12 NACA functions to have the same number of total design variables.}
-\item{\textbf{nfunctions\_bot}: The number of shape functions used to parameterize the
-bottom surface of the airfoil.  See the note on nfunction\_top regarding differences
-between NACA and Hicks-Henne functions.}
-\item{\textbf{initial\_perturb}: The maximum strength of the shape functions used when
-generating initial designs.}
+	value is more likely to result in a final design with small ``bumps'' present.  Default
+	value is 0.1 (10\% chord).}
+\item{\textbf{kulfan\_bussoletti\_LEM}: Wheter to use a adicional design variable for `kulfan-bussoletti'
+	shape\_functions to improve the leading edge accuracy, recommended to use.}
+\item{\textbf{b\_spline\_degree}: Degree of b-spline curve, used only for `b-spline'
+	shape\_functions.}
+\item{\textbf{b\_spline\_xtype}: Selects the type of `b-spline' shape\_functions, 1 if x is fixed, 2 if free.}
+\item{\textbf{b\_spline\_distribution}: Selects the type of x distribution in `b-spline' shape\_functions, if x
+	is free this is the seed distribution. 1 for cossine, 2 for non uniform cossine and 3 for linear.}
 \item{\textbf{restart}: Whether or not to restart a prior optimization that terminated
-early -- .true. or .false.  If enabled, files with the pattern restart\_* from the 
-previous run must be present, and most inputs should be kept the same. See Section 
-\ref{sec:restarting} for more information.}
+	early -- .true. or .false.  If enabled, files with the pattern restart\_* from the 
+	previous run must be present, and most inputs should be kept the same. See Section 
+	\ref{sec:restarting} for more information.}
 \item{\textbf{restart\_write\_freq}: How often to write restart files, in terms of number
-of iterations.}
+	of iterations.}
 \item{\textbf{write\_designs}: Whether to write airfoil coordinates and polars to files
-during the optimization.  See Section \ref{sec:output_files} for more information on the
-output files generated.}
+	during the optimization.  See Section \ref{sec:output_files} for more information on the
+	output files generated.}
+\item{\textbf{write\_cp\_file}: Whether to write cp polar file for designs during the optimization. 
+	See Section \ref{sec:output_files} for more information on the output files generated.}
+\item{\textbf{write\_bl\_file}: Whether to write bl polar file for designs during the optimization. 
+	See Section \ref{sec:output_files} for more information on the output files generated.}
+\item{\textbf{write\_dvs\_file}: Whether to write dvs files during the optimization. 
+	See Section \ref{sec:output_files} for more information on the output files generated.}
+\item{\textbf{number\_threads}: Number of threads to use during optimization.}
 \end{enumerate}
 
 \subsection{operating\_conditions namelist}
 
 This namelist specifies aerodynamic operating conditions over which to optimize the
-airfoil.  These are the operating points at which each potential design will be evaluated,
+airfoil. These are the operating points at which each potential design will be evaluated,
 including angle of attack or lift coefficient, Reynolds number, Mach number, and
 relative weighting of each operating point.
 
 \begin{enumerate}
 \item{\textbf{noppoint}: The total number of operating points at which to evaluate
-potential designs.  A maximum of 30 is allowed.  Including more operating points makes the
-final design more robust, but there is probably also a point of diminishing returns.
-With only one or two operating points, the final airfoil will
-probably perform quite well at those conditions but do poorly elsewhere.  Including more
-operating points is more expensive, however, because Xfoil must be run for each airfoil at
-each operating point. With many operating points, it is also more likely for Xfoil to not
-converge at one of
-them, which will result in the optimizer essentially throwing out that design.
-Typically, 5 - 10 operating points spanning the range of needed conditions is a
-good number.}
+	potential designs.  A maximum of 30 is allowed.  Including more operating points makes the
+	final design more robust, but there is probably also a point of diminishing returns.
+	With only one or two operating points, the final airfoil will
+	probably perform quite well at those conditions but do poorly elsewhere.  Including more
+	operating points is more expensive, however, because Xfoil must be run for each airfoil at
+	each operating point. With many operating points, it is also more likely for Xfoil to not
+	converge at one of
+	them, which will result in the optimizer essentially throwing out that design.
+	Typically, 5 - 10 operating points spanning the range of needed conditions is a
+	good number.}
 \item{\textbf{use\_flap}: Whether flap deflections will be applied in the optimization.}
-\item{\textbf{x\_flap}: Flap hinge point in x (between 0 and 1). Only used if use\_flap is
-enabled.}
+\item{\textbf{flap\_connection}: Type of flap connection. Either `sharp', `smooth-top', `smooth-bot' or `smooth'.
+	
+	`sharp' is the standard connection. A trip wire is added to the sharp point.
+	
+	`smooth-top' smooths the sharp flap on the top surface from $x\_flap-connection\_radius$ to $x\_flap+connection\_radius$. 
+	A trip wire is added to the sharp point if applicable.
+	
+	`smooth-bot' smooths the sharp flap on the bottom surface from $x\_flap-connection\_radius$ to $x\_flap+connection\_radius$.
+	A trip wire is added to the sharp point if applicable.
+	
+	`smooth' smooths the sharp flap on the both surfaces from $x\_flap-connection\_radius$ to $x\_flap+connection\_radius$.}
+\item{\textbf{connection\_apply}: Type of smooth and sharp connections. Either `none', `geometric', `trip\_wire' or `both'.
+	
+	`none' deactivates the flap\_connection changes.
+	
+	`geometric' activates the flap\_connection geometric changes.
+	
+	`trip\_wire' activates the flap\_connection trip wire changes.
+	
+	`both' activates all the flap\_connection changes.}
+\item{\textbf{connection\_radius}: Radius of the smooth connection changes near the plap hinge point in x.}
+\item{\textbf{x\_flap\_spec}: Options are `specify' or `optimize'.  In the former case, the input value of x\_flap
+	will be used for \textit{all} designs considered by the optimizer.
+	In the latter case, the optimizer will consider the flap hinge point in x as a design variable
+	and optimize it.  The value of x\_flap will then be used
+	only for the seed airfoil to establish the reference seed airfoil performance.}
+\item{\textbf{x\_flap}: Flap hinge point in x (between 0 and 1).}
 \item{\textbf{y\_flap\_spec}: Method of specifying vertical hinge location. Either `y/c'
-(vertical location normalized by chord length) or `y/t' (vertical location normalized by
-local thickness at x\_flap). The default is `y/c'. Only used if use\_flap is enabled.}
+	(vertical location normalized by chord length) or `y/t' (vertical location normalized by
+	local thickness at x\_flap). The default is `y/c'.}
 \item{\textbf{y\_flap}: Flap hinge point in y. Only used if use\_flap is enabled. If
-y\_flap\_spec is `y/c', y\_flap refers to the vertical location of the hinge normalized by
-the chord length. If instead y\_flap\_spec is `y/t', the position is normalized by the
-local thickness at x\_flap. In the latter case, for example, -1.0 places the hinge at the
-lower surface, and 1.0 places it at the upper surface.}
+	y\_flap\_spec is `y/c', y\_flap refers to the vertical location of the hinge normalized by
+	the chord length. If instead y\_flap\_spec is `y/t', the position is normalized by the
+	local thickness at x\_flap. In the latter case, for example, -1.0 places the hinge at the
+	lower surface, and 1.0 places it at the upper surface.}
+\item{\textbf{TE\_spec}: Options are `use\_seed', `specify' or `optimize'.
+	
+	`use\_seed', the program uses the seed trailing edge thickness after transformations for all designs.
+	
+	`specify', the program uses the input value of tcTE for all designs.
+	
+	 `optimize', the program considers the trailing edge thickness as a design variable
+	 and optimize it. The value of tcTE will then be used
+	 only for the seed airfoil to establish the reference seed airfoil performance.}
+\item{\textbf{tcTE}: Trailing edge thickness.}
+\item{\textbf{xltTE}: Starting x position (0 to 1) for seed trailing edge transformation.}
+
 \item{\textbf{op\_mode(n)} (where n is an integer ranging from 1 to noppoint): Tells
-Xfoil whether the angle of attack or lift coefficient is being specified for this
-operating point.  May be `spec-al' for specified angle of attack or `spec-cl' for
-specified lift coefficient. `spec-cl' is usually more useful, because generally the lift
-coefficient is known as a function of the aircraft weight and flight speed during design.}
+	Xfoil whether the angle of attack or lift coefficient is being specified for this
+	operating point.  May be `spec-al' for specified angle of attack or `spec-cl' for
+	specified lift coefficient.}
 \item{\textbf{op\_point(n)} (where n is an integer ranging from 1 to noppoint):
-Specifies either the angle of attack (in degrees) or the lift coefficient for this
-operating point, depending on whether op\_mode is `spec-al' or `spec-cl' for this
-operating point.  Note that Xfoil calculations are not accurate above stall, so do not
-specify too large a lift coefficient or angle of attack.}
+	Specifies either the angle of attack (in degrees) or the lift coefficient for this
+	operating point, depending on whether op\_mode is `spec-al' or `spec-cl' for this
+	operating point.  Note that Xfoil calculations are not accurate above stall, so do not
+	specify too large a lift coefficient or angle of attack.}
 \item{\textbf{optimization\_type(n)}: (where n is an integer ranging from 1 to
-noppoint): Specifies the optimization objective for this operating point. Current options 
-include `min-drag' (to minimize drag), `max-glide' (to maximize 
-glide slope), `min-sink' (to minimize sink rate), `max-lift' (to maximize lift at a
-specified angle of attack), `max-xtr' (to move the turbulent transition location as far
-towards the trailing edge as possible), or `max-lift-slope' (to maximize the lift curve
-slope at operating point n).}
+	noppoint): Specifies the optimization objective for this operating point. Current options 
+	include `min-drag' (to minimize drag), `max-glide' (to maximize 
+	glide slope), `min-sink' (to minimize sink rate), `max-lift' (to maximize lift at a
+	specified angle of attack), `max-xtr' (to move the turbulent transition location as far
+	towards the trailing edge as possible), or `max-lift-slope' (to maximize the lift curve
+	slope at operating point n).
+	
+	`target-\{option\}' specifies that the objective is \{options\} value should be target\_value. 
+	With \{option\} = \{lift, drag, moment, xtrt, xtrb, glide or sink\}.
+	
+	`max-lift-search' maximizes the lift in a interval set by op\_point\_start, op\_point\_end and op\_point\_step.}
+\item{\textbf{use\_previous\_op(n)} (where n is an integer ranging from 1 to noppoint): Whether to use previous op polar results.
+	Allows for optimization of different objectives for the same operating point without increasing the number of XFOIL analysis.}
+
+\item{\textbf{op\_point\_start(n)} (where n is an integer ranging from 1 to noppoint): Start value for op\_point(n) interval in `max-lift-search' in optimization\_type(n).}
+
+\item{\textbf{op\_point\_end(n)} (where n is an integer ranging from 1 to noppoint): End value for op\_point(n) interval in `max-lift-search' in optimization\_type(n).}
+
+\item{\textbf{op\_point\_step(n)} (where n is an integer ranging from 1 to noppoint): Step value for op\_point(n) interval in `max-lift-search' in optimization\_type(n).}
+
+\item{\textbf{target\_value(n)} (where n is an integer ranging from 1 to noppoint): Target value for `target-\{option\}' in optimization\_type(n).}
+
 \item{\textbf{reynolds(n)} (where n is an integer ranging from 1 to noppoint): Specifies
-the Reynolds number based on chord for this operating point.}
+	the Reynolds number based on chord for this operating point.}
 \item{\textbf{mach(n)} (where n is an integer ranging from 1 to noppoint): Specifies
-the Mach number for this operating point.  Note that Xfoil calculations are not accurate
-at or above the transonic regime, so do not specify too high a Mach number.}
+	the Mach number for this operating point.  Note that Xfoil calculations are not accurate
+	at or above the transonic regime, so do not specify too high a Mach number.}
+
 \item{\textbf{flap\_selection(n)} (where n is an integer ranging from 1 to noppoint):
-Options are `specify' or `optimize'.  In the former case, the input value of flap\_degrees
-will be used at this operating point for \textit{all} designs considered by the optimizer.
-In the latter case, the optimizer will consider the flap deflection as a design variable
-and optimize it at this operating point.  The value of flap\_degrees will then be used
-only for the seed airfoil to establish the reference seed airfoil performance.}
+	Options are `specify', `identical' or `optimize'.  
+	
+	For `specify', the input value of flap\_degrees(n)
+	will be used at this operating point for \textit{all} designs considered by the optimizer.
+	
+	For `identical', flap\_degrees(n) uses the value from flap\_degrees(flap\_identical\_op(n)).
+	
+	For `optimize', the optimizer will consider the flap deflection as a design variable
+	and optimize it at this operating point.  The value of flap\_degrees will then be used
+	only for the seed airfoil to establish the reference seed airfoil performance.}
+\item{\textbf{flap\_identical\_op(n)} (where n is an integer ranging from 1 to noppoint):
+	Operating point number used for `identical' flap\_selection(n).}
+
 \item{\textbf{flap\_degrees(n)} (where n is an integer ranging from 1 to noppoint):
-Specifies the flap deflection for this operating point, in degrees, with a positive
-deflection being in the downward direction. Only used if use\_flap is enabled. The
-optimized flap deflection is subject to the constraints max\_flap\_degrees and
-min\_flap\_degrees.}
+	Specifies the flap deflection for this operating point, in degrees, with a positive
+	deflection being in the downward direction. Only used if use\_flap is enabled. The
+	optimized flap deflection is subject to the constraints max\_flap\_degrees and
+	min\_flap\_degrees.}
 \item{\textbf{weighting(n)} (where n is an integer ranging from 1 to noppoint): Specifies
-the weighting for this operating point.  Operating points with a higher weighting are
-given more importance by the optimizer.  Note that the weightings are automatically 
-normalized by the optimizer so that they add up to 1.}
+	the weighting for this operating point.  Operating points with a higher weighting are
+	given more importance by the optimizer.  Note that the weightings are automatically 
+	normalized by the optimizer so that they add up to 1.}
 \item{\textbf{ncrit\_pt(n)} (where n is an integer ranging from 1 to noppoint): Specifies
-ncrit for this operating point. If not specified, the ncrit value from the
-xfoil\_run\_options namelist will be used.}
+	ncrit for this operating point. If not specified, the ncrit value from the
+	xfoil\_run\_options namelist will be used.}
 \end{enumerate}
 
 \subsection{constraints namelist}
@@ -408,70 +538,142 @@ violated.
 fraction of the chord (for example, 0.08 means 8\% thickness).  A minimum allowable
 thickness is usually required for structural reasons.  If you don't want to impose this
 constraint, just set it to 0.}
+
 \item{\textbf{max\_thickness}: The maximum allowable thickness of designs, as a
 fraction of the chord (for example, 0.08 means 8\% thickness). This can be used to set an
 upper bound on max airfoil thickness.  If you don't want to use this constraint, just set
 it to a very large number like 1000 (or just don't specify a max\_thickness, as 1000 is
 the default value).}
+
 \item{\textbf{min\_camber}: The minimum allowable camber of designs, as a fraction of the
 chord (for example, 0.02 means 2\% camber). If you don't want to impose this constraint,
 set it to some large negative value (the default is -0.10).}
+
 \item{\textbf{max\_camber}: The maximum allowable camber of designs, as a fraction of the
 chord (for example, 0.02 means 2\% camber). If you don't want to impose this constraint,
 set it to some large positive value (the default is 0.10).}
-\item{\textbf{moment\_constraint\_type(n)} (where n is an integer ranging from 1 to
-noppoint): How to implement the pitching moment constraint for the specified operating
-point. Either `none', `specify', or `use\_seed'.  If `none', then no pitching moment 
-constraint is applied at this operating point.  If `specify', then the user specifies the 
-minimum allowable moment using the min\_moment constraint.  If `use\_seed', then the 
-pitching moment from the seed airfoil at this operating point will be taken as the minimum
-allowable.}
-\item{\textbf{min\_moment(n)} (where n is an integer ranging from 1 to noppoint): The 
-minimum allowable pitching moment coefficient at the specified operating point.  A larger
-negative pitching moment will require a larger tail.  For flying-wing airfoils, this is 
-usually set to 0.  This input is only used if moment\_constraint\_type = `specify'.} 
+
+\item{\textbf{symmetrical} (.true. or .false.): Whether to only generate symmetrical 
+	airfoils.  If true, only the top surface of the seed airfoil will be modified, and the
+	bottom surface will be replaced by a mirrored version of the top surface. This option is
+	useful if you want to ensure that the final optimized airfoil is symmetrical.  The seed 
+	airfoil does not need
+	to be symmetrical to use this option (but note that Xoptfoil will actually be using a
+	symmetrical version of the seed airfoil instead of the actual one).}
+
+\item{\textbf{max\_growth\_seed\_mult}: Largest allowable growth rate multipler on seed max growth rate. 
+	If you don't want to impose this constraint, just set it to a high value.}
+
+\item{\textbf{min\_leading\_edge\_angle}: Lowest allowable value of leading edge angle. 
+	If you don't want to impose this constraint, just set it to 0.}
+\item{\textbf{max\_leading\_edge\_angle}: Largest allowable growth rate multipler on seed max growth rate. 
+	If you don't want to impose this constraint, just set it to a high value.}
+\item{\textbf{dif\_leading\_edge\_angle}: Largest allowable value of leading edge angle 
+	difference between top and botton. 
+	If you don't want to impose this constraint, just set it to a high value.}
+
+\item{\textbf{min\_te\_angle}: The minimum trailing edge wedge angle, in degrees.  Without
+	this constraint, the optimizer may converge on airfoils with a very thin cusped aft
+	section, which is challenging to build and presents structural problems.  If you don't
+	want to impose this constraint, just set it to 0.}
+\item{\textbf{te\_angle\_x\_apply}: The starting x position in which to apply min\_te\_angle constrain.}
+
+\item{\textbf{max\_panel\_angle}: Largest allowable value of panel angle. 
+	If you don't want to impose this constraint, just set it to a high value.}
+
+\item{\textbf{lift\_check\_tol}: Lift tolerance before checking at a perturb point. 
+	If you don't want to impose this constraint, just set it to a high value.}
+\item{\textbf{drag\_check\_tol}: Drag tolerance before checking at a perturb point. 
+	If you don't want to impose this constraint, just set it to a high value.}
+
 \item{\textbf{max\_flap\_degrees}: Maximum flap angle, in degrees, for `optimize' flap 
-selection type in operating\_conditions, where positive corresponds to a downward
-deflection.}
+	selection type in operating\_conditions, where positive corresponds to a downward
+	deflection.}
+
 \item{\textbf{min\_flap\_degrees}: Minimum flap angle, in degrees, for `optimize' flap 
 selection type in operating\_conditions, where positive corresponds to a downward
 deflection.}
-\item{\textbf{min\_te\_angle}: The minimum trailing edge wedge angle, in degrees.  Without
-this constraint, the optimizer may converge on airfoils with a very thin cusped aft
-section, which is challenging to build and presents structural problems.  If you don't
-want to impose this constraint, just set it to 0.}
+
+\item{\textbf{max\_flap\_x}: Maximum flap hinge position in x for `optimize' flap 
+	selection type in operating\_conditions.}
+
+\item{\textbf{min\_flap\_x}: Minimum flap hinge position in x for `optimize' flap 
+	selection type in operating\_conditions.}
+
+\item{\textbf{max\_tcTE}: Maximum trailing edge thickness for `optimize' flap 
+	selection type in operating\_conditions.}
+
+\item{\textbf{min\_tcTE}: Minimum trailing edge thickness for `optimize' flap 
+	selection type in operating\_conditions.}
+
 \item{\textbf{check\_curvature}: Whether to check the curvature for applying a curvature
 reversals constraint.  If you don't want to apply a curvature reversals constraint, set
 this to .false., because checking the curvature adds computational cost.  Set this to
 .true. if you wish to specify a constraint on the number of curvature reversals.}
+
 \item{\textbf{max\_curv\_reverse\_top}: Maximum allowed number of curvature reversals on
 the top surface within the specified curvature threshold.  If you wish to use this 
 constraint, you must enable check\_curvature. The default is 0. Increasing it may improve
 the predicted performance but also may produce more wavy designs.}
+
 \item{\textbf{max\_curv\_reverse\_bot}: Maximum allowed number of curvature reversals on
 the bottom surface within the specified curvature threshold.  If you wish to use this 
 constraint, you must enable check\_curvature. The default is 1, so a single curvature
 reversal is allowed on the bottom surface.  Increasing it may improve the predicted
 performance but also may produce more wavy designs.}
+
 \item{\textbf{curv\_threshold}: Curvature thresshold for detecting reversals.  The local
 curvature can be thought of as 1/r, where r is the local radius.  So, for instance, a
 curvature threshold of 0.2 means that any reversals with a radius greater than 5.0 will
 be ignored.  If you make this value too small, it may be very hard for the optimizer to
 come up with feasible designs, so you may need to increase feasible\_init\_attempts. The
 default is 0.1.} 
-\item{\textbf{symmetrical} (.true. or .false.): Whether to only generate symmetrical 
-airfoils.  If true, only the top surface of the seed airfoil will be modified, and the
-bottom surface will be replaced by a mirrored version of the top surface. This option is
-useful if you want to ensure that the final optimized airfoil is symmetrical.  The seed 
-airfoil does not need
-to be symmetrical to use this option (but note that Xoptfoil will actually be using a
-symmetrical version of the seed airfoil instead of the actual one).}
+
+
+\item{\textbf{moment\_constraint\_type(n)} (where n is an integer ranging from 1 to
+	noppoint): How to implement the pitching moment constraint for the specified operating
+	point. Either `none', `specify', or `use\_seed'.  If `none', then no pitching moment 
+	constraint is applied at this operating point.  If `specify', then the user specifies the 
+	minimum allowable moment using the min\_moment constraint.  If `use\_seed', then the 
+	pitching moment from the seed airfoil at this operating point will be taken as the minimum
+	allowable.}
+
+\item{\textbf{min\_moment(n)} (where n is an integer ranging from 1 to noppoint): The 
+	minimum allowable pitching moment coefficient at the specified operating point.  A larger
+	negative pitching moment will require a larger tail.  For flying-wing airfoils, this is 
+	usually set to 0.  This input is only used if moment\_constraint\_type = `specify'.} 
+
+\item{\textbf{lift\_constraint\_type(n)} (where n is an integer ranging from 1 to
+	noppoint): How to implement the lift constraint for the specified operating
+	point. Either `none', `specify', or `use\_seed'.  If `none', then no lift 
+	constraint is applied at this operating point.  If `specify', then the user specifies the 
+	minimum allowable lift using the min\_lift constraint.  If `use\_seed', then the 
+	lift from the seed airfoil at this operating point will be taken as the minimum
+	allowable.}
+
+\item{\textbf{min\_lift(n)} (where n is an integer ranging from 1 to noppoint): The 
+	minimum allowable lift coefficient at the specified operating point.} 
+
+\item{\textbf{drag\_constraint\_type(n)} (where n is an integer ranging from 1 to
+	noppoint): How to implement the drag constraint for the specified operating
+	point. Either `none', `specify', or `use\_seed'.  If `none', then no drag 
+	constraint is applied at this operating point.  If `specify', then the user specifies the 
+	maximum allowable drag using the min\_lift constraint.  If `use\_seed', then the 
+	drag from the seed airfoil at this operating point will be taken as the maximum
+	allowable.}
+
+\item{\textbf{max\_drag(n)} (where n is an integer ranging from 1 to noppoint): The 
+	maximum allowable drag coefficient at the specified operating point.} 
+
 \item{\textbf{naddthickconst}: Number of additional thickness constraints to specify. The
 max allowed is 10.}
+
 \item{\textbf{addthick\_x(n)} (where n is an integer ranging from 1 to naddthickconst):
 x/c location where additional thickness constraint n is applied.}
+
 \item{\textbf{addthick\_min(n)} (where n is an integer ranging from 1 to naddthickconst):
 The minimum thickness allowed at the location specified by addthick\_x(n).}
+
 \item{\textbf{addthick\_max(n)} (where n is an integer ranging from 1 to naddthickconst):
 The maximum thickness allowed at the location specified by addthick\_x(n).}
 \end{enumerate}
@@ -558,6 +760,7 @@ adjusts some parameters in the particle swarm algorithm which affect how quickly
 optimization converges.  The quick profile works well and converges quickly.  The
 exhaustive profile usually is able to find a little bit better designs than the quick
 profile, but it also takes much longer to converge (e.g., 700 iterations instead of 150).}
+\item{\textbf{pso\_speed\_limit}: Speed limit value, default value is 0.025.}
 \end{enumerate}
 
 \subsection{genetic\_algorithm\_options namelist}
@@ -642,29 +845,47 @@ This namelist specifies options that control how Xfoil calculations are run.
 \begin{enumerate}
 \item{\textbf{ncrit}: Transition-triggering parameter.  A higher number represents cleaner
 (less turbulent) freestream conditions.  9 is the default.}
+
 \item{\textbf{xtript}: Top-surface trip location for turbulent transition.  For free
 transition, set this to 1.  1 is the default.}
+
 \item{\textbf{xtripb}: Bottom-surface trip location for turbulent transition.  For free
 transition, set this to 1.  1 is the default.}
+
 \item{\textbf{viscous\_mode} (.true. or .false.): Whether to run Xfoil boundary layer
 calculations.  The default is .true., which is recommended.  If it is .false., the pressure
 drag is used as the drag coefficient, which isn't very meaningful for real designs.}
+
 \item{\textbf{silent\_mode} (.true. or .false.): If .true., suppresses Xfoil screen writes.
 This is desirable for optimization, because thousands of designs are tested and there is
 not time to read the Xfoil notifications anyway.  For running Xfoil alone without
 optimizing, you may want to see the Xfoil screen writes.  .true. is the default.}
+
 \item{\textbf{bl\_maxit}: Max number of iterations for viscous calculations.  100 is the
 default.}
+
 \item{\textbf{vaccel}: Xfoil viscous convergence acceleration parameter.  0.01 is the
 default.}
-\item{\textbf{fix\_unconverged} (.true. or .false.): Whether to try to fix
-unconverged operating points by reinitializing the boundary layer at a different operating
-condition.  .true. is the default.  This will make the optimization a little more
-expensive, but it helps to prevent good designs from getting penalized by
-non-convergence.}
+
 \item{\textbf{reinitialize} (.true. or .false.): Whether to reinitialize the boundary
-layer at each consecutive operating point.  .true. is the default, which seems to result 
-in a more robust optimization, but you may want to experiment with this.}
+	layer at each consecutive operating point.  .true. is the default, which seems to result 
+	in a more robust optimization, but you may want to experiment with this.}
+
+
+\item{\textbf{init\_type}: Either `always', `unconverged' or `never'.
+	This setting sets how a operating point is analyzed in XFOIL.
+	
+	`always' sets that the operating should be approached through a sequential analysis of a initializing polar.
+	
+	`unconverged' sets that the operating should analyzed normally. However if it unconverges the point will be reanalyzed through a sequential analysis of a initializing polar.
+	
+	`never' sets that the operating should analyzed normally, regardless of convergence.}
+
+\item{\textbf{init\_number\_points} Number of points in the initializing polar.}
+\item{\textbf{init\_al0} Angle of attack reference value for initializing polar.}
+\item{\textbf{init\_cl0} Lift coefficient reference value for initializing polar.}
+\item{\textbf{init\_initial\_position} Adimensional start position in initializing polar. With 0 being the reference value and 1 being the operating point.}
+\item{\textbf{init\_dist} Distribution of initializing polar points. Either `linear' or `sine'.}
 \end{enumerate}
 
 \subsection{xfoil\_paneling\_options namelist}
@@ -715,28 +936,53 @@ unless otherwise specified with the -o command line option as described in Secti
 \ref{sec:CLOs}.
 
 \begin{enumerate}
+\item{\textbf{echo\_\{prefix\}.txt}: File with the inputs used in the program. Can be read by xoptfoil.}
+
+\item{\textbf{seed\_\{airfoil\_file\}}: File with the airfoil coordinates after transformations (scaling, rotating and translating).}
+
+\item{\textbf{TE\_seed\_\{airfoil\_file\}}: File with the airfoil coordinates after trailing edge transformation.}
+
+\item{\textbf{param\_seed\_\{airfoil\_file\}}: File with the airfoil coordinates after being parametrized.}
+
+
 \item{\textbf{\{prefix\}.dat}: The coordinates of the final optimized design.}
+
 \item{\textbf{\{prefix\}\_performance\_summary.dat}: Aerodynamic data for the final optimized
 design at the requested operating points.}
+
+\item{\textbf{\{prefix\}\_optimization\_history.dat}: Convergence information from the optimizer,
+	including the iteration, objective function value of the best design, percent improvement
+	over the seed airfoil, and radius of the candidate designs. This information can be
+	plotted using xoptfoil\_visualizer\_V2; see Section \ref{sec:xoptfoil_visualizer_V2} for more
+	information.}
+
 \item{\textbf{\{prefix\}\_design\_coordinates.dat}: Airfoil coordinates for each
 progressively better design found during the optimization.  Only written if the option
 write\_designs is set to .true.  Each new design is identified under one of the ``zone
-t=...'' labels.  You can plot these using xoptfoil\_visualizer. See Section 
-\ref{sec:xoptfoil_visualizer} for more information.}
+t=...'' labels.  You can plot these using xoptfoil\_visualizer\_V2. See Section 
+\ref{sec:xoptfoil_visualizer_V2} for more information.}
+
 \item{\textbf{\{prefix\}\_design\_polars.dat}: Airfoil polars (lift, drag, pitching
 moment coefficients, and transition locations) at
 the requested operating points for each progressively better design found during the 
 optimization.  Only written if the option write\_designs is set to .true.  Each new design
 is identified under one of the ``zone t=...'' labels.  You can plot these using 
-xoptfoil\_visualizer. See Section \ref{sec:xoptfoil_visualizer} for more information.}
-\item{\textbf{optimization\_history.dat}: Convergence information from the optimizer,
-including the iteration, objective function value of the best design, percent improvement
-over the seed airfoil, and radius of the candidate designs. This information can be
-plotted using xoptfoil\_visualizer; see Section \ref{sec:xoptfoil_visualizer} for more
-information.}
+xoptfoil\_visualizer\_V2. See Section \ref{sec:xoptfoil_visualizer_V2} for more information.}
+
+\item{\textbf{\{prefix\}\_design\_aifoil\_variables.dat}: Airfoil design variables file for the
+	last design.}
+
+
 \item{\textbf{A number of files with the pattern restart\_*\_\{prefix\}}: Restart data
 written by Xoptfoil.  These files are required to restart a prior optimization that was
 terminated early. More information is available in Section \ref{sec:restarting}.}
+
+\item{\textbf{run\_control\_\{prefix\}}: File that allows control over optimization stop and monitoring stop in 
+	xoptfoil\_visualizer\_V2.}
+
+\item{\textbf{dvs\_*\_\{prefix\}.dat}: File that saves all design variables, objective value and return type.}
+\item{\textbf{aero\_*\_\{prefix\}.dat}: File that saves all objective variables.}
+\item{\textbf{constrain\_*\_\{prefix\}.dat}: File that saves all constrain variables.}
 \end{enumerate}
 
 \section{Restarting an optimization}\label{sec:restarting}
@@ -765,9 +1011,9 @@ that do not affect the number of design variables or population of designs and s
 restart successfully.  For example, Xfoil paneling and run options can be changed when
 restarting, but the number of operating points cannot. 
 
-\section{Using xoptfoil\_visualizer}\label{sec:xoptfoil_visualizer}
+\section{Using xoptfoil\_visualizer\_V2}\label{sec:xoptfoil_visualizer_V2}
 
-A Python script called xoptfoil\_visualizer.py is provided to plot and animate airfoil
+A Python script called xoptfoil\_visualizer\_V2.py is provided to plot and animate airfoil
 designs generated during the optimization process, either while the optimization is going
 on or afterwards.  In order to use this tool, it is
 necessary to have Python with matplotlib and numpy installed. It has been tested with
@@ -792,16 +1038,16 @@ matplotlib
 and numpy depending on whether you are using Python 2 or Python 3. Again, matplotlib
 version 1.5.0 or higher is recommended.
 
-To use xoptfoil\_visualizer, you must first start an optimization with write\_designs set
-to .true. In the same directory, run xoptfoil\_visualizer using the following command:
+To use xoptfoil\_visualizer\_V2, you must first start an optimization with write\_designs set
+to .true. In the same directory, run xoptfoil\_visualizer\_V2 using the following command:
 
 \begin{verbatim}
-xoptfoil_visualizer.py
+xoptfoil_visualizer_V2.py
 \end{verbatim}
 
-Note that xoptfoil\_visualizer.py must be present in the directory where you try to run it,
+Note that xoptfoil\_visualizer\_V2.py must be present in the directory where you try to run it,
 or it must be in your PATH environment variable as described in Section
-\ref{sec:installing}. xoptfoil\_visualizer is menu based.  When it is run, 
+\ref{sec:installing}. xoptfoil\_visualizer\_V2 is menu based.  When it is run, 
 it first asks for the case name of the optimization.  By default, this is `optfoil,' but
 it will be different if you specified a different name as a command line argument to
 xoptfoil. (It is the prefix in front of the files 
@@ -864,11 +1110,13 @@ To quit the design visualizer tool, enter 0 at the main menu.
 
   \subfloat[Aerodynamics]{
     \includegraphics[width=0.75\textwidth]{User_Guide_figs/visualizer_aero.png}}
-\caption{Example of plots generated by xoptfoil\_visualizer.}
+\caption{Example of plots generated by xoptfoil\_visualizer\_V2.}
 \label{fig:visualizer_plot}
 \end{figure}
 
 \section{Using xfoil\_only}
+
+Not available in this version.
 
 Xoptfoil comes with a tool called xfoil\_only, which does exactly what it sounds like it
 does: it runs Xfoil alone without optimizing. This can be useful for getting an idea of

@@ -13,7 +13,7 @@
 !  You should have received a copy of the GNU General Public License
 !  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
 
-!  Copyright (C) 2017-2019 Daniel Prosser
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
 
 module input_output
 
@@ -194,7 +194,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   y_flap_spec = 'y/c'
   TE_spec = 'use_seed'    !'specify', 'use_seed' or 'optimize' 
   tcTE = 1.0E-4           
-  xltTE = 0.0             
+  xltTE = 0.8             
   
   op_mode(:) = 'spec-cl'
   optimization_type(:) = 'min-drag'
@@ -412,7 +412,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   simplex_maxit = 1000
   
   epsexit_linear = .true. 
-
+  
+  ! Read only the required namelist
   if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
       'global') then
 
@@ -497,7 +498,6 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     end if
 
   end if 
-
 
 ! Set default xfoil aerodynamics and paneling options
 
@@ -848,6 +848,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*)
 
 ! Optimizer namelists
+! Only the used namelists are written
 
   if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
       'global') then
@@ -874,7 +875,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
       write(*,*) " ga_tol = ", ga_options%tol
       write(*,*) " ga_maxit = ", ga_options%maxit
       write(*,*) " parents_selection_method = ",                               &
-                 ga_options%parents_selection_method
+                 parents_selection_method
       write(*,*) " parent_fraction = ", ga_options%parent_fraction 
       write(*,*) " roulette_selection_pressure = ",                            &
                  ga_options%roulette_selection_pressure
@@ -1109,65 +1110,50 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(100,*)
 
 ! Optimizer namelists
+! Attention not all namelists are read but all will be writen, must use the 
+! inputs
 
-  if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
-      'global') then
+! Particle swarm namelist
 
-    if (trim(global_search) == 'particle_swarm') then
+  write(100,'(A)') "&particle_swarm_options"
+  write(100,*) " pso_pop = ", pso_pop
+  write(100,*) " pso_tol = ", pso_tol
+  write(100,*) " pso_maxit = ", pso_maxit
+  write(100,*) " pso_speed_limit = ", pso_speed_limit
+  write(100,*) " pso_convergence_profile = '"//                                &
+    trim(pso_convergence_profile)//"'"
+  write(100,'(A)') "/"
+  write(100,*)
 
-!     Particle swarm namelist
 
-      write(100,'(A)') "&particle_swarm_options"
-      write(100,*) " pso_pop = ", pso_options%pop
-      write(100,*) " pso_tol = ", pso_options%tol
-      write(100,*) " pso_maxit = ", pso_options%maxit
-      write(100,*) " pso_speed_limit = ", pso_options%maxspeed
-      write(100,*) " pso_convergence_profile = ", pso_options%convergence_profile
-      write(100,'(A)') "/"
-      write(100,*)
+! Genetic algorithm options
 
-    else if (trim(global_search) == 'genetic_algorithm') then
+  write(100,'(A)') "&genetic_algorithm_options"
+  write(100,*) " ga_pop = ", ga_pop
+  write(100,*) " ga_tol = ", ga_tol
+  write(100,*) " ga_maxit = ", ga_maxit
+  write(100,*) " parents_selection_method = '"//                               &
+    trim(parents_selection_method)//"'"
+  write(100,*) " parent_fraction = ", parent_fraction 
+  write(100,*) " roulette_selection_pressure = ",                              &
+    roulette_selection_pressure
+  write(100,*) " tournament_fraction = " , tournament_fraction
+  write(100,*) " crossover_range_factor = ", crossover_range_factor
+  write(100,*) " mutant_probability = ", mutant_probability
+  write(100,*) " chromosome_mutation_rate = ",                                 &
+    chromosome_mutation_rate
+  write(100,*) " mutation_range_factor = ", mutation_range_factor
+  write(100,'(A)') "/"
+  write(100,*)
 
-!     Genetic algorithm options
+! Simplex search namelist
 
-      write(100,'(A)') "&genetic_algorithm_options"
-      write(100,*) " ga_pop = ", ga_options%pop
-      write(100,*) " ga_tol = ", ga_options%tol
-      write(100,*) " ga_maxit = ", ga_options%maxit
-      write(100,*) " parents_selection_method = '"//                           &
-                 trim(ga_options%parents_selection_method)//"'"
-      write(100,*) " parent_fraction = ", ga_options%parent_fraction 
-      write(100,*) " roulette_selection_pressure = ",                            &
-                 ga_options%roulette_selection_pressure
-      write(100,*) " tournament_fraction = " , ga_options%tournament_fraction
-      write(100,*) " crossover_range_factor = ", ga_options%crossover_range_factor
-      write(100,*) " mutant_probability = ", ga_options%mutant_probability
-      write(100,*) " chromosome_mutation_rate = ",                               &
-                 ga_options%chromosome_mutation_rate
-      write(100,*) " mutation_range_factor = ", ga_options%mutation_range_factor
-      write(100,'(A)') "/"
-      write(100,*)
+  write(100,'(A)') "&simplex_options"
+  write(100,*) " simplex_tol = ", simplex_tol
+  write(100,*) " simplex_maxit = ", simplex_maxit
+  write(100,'(A)') "/"
+  write(100,*)
 
-    end if
-
-  end if
-
-  if (trim(search_type) == 'global_and_local' .or. trim(search_type) ==        &
-      'local') then
-
-    if(trim(local_search) == 'simplex') then
-
-!     Simplex search namelist
-
-      write(100,'(A)') "&simplex_options"
-      write(100,*) " simplex_tol = ", ds_options%tol
-      write(100,*) " simplex_maxit = ", ds_options%maxit
-      write(100,'(A)') "/"
-      write(100,*)
-
-    end if
-
-  end if
 
 ! Xfoil run options namelist
 
@@ -1221,34 +1207,34 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
 
   if (trim(seed_airfoil) /= 'from_file' .and.                                  &
       trim(seed_airfoil) /= 'naca' .and.                                       &
-      trim(seed_airfoil) /= 'from_variables')                                            &
+      trim(seed_airfoil) /= 'from_variables')                                  &
     call my_stop("seed_airfoil must be 'from_file' or 'naca' or "//            &
       &"'from_variables'.")
   if (trim(seed_airfoil) .EQ. 'from_variables' .AND.                           &
-     (trim(shape_functions) /= 'hicks-henne' .OR.                              &
-      trim(shape_functions) /= 'naca'))                                        &
+     (trim(shape_functions) /= 'kulfan-bussoletti' .AND.                       &
+      trim(shape_functions) /= 'bezier-parsec'))                               &
     call my_stop("seed_airfoil must not be 'from_variables' when using "//     &
-    &"'naca' or 'hicks-henne' shape_functions")
+      "'naca' or 'hicks-henne' or 'b-spline' shape_functions")
   if (trim(shape_functions) /= 'hicks-henne' .and.                             &
       trim(shape_functions) /= 'naca' .and.                                    &
       trim(shape_functions) /= 'kulfan-bussoletti' .and.                       &
       trim(shape_functions) /= 'b-spline' .and.                                &
-      trim(shape_functions) /= 'bezier-parsec')                            &
-    call my_stop("shape_functions must be 'hicks-henne' or 'naca' or &
-                 &'kulfan-bussoletti' or 'b-spline' or 'bezier-parsec'.")
+      trim(shape_functions) /= 'bezier-parsec')                                &
+    call my_stop("shape_functions must be 'hicks-henne' or 'naca' or "//       &
+      "'kulfan-bussoletti' or 'b-spline' or 'bezier-parsec'.")
   if (nparameters_top < 0)                                                     &
     call my_stop("nparameters_top must be >= 0.")
   if (nparameters_bot < 0)                                                     &
     call my_stop("nparameters_bot must be >= 0.")
   if (abs_initial_perturb <= 0.d0)                                             &
     call my_stop("abs_initial_perturb must be > 0.")
-  if (rel_initial_perturb < 0.d0)                                             &
+  if (rel_initial_perturb < 0.d0)                                              &
     call my_stop("rel_initial_perturb must be >= 0.")
-  if (penalty_limit_initial < 0.d0)                                             &
+  if (penalty_limit_initial < 0.d0)                                            &
     call my_stop("penalty_limit_initial must be >= 0.")
-  if (penalty_limit_end < 0.d0)                                             &
+  if (penalty_limit_end < 0.d0)                                                &
     call my_stop("penalty_limit_end must be >= 0.")
-  if (penalty_factor < 0.d0)                                             &
+  if (penalty_factor < 0.d0)                                                   &
     call my_stop("penalty_factor must be >= 0.")
   if (min_bump_width <= 0.d0)                                                  &
     call my_stop("min_bump_width must be > 0.")
@@ -1256,14 +1242,16 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("b_spline_degree must be >= 2")
   if (b_spline_xtype /= 1 .and. b_spline_xtype /= 2)                           &
     call my_stop("b_spline_xtype must be 1 or 2")
-  if (b_spline_distribution /= 1 .and. b_spline_distribution /= 2 .and.          &
-      b_spline_distribution /= 3)                                               &
+  if (b_spline_distribution /= 1 .and. b_spline_distribution /= 2 .and.        &
+      b_spline_distribution /= 3)                                              &
     call my_stop("b_spline_distribution must be 1 or 2 or 3")
+  if (restart_write_freq < 2)                                                  &
+    call my_stop("restart_write_freq must be >= 2.")
   if ( (flap_optimization_only) .and. ((.not. use_flap) .or. (match_foils)) )  &
     call my_stop("flap_optimization_only can only be used with use_flap=.true. &
       &and match_foils=.false.")
-  if ( (flap_optimization_only) .and. (nflap_optimize==0))                    &
-    call my_stop("flap_optimization_only can only be used with with a number &
+  if ( (flap_optimization_only) .and. (nflap_optimize==0))                     &
+    call my_stop("flap_optimization_only can only be used with with a number   &
       &of flaps to optimize diferent from 0")
 ! Operating points
 
@@ -1678,7 +1666,8 @@ end subroutine read_clo
 subroutine print_version()
 
   write(*,'(A)') "Xoptfoil "//trim(PACKAGE_VERSION)
-  write(*,'(A)') "Copyright (C) 2017-2019 Daniel Prosser"
+  write(*,'(A)') "Copyright (C) 2017-2019 Daniel Prosser, "//                  &
+                 "2020-2021 Ricardo Palmeira"
   write(*,'(A)') "License GPLv3+: GNU GPL version 3 or later "//               &
                  "<http://gnu.org/licenses/gpl.html>"
   write(*,'(A)') "This is free software: you are free to change and "//        &
@@ -1706,8 +1695,8 @@ subroutine print_usage(exeprint)
   write(*,'(A)')
   write(*,'(A)') "Refer to the PDF user guide for complete input help."
   write(*,'(A)')
-  write(*,'(A)') "Home page: https://sourceforge.net/projects/xoptfoil/"
-  write(*,'(A)') "Development page: https://github.com/montagdude/Xoptfoil"
+  write(*,'(A)') "Home page: https://github.com/r-palmeira-pt/Xoptfoil"
+  write(*,'(A)') "Development page: https://github.com/r-palmeira-pt/Xoptfoil"
   write(*,'(A)') "Report bugs using the issue reporting system at either "//   &
                  "of the above sites."
 

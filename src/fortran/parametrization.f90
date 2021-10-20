@@ -13,7 +13,7 @@
 !  You should have received a copy of the GNU General Public License
 !  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
 
-!  Copyright (C) 2017-2019 Daniel Prosser
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
 
 module parametrization
 
@@ -345,7 +345,7 @@ subroutine parametrization_constrained_dvs(parametrization_type,               &
     end do
 
   elseif (trim(parametrization_type) == 'b-spline') then
-    !     For b-spline, we will only constrain the flap deflection
+    !     For b-spline fixed, we will only constrain the flap deflection
 
     allocate(constrained_dvs(nflap_optimize + int_x_flap_spec + int_tcTE_spec))
     counter = 0
@@ -541,11 +541,11 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
   use vardef,             only : shape_functions, nflap_optimize,              &
                                  abs_initial_perturb, rel_initial_perturb,     &
                                  min_flap_degrees, max_flap_degrees,           &
-                                 nshapedvtop,                                  &  
+                                 nshapedvtop, nparams_top, nparams_bot,        &  
                                  int_x_flap_spec, min_flap_x, max_flap_x,      &
                                  int_tcTE_spec, min_tcTE, max_tcTE      ,      &
                                  min_bump_width, modest_seed, modesb_seed,     &
-                                 flap_optimization_only
+                                 flap_optimization_only, b_spline_xtype
   
   double precision, dimension(:), intent(in) :: optdesign
   double precision, dimension(size(optdesign,1)), intent(out) :: xmin, xmax
@@ -679,6 +679,32 @@ subroutine parametrization_maxmin(optdesign, xmin, xmax)
     if (int_tcTE_spec == 1) then
       xmin(ndv) = (min_tcTE - min_tcTE)*tefact
       xmax(ndv) = (max_tcTE - min_tcTE)*tefact
+    end if
+    
+    !write(*,*) 'xmin'
+    !write(*,*) xmin
+    !write(*,*) 'xmax'
+    !write(*,*) xmax
+    
+    !semi check for x outside of [0,1] 
+    
+    if (.NOT. b_spline_xtype .EQ. 1) then
+      do i = 1, nparams_top-3
+        if (xmin(i) .LT. 0.0) then
+          xmin(i) = 0.0
+        end if
+        if(xmax(i) .GT. 1.0) then
+          xmax(i) = 1.0
+        end if        
+      end do
+      do i = nshapedvtop+ 1, nshapedvtop+ nparams_bot-3
+        if (xmin(i) .LT. 0.0) then
+          xmin(i) = 0.0
+        end if
+        if(xmax(i) .GT. 1.0) then
+          xmax(i) = 1.0
+        end if        
+      end do
     end if
     
   elseif (trim(shape_functions) == 'bezier-parsec') then

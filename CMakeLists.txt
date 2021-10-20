@@ -1,6 +1,6 @@
 # Set up project
 cmake_minimum_required(VERSION 2.8.8)
-set(XOPTFOIL_VERSION 1.11.1)
+set(XOPTFOIL_VERSION 2.01.0)
 project(Xoptfoil)
 enable_language(Fortran)
 
@@ -28,7 +28,7 @@ if (CMAKE_BUILD_TYPE MATCHES "Release")
 elseif (CMAKE_BUILD_TYPE MATCHES "Debug")
   set (OPENMP_FLAG "")
   if (ENABLE_OPENMP)
-    MESSAGE(WARNING "Enabling OpenMP support for debug build since ENABLE_OPENMP=TRUE")
+    #MESSAGE(WARNING "Enabling OpenMP support for debug build since ENABLE_OPENMP=TRUE")
     set (OPENMP_FLAG "-fopenmp")
   endif (ENABLE_OPENMP)
 endif (CMAKE_BUILD_TYPE MATCHES "Release")
@@ -36,7 +36,9 @@ endif (CMAKE_BUILD_TYPE MATCHES "Release")
 # Default compiler flags
 if (Fortran_COMPILER_NAME MATCHES "gfortran")
   set (CMAKE_Fortran_FLAGS_RELEASE "-O3 ${OPENMP_FLAG}")
+  #set (CMAKE_Fortran_FLAGS_DEBUG "-O -Wall -fcheck=all -g -fbacktrace ${OPENMP_FLAG}")
   set (CMAKE_Fortran_FLAGS_DEBUG "-g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow -Wall ${OPENMP_FLAG}")
+  #set (CMAKE_Fortran_FLAGS_DEBUG "-g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow,underflow,denormal -Wall ${OPENMP_FLAG}")
   set (Fortran_REAL8_FLAG "-fdefault-real-8")
 elseif (Fortran_COMPILER_NAME MATCHES "ifort")
   set (CMAKE_Fortran_FLAGS_RELEASE "-O3 ${OPENMP_FLAG}")
@@ -50,7 +52,7 @@ endif (Fortran_COMPILER_NAME MATCHES "gfortran")
 add_definitions(-DPACKAGE_VERSION=\"${XOPTFOIL_VERSION}\")
 
 # Set source files (exclude programs here)
-file(GLOB SOURCESDBLE "src/fortran/*.f90" "src/fortran/*.F90" "src/fortran/xfoil_deps/*.f90")
+file(GLOB SOURCESDBLE "src/fortran/*.f90" "src/fortran/*.F90" "src/fortran/xfoil_deps/*.f90" "src/fortran/lapack/lapack_routine/*.f" "src/fortran/lapack/lapack_routine/*.f90" "src/fortran/lapack/util/*.f")
 file(GLOB SOURCESREAL "src/fortran/xfoil_deps/*.f" "src/fortran/naca456_deps/*.f90")
 list(REMOVE_ITEM SOURCESDBLE "${CMAKE_SOURCE_DIR}/src/fortran/main.f90")
 list(REMOVE_ITEM SOURCESDBLE "${CMAKE_SOURCE_DIR}/src/fortran/xfoil_only.f90")
@@ -69,16 +71,17 @@ add_executable("xfoil_only" $<TARGET_OBJECTS:MYOBJLIB> "src/fortran/xfoil_only.f
 
 # Installation
 install(TARGETS xoptfoil xfoil_only DESTINATION bin)
-install(FILES src/python/xoptfoil_visualizer.py
+install(FILES "doc/User_Guide.pdf" DESTINATION ${DATADIR})
+install(FILES "doc/all_inputs.txt" DESTINATION ${DATADIR})
+install(FILES "src/python/xoptfoil_visualizer_V2.py"
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
                     GROUP_READ             GROUP_EXECUTE
                     WORLD_READ             WORLD_EXECUTE
         DESTINATION bin)
-install(FILES "doc/User_Guide.pdf" DESTINATION ${DATADIR})
 install(FILES "doc/example_case/example_case.pdf"
               "doc/example_case/inputs.txt" 
               "doc/example_case/inputs_withflap.txt" 
               DESTINATION ${DATADIR}/example_case)
-file(GLOB AIRFOILS "sample_airfoils/*.dat")
-install(FILES ${AIRFOILS} DESTINATION ${DATADIR}/sample_airfoils)
-install(FILES "doc/all_inputs.txt" DESTINATION ${DATADIR})
+#file(GLOB AIRFOILS "sample_airfoils/*.dat")
+#install(FILES ${AIRFOILS} DESTINATION ${DATADIR}/sample_airfoils)
+

@@ -1,3 +1,20 @@
+!  This file is part of XOPTFOIL.
+
+!  XOPTFOIL is free software: you can redistribute it and/or modify
+!  it under the terms of the GNU General Public License as published by
+!  the Free Software Foundation, either version 3 of the License, or
+!  (at your option) any later version.
+
+!  XOPTFOIL is distributed in the hope that it will be useful,
+!  but WITHOUT ANY WARRANTY; without even the implied warranty of
+!  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!  GNU General Public License for more details.
+
+!  You should have received a copy of the GNU General Public License
+!  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
+
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
+  
 module parametrization_constr
 
 ! Contains subroutines to create an airfoil shape from design variables
@@ -140,7 +157,7 @@ end subroutine KBP_init
 
 subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
 
-  use math_deps, only : SOLVE_SVD, fx, BINCOEF
+  use math_deps, only : fx, BINCOEF
 
   implicit none
   
@@ -158,9 +175,17 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
   
   double precision, dimension(n+1+int_LEM,n+1+int_LEM) :: A
   double precision, dimension(n+1+int_LEM) ::             B
+  
   real, dimension(n+1+int_LEM) ::                         W_send
   
+  double precision, dimension(n+1+int_LEM,1) ::           B_send
+  double precision, dimension(n+1+int_LEM) ::             S
+  double precision ::                                     RCOND
+  integer ::                                              RANK, LWORK, INFO
+  double precision, dimension(5*(n+1+int_LEM)) ::         WORK
+  
   integer ::                                              i,j
+  double precision ::                                     rmse
     
   F  = 0.0d0
   G  = 0.0d0  
@@ -186,13 +211,15 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
 
   A=matmul(G_trans, G)
   B=matmul(G_trans, F)
+   
+  B_send(:,1) = B(:)
+  RCOND = 1.0e-6
+  LWORK = 5*(n+1+int_LEM)
+  call DGELSS(n+1+int_LEM, n+1+int_LEM, 1, A, n+1+int_LEM, B_send, n+1+int_LEM,&
+    S, RCOND, RANK, WORK, LWORK, INFO )
   
-  W_send    = real(W,4)
-  call Solve_SVD(n+1+int_LEM,real(A,4),real(B,4),W_send)
-  W         = real(W_send,8)
-
-  W=W_send
-
+  W = B_send(:,1)
+   
 end subroutine KBParameterization_fitting
 
 !/////////////////////////////////////////////////////////////////////////////80
@@ -476,7 +503,7 @@ subroutine d_BSpline(t,k,i,x,b)
 end subroutine d_BSpline  
 
 ! ----------------------------------------------------------------------------
-! Subroutine that implements the Kulfan-Bussoletti Parameterization, coordinates to weights.
+! Subroutine that implements the B-Spline Parameterization, coordinates to weights.
 subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
 
   use vardef, only : nparams_top, nparams_bot,b_spline_degree, b_spline_xtype, &
@@ -522,27 +549,26 @@ subroutine BSP_init(xseedt, xseedb, zseedt, zseedb, modest, modesb)
     allocate(modest(2*nparams_top-5), modesb(2*nparams_bot-5))
     allocate(modest_full(nparams_top*2), modesb_full(nparams_bot*2))
 
-    !call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,    &
-    !xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
-    !modest_full(1+nparams_top:2*nparams_top),top_b_matrix)
+    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointst,    &
+    xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
+    modest_full(1+nparams_top:2*nparams_top),top_b_matrix)
 
-   call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointst,     &
-   xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
-   modest_full(1+nparams_top:2*nparams_top))
+   !call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointst,     &
+   !xseedt,zseedt,upointst,nparams_top,modest_full(1:nparams_top),              &
+   !modest_full(1+nparams_top:2*nparams_top))
     
     !x
     modest(1:nparams_top-3)=modest_full(3:nparams_top-1)
     !z
     modest(nparams_top-2:2*nparams_top-5)=modest_full(nparams_top+2:2*nparams_top-1)
     
+    call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,    &
+    xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
+    modesb_full(1+nparams_bot:2*nparams_bot),bot_b_matrix)
 
-    !call BSpline_A2C_fixedx(b_spline_degree,b_spline_distribution,npointsb,    &
-    !xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
-    !modesb_full(1+nparams_bot:2*nparams_bot),bot_b_matrix)
-
-   call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointsb,     &
-   xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
-   modesb_full(1+nparams_bot:2*nparams_bot))
+   !call BSpline_A2C_freex(b_spline_degree,b_spline_distribution,npointsb,     &
+   !xseedb,zseedb,upointsb,nparams_bot,modesb_full(1:nparams_bot),              &
+   !modesb_full(1+nparams_bot:2*nparams_bot))
     
     !x
     modesb(1:nparams_bot-3)=modesb_full(3:nparams_bot-1)
@@ -629,7 +655,7 @@ subroutine BSpline_A2C_freex(n,option,nspline,xspline,zspline,uspline,n_cp,x,z)
   ! Get Z, computed from U and zspline, min squares
   call GET_Z_MINSQUARES(nspline,uspline,zspline,n,n_cp,z,BSPLINE_FULL)
   
-  end subroutine BSpline_A2C_freex  
+end subroutine BSpline_A2C_freex  
 
 !--------------------------------------------------------------------
 ! Get u from x control points and x airfoil coordinates
@@ -687,8 +713,6 @@ end subroutine GET_U_NEWTON
 !--------------------------------------------------------------------
 ! Get p control points from u parametric vector and p airfoil coordinates
 subroutine GET_Z_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL)
-
-  use math_deps, only : SOLVE_SVD  
   
   ! Variables declaration.
   implicit none
@@ -713,6 +737,15 @@ subroutine GET_Z_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   real*8:: A(n_cp-2,n_cp-2), B(n_cp-2)
   real:: X(n_cp-2)
   real*8, dimension(n_cp+n+1):: t 
+  
+  double precision, dimension(n_cp-2,1) ::           B_send
+  double precision, dimension(n_cp-2) ::             S
+  double precision ::                                RCOND
+  integer ::                                         RANK, LWORK, INFO
+  double precision, dimension(5*(n_cp-2)) ::         WORK
+  
+  double precision, dimension(n_cp) ::               pcontrol2
+  double precision ::                                rmse
   
   !Knot vector
   do i =1,n_cp+n+1
@@ -749,18 +782,21 @@ subroutine GET_Z_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   p=P_FULL(2:nspline-1)-pcontrol(1)*BSPLINE_FULL(2:nspline-1,1) &
                        -pcontrol(n_cp)*BSPLINE_FULL(2:nspline-1,n_cp)
   B=matmul(BSPLINE_T,p)
-
+  
   !Solve A.X=B
-  call Solve_SVD(n_cp-2,real(A,4),real(B,4),X)
-  pcontrol(2:n_cp-1)         = real(X,8)
-
+  B_send(:,1) = B(:)
+  RCOND = 1.0e-6
+  LWORK = 5*(n_cp-2)
+  call DGELSS(n_cp-2, n_cp-2, 1, A, n_cp-2, B_send, n_cp-2,          &
+    S, RCOND, RANK, WORK, LWORK, INFO )
+  
+  pcontrol(2:n_cp-1)  = B_send(:,1)
+  
 end subroutine GET_Z_MINSQUARES
 
 !--------------------------------------------------------------------
 ! Get p control points from u parametric vector and p airfoil coordinates
 subroutine GET_X_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL)
-
-  use math_deps, only : SOLVE_SVD  
   
   ! Variables declaration.
   implicit none
@@ -785,6 +821,15 @@ subroutine GET_X_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   real*8:: A(n_cp-3,n_cp-3), B(n_cp-3)
   real:: X(n_cp-3)
   real*8, dimension(n_cp+n+1):: t 
+  
+  double precision, dimension(n_cp-3,1) ::           B_send
+  double precision, dimension(n_cp-3) ::             S
+  double precision ::                                RCOND
+  integer ::                                         RANK, LWORK, INFO
+  double precision, dimension(5*(n_cp-3)) ::         WORK
+  
+  double precision, dimension(n_cp) ::               pcontrol2
+  double precision ::                                rmse
   
   !Knot vector
   do i =1,n_cp+n+1
@@ -827,9 +872,14 @@ subroutine GET_X_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   B=matmul(BSPLINE_T,p)
 
   !Solve A.X=B
-  call Solve_SVD(n_cp-3,real(A,4),real(B,4),X)
-  pcontrol(3:n_cp-1)         = real(X,8)
-
+  B_send(:,1) = B(:)
+  RCOND = 1.0e-6
+  LWORK = 5*(n_cp-3)
+  call DGELSS(n_cp-3, n_cp-3, 1, A, n_cp-3, B_send, n_cp-3,          &
+    S, RCOND, RANK, WORK, LWORK, INFO )
+  
+  pcontrol(3:n_cp-1)  = B_send(:,1)
+  
 end subroutine GET_X_MINSQUARES
 
 !***************************************************************

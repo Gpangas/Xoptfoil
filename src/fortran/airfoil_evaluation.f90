@@ -13,7 +13,7 @@
 !  You should have received a copy of the GNU General Public License
 !  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
 
-!  Copyright (C) 2017-2019 Daniel Prosser
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
 
 module airfoil_evaluation
 
@@ -76,7 +76,7 @@ function objective_function_nopenalty(designvars)
     objective_function_nopenalty = matchfoil_objective_function(designvars)
   else
     objective_function_nopenalty =                                             &
-                    aero_objective_function(designvars, 0, include_penalty=.false.)
+      aero_objective_function(designvars, 0, include_penalty=.false.)
   end if
 
 end function objective_function_nopenalty
@@ -173,7 +173,8 @@ function aero_objective_function(designvars, step, include_penalty)
 
   ! Set modes for top and bottom surfaces
 
-  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top,        &
+    ndvs_bot)
   
   dvtbnd1 = 1
   dvtbnd2 = ndvs_top
@@ -441,7 +442,7 @@ function variable_penalty_function(designvars, dvbbnd2, epsexit,               &
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
     tefact = 1.d0/(max_tcTE - min_tcTE)
-    actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
+    actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+           &
       int_tcTE_spec)/tefact + min_tcTE
     penaltyval = penaltyval + max(0.d0,actual_tcTE-max_tcTE)/(max_tcTE+1.E-12)
     penaltyval = penaltyval + max(0.d0,min_tcTE-actual_tcTE)/(min_tcTE+1.E-12)
@@ -520,7 +521,8 @@ function variable_penalty_function(designvars, dvbbnd2, epsexit,               &
   ! Set identical flap angles
   do i = 1, nflap_identical
     flap_idi = flap_identical_points(i)
-    actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
+    actual_flap_degrees(flap_idi) =                                            &
+      actual_flap_degrees(flap_identical_op(flap_idi))
   end do
   
   ! Get actual flap hinge based on design variable
@@ -528,8 +530,10 @@ function variable_penalty_function(designvars, dvbbnd2, epsexit,               &
   if (int_x_flap_spec == 1) then
     fxfact = 1.d0/(max_flap_x - min_flap_x)
     actual_x_flap = designvars(dvcounter)/fxfact + min_flap_x
-    penaltyval = penaltyval + max(0.d0,actual_x_flap-max_flap_x) / (max_flap_x+1.E-12)
-    penaltyval = penaltyval + max(0.d0,min_flap_x-actual_x_flap) / (min_flap_x+1.E-12)
+    penaltyval = penaltyval + max(0.d0,actual_x_flap-max_flap_x) /             &
+      (max_flap_x+1.E-12)
+    penaltyval = penaltyval + max(0.d0,min_flap_x-actual_x_flap) /             &
+      (min_flap_x+1.E-12)
   else
     actual_x_flap=x_flap
   end if
@@ -564,7 +568,8 @@ end function variable_penalty_function
   ! curvature reversals(12), max panel angles(13), max growth rate(14)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   
-function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains_vector)
+function geometry_penalty_function(zt_new, zb_new, epsexit, penalize,          &
+  constrains_vector)
 
   use vardef, only: curr_foil, xseedt, xseedb, nflap_optimize, min_thickness,  &
     max_thickness, naddthickconst, addthick_min, addthick_max, max_camber,     &
@@ -612,13 +617,15 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
   if (xseedt(nptt) <= xseedb(nptb)) then
     nptint = nptt
     side=.false.
-    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedt,zb_interp(1:nptt),side)
+    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedt,      &
+      zb_interp(1:nptt),side)
     x_interp(1:nptt) = xseedt
     zt_interp(1:nptt) = zt_new  
   else
     nptint = nptb
     side=.true.
-    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedb,zt_interp(1:nptb),side)
+    call spline_interp_z(curr_foil%npoint,curr_foil%x,curr_foil%z,xseedb,      &
+      zt_interp(1:nptb),side)
     x_interp(1:nptb) = xseedb
     zb_interp(1:nptb) = zb_new
   end if
@@ -645,12 +652,13 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
     if (thickness(i) < minthick) minthick = thickness(i)
     
     camber(i) = ( zt_interp(i) + zb_interp(i) ) / 2.0d0
-    if (camber(i) > maxcamb) maxcamb = camber(i)
+    if (abs(camber(i)) > abs(maxcamb)) maxcamb = camber(i)
 
 !   Check if thinner than specified wedge angle on specified back of airfoil
 
     if (xseedt(i) > te_angle_x_apply) then
-      TE_angle = atan((thickness(i) - tegap) / (x_interp(nptint) - x_interp(i))+1.E-12)
+      TE_angle = atan((thickness(i) - tegap) / (x_interp(nptint) - x_interp(i))&
+        +1.E-12)
       if (TE_angle .LT. actual_min_TE_angle) actual_min_TE_angle = TE_angle
     end if
 
@@ -676,8 +684,10 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
   
 ! Penalties for max thickness too low or high
 
-  penaltyval = penaltyval + max(0.d0,min_thickness-maxthick)/(min_thickness+1.E-12)
-  penaltyval = penaltyval + max(0.d0,maxthick-max_thickness)/(max_thickness+1.E-12)
+  penaltyval = penaltyval + max(0.d0,min_thickness-maxthick)/(min_thickness    &
+    +1.E-12)
+  penaltyval = penaltyval + max(0.d0,maxthick-max_thickness)/(max_thickness    &
+    +1.E-12)
   constrains_vector(1+nflap_optimize+3) = maxthick
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -699,8 +709,10 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
     call spline_interp_t(curr_foil%npoint,curr_foil%x,curr_foil%z,             &
                          addthick_x(1:naddthickconst),add_thickvec)
     do i = 1, naddthickconst
-      penaltyval = penaltyval + max(0.d0,addthick_min(i)-add_thickvec(i))/(addthick_min(i)+1.E-12)
-      penaltyval = penaltyval + max(0.d0,add_thickvec(i)-addthick_max(i))/(addthick_max(i)+1.E-12)
+      penaltyval = penaltyval + max(0.d0,addthick_min(i)-add_thickvec(i))/     &
+        (addthick_min(i)+1.E-12)
+      penaltyval = penaltyval + max(0.d0,add_thickvec(i)-addthick_max(i))/     &
+        (addthick_max(i)+1.E-12)
       constrains_vector(1+nflap_optimize+3+i) = add_thickvec(i)
       if ((addthick_min(i) .GT. add_thickvec(i)) .OR.                          &
                                     (add_thickvec(i) .GT. addthick_max(i))) then
@@ -751,8 +763,10 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
   
   ! Add penalty for max camber outside of constraints
 
-  penaltyval = penaltyval + max(0.d0,maxcamb-max_camber)/(abs(max_camber)+1.0E-12)
-  penaltyval = penaltyval + max(0.d0,min_camber-maxcamb)/(abs(min_camber)+1.0E-12)
+  penaltyval = penaltyval + max(0.d0,maxcamb-max_camber)/(abs(max_camber)      &
+    +1.0E-12)
+  penaltyval = penaltyval + max(0.d0,min_camber-maxcamb)/(abs(min_camber)      &
+    +1.0E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+2) = maxcamb
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -776,7 +790,8 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
             180.d0/acos(-1.d0)
   maxpanang = max(panang2,panang1)
   minpanang = min(panang2,panang1)
-  penaltyval = penaltyval + max(0.d0,maxpanang-max_leading_edge_angle)/(90.d0-max_leading_edge_angle+1.0E-12)
+  penaltyval = penaltyval + max(0.d0,maxpanang-max_leading_edge_angle)/        &
+    (90.d0-max_leading_edge_angle+1.0E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+3) = maxpanang
   
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -795,7 +810,8 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
   
   ! Penalty for too sharp leading edge
 
-  penaltyval = penaltyval + max(0.d0,min_leading_edge_angle-minpanang)/(90.d0-min_leading_edge_angle+1.E-12)
+  penaltyval = penaltyval + max(0.d0,min_leading_edge_angle-minpanang)/        &
+    (90.d0-min_leading_edge_angle+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+4) = minpanang
   
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -815,7 +831,7 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
   ! Penalty for too disparate leading edge
 
   penaltyval = penaltyval + max(0.d0,abs(panang1-panang2)-                     &
-                                dif_leading_edge_angle)/(dif_leading_edge_angle+1.E-12)
+    dif_leading_edge_angle)/(dif_leading_edge_angle+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+5) = abs(panang1-panang2)
   
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -863,8 +879,10 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
       end if
     end do
 
-    penaltyval = penaltyval + max(0.d0,dble(nreversalst-max_curv_reverse_top))/dble(max_curv_reverse_top)
-    penaltyval = penaltyval + max(0.d0,dble(nreversalsb-max_curv_reverse_bot))/dble(max_curv_reverse_bot)
+    penaltyval = penaltyval + max(0.d0,dble(nreversalst-max_curv_reverse_top))/&
+      dble(max_curv_reverse_top)
+    penaltyval = penaltyval + max(0.d0,dble(nreversalsb-max_curv_reverse_bot))/&
+      dble(max_curv_reverse_bot)
     constrains_vector(1+nflap_optimize+3+naddthickconst+6) = nreversalst
     constrains_vector(1+nflap_optimize+3+naddthickconst+7) = nreversalsb
   end if
@@ -887,7 +905,8 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
 
   call get_max_panel_angle(curr_foil, panel_angle)
   
-  penaltyval = penaltyval + max(0.0d0,panel_angle-max_panel_angle)/(max_panel_angle+1.E-12)
+  penaltyval = penaltyval + max(0.0d0,panel_angle-max_panel_angle)/            &
+    (max_panel_angle+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+8) = panel_angle
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -921,7 +940,8 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize, constrains
 
 ! Penalty for too large growth rate
 
-  penaltyval = penaltyval + max(0.d0,maxgrowth-growth_allowed)/(growth_allowed+1.E-12)
+  penaltyval = penaltyval + max(0.d0,maxgrowth-growth_allowed)/                &
+    (growth_allowed+1.E-12)
   constrains_vector(1+nflap_optimize+3+naddthickconst+9) = maxgrowth
 
   if ( (penaltyval > epsexit) .and. penalize ) then
@@ -995,12 +1015,14 @@ function aerodynamic_penalty_function(moment, drag, lift, viscrms, &
   
 ! Add penalty for too low moment
   n_op = 0
+  op_list = 0
+  op_list_value = 0
   do i = 1, nmoment_constrain
     const_idx = moment_constrain_points(i)
     
-    penaltyval = penaltyval + max(0.d0,min_moment(const_idx)-moment(const_idx))&
-                                                          /min_moment(const_idx)
-    constrains_vector(1+nflap_optimize+3+naddthickconst+10+i) = moment(const_idx)
+    penaltyval = penaltyval +max(0.d0,(min_moment(const_idx)-moment(const_idx))&
+                                /(abs(min_moment(const_idx))+1.E-12))
+    constrains_vector(1+nflap_optimize+3+naddthickconst+10+i)=moment(const_idx)
     
     if (min_moment(const_idx) .GT. moment(const_idx)) then
       n_op = n_op + 1
@@ -1008,7 +1030,7 @@ function aerodynamic_penalty_function(moment, drag, lift, viscrms, &
       op_list_value(n_op) = moment(const_idx)
     end if
   end do
-  
+    
   if ( (penaltyval > epsexit) .and. penalize ) then
     write(text,'(1000I4)') (op_list(i),i=1,n_op)
     write(text1,'(1000F6.4)') (op_list_value(i),i=1,n_op)
@@ -1028,9 +1050,10 @@ function aerodynamic_penalty_function(moment, drag, lift, viscrms, &
   do i = 1, nlift_constrain
     const_idx = lift_constrain_points(i)
     
-    penaltyval = penaltyval + max(0.d0,min_lift(const_idx)-lift(const_idx))&
-                                                          /(min_lift(const_idx)+1.E-12)
-    constrains_vector(1+nflap_optimize+3+naddthickconst+10+nmoment_constrain+i) = lift(const_idx)
+    penaltyval = penaltyval + max(0.d0,(min_lift(const_idx)-lift(const_idx))   &
+      /(abs(min_lift(const_idx))+1.E-12))
+    constrains_vector(1+nflap_optimize+3+naddthickconst+10+nmoment_constrain+i)&
+      = lift(const_idx)
     
     if (min_lift(const_idx) .GT. lift(const_idx)) then
       n_op = n_op + 1
@@ -1058,9 +1081,10 @@ function aerodynamic_penalty_function(moment, drag, lift, viscrms, &
   do i = 1, ndrag_constrain
     const_idx = drag_constrain_points(i)
 
-    penaltyval = penaltyval + max(0.d0,drag(const_idx)-max_drag(const_idx))&
-                                                          /(max_drag(const_idx)+1.E-12)
-    constrains_vector(1+nflap_optimize+3+naddthickconst+10+nmoment_constrain+nlift_constrain+i) = drag(const_idx)
+    penaltyval = penaltyval + max(0.d0,(drag(const_idx)-max_drag(const_idx))   &
+      /(abs(max_drag(const_idx))+1.E-12))
+    constrains_vector(1+nflap_optimize+3+naddthickconst+10+nmoment_constrain+  &
+      nlift_constrain+i) = drag(const_idx)
     
     if (max_drag(const_idx) .LT. drag(const_idx)) then
       n_op = n_op + 1
@@ -1291,7 +1315,8 @@ function calculate_objective_function(moment, drag, lift, alpha, viscrms, xtrt,&
 
     !   Add contribution to the objective function
 
-    calculate_objective_function = calculate_objective_function + weighting(i)*increment
+    calculate_objective_function = calculate_objective_function +              &
+      weighting(i)*increment
 
   end do
 
@@ -1381,8 +1406,8 @@ subroutine run_consistency_check(actual_flap_degrees, actual_x_flap, lift,     &
   anychecked: if (ncheckpt > 0) then
 
     call run_xfoil(curr_foil, xfoil_geom_options, opp_check(1:ncheckpt),       & 
-                   opm_check(1:ncheckpt), op_search, opm_previous_op(1:noppoint), &
-                   re_check(1:ncheckpt),     &
+                   opm_check(1:ncheckpt), op_search,                           &
+                   opm_previous_op(1:noppoint), re_check(1:ncheckpt),          &
                    ma_check(1:ncheckpt), use_flap, actual_x_flap, y_flap,      &
                    y_flap_spec, fd_check(1:ncheckpt), xfoil_options,           &
                    file_options, clcheck, cdcheck, cmcheck, rmscheck, alcheck, &
@@ -1462,7 +1487,7 @@ function matchfoil_objective_function(designvars)
 
 ! Set modes for top and bottom surfaces
 
-  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top,ndvs_bot)
   
   dvtbnd = ndvs_top
   dvbbnd = ndvs_top + ndvs_bot
@@ -1470,7 +1495,7 @@ function matchfoil_objective_function(designvars)
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
     tefact = 1.d0/(max_tcTE - min_tcTE)
-    actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+         &
+    actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+            &
       int_tcTE_spec)/tefact + min_tcTE
   else
     actual_tcTE=tcTE
@@ -1489,9 +1514,10 @@ function matchfoil_objective_function(designvars)
 
 ! Evaluate the new airfoil, not counting fixed LE and TE points
 
-  matchfoil_objective_function%value = norm_2(zt_new(2:nptt-1) - zmatcht(2:nptt-1))
-  matchfoil_objective_function%value = matchfoil_objective_function%value +                &
-                                 norm_2(zb_new(2:nptb-1) - zmatchb(2:nptb-1))
+  matchfoil_objective_function%value = norm_2(zt_new(2:nptt-1) -               &
+    zmatcht(2:nptt-1))
+  matchfoil_objective_function%value = matchfoil_objective_function%value +    &
+    norm_2(zb_new(2:nptb-1) - zmatchb(2:nptb-1))
   constrains_data(:) = 0.0
   aero_vector(:)  = 0.0
   
@@ -1521,7 +1547,7 @@ function write_function(designvars, designcounter, laststep)
                                                            designcounter)
   else
     write_function = write_airfoil_optimization_progress(designvars,           &
-                                                         designcounter, laststep)
+                                                        designcounter, laststep)
   end if
 
 end function write_function
@@ -1531,7 +1557,8 @@ end function write_function
 ! Writes airfoil coordinates and polars to files during optimization
 !
 !=============================================================================80
-function write_airfoil_optimization_progress(designvars, designcounter, laststep)
+function write_airfoil_optimization_progress(designvars, designcounter,        &
+  laststep)
   use vardef,          only : nparams_top, nparams_bot, xseedt, xseedb,        &
     int_tcTE_spec, nflap_optimize, int_x_flap_spec, max_tcTE, min_tcTE,        &
     shape_functions, zseedt, zseedb, noppoint, curr_foil, max_flap_x,          &
@@ -1575,7 +1602,8 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
 
 ! Set modes for top and bottom surfaces
 
-  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top,        &
+    ndvs_bot)
   dvtbnd1 = 1
   dvtbnd2 = ndvs_top
   dvbbnd1 = dvtbnd2 + 1
@@ -1599,7 +1627,7 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
     tefact = 1.d0/(max_tcTE - min_tcTE)
-    actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+         &
+    actual_tcTE = designvars(dvbbnd2+nflap_optimize+int_x_flap_spec+           &
       int_tcTE_spec)/tefact + min_tcTE
   else
     actual_tcTE=tcTE
@@ -1652,7 +1680,8 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
 ! Set identical flap angles
   do i = 1, nflap_identical
     flap_idi = flap_identical_points(i)
-    actual_flap_degrees(flap_idi) = actual_flap_degrees(flap_identical_op(flap_idi))
+    actual_flap_degrees(flap_idi) = actual_flap_degrees(                       &
+      flap_identical_op(flap_idi))
   end do
   
 ! Get actual flap chord based on design variable
@@ -1732,7 +1761,7 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
 
   !   Header for coordinate file
 
-      write(*,*) "  Writing coordinates for seed airfoil to file "//             &
+      write(*,*) "  Writing coordinates for seed airfoil to file "//           &
                  trim(foilfile)//" ..."
       open(unit=foilunit, file=foilfile, status='replace')
       write(foilunit,'(A)') 'title="Airfoil coordinates"'
@@ -1743,11 +1772,12 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
 
   !!   Header for polar file
   !
-  !    write(*,*) "Writing polars for seed airfoil to file "//                    &
+  !    write(*,*) "Writing polars for seed airfoil to file "//                 &
   !               trim(polarfile)//" ..."
   !    open(unit=polarunit, file=polarfile, status='replace')
   !    write(polarunit,'(A)') 'title="Airfoil polars"'
-  !    write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb" "flap deflexion" "flap hinge position"'
+  !    write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb"  &
+  !    "flap deflexion" "flap hinge position"'
   !    write(polarunit,'(A)') 'zone t="Seed airfoil polar"'
 
     else
@@ -1759,20 +1789,20 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
 
   !   Open coordinate file and write zone header
 
-      write(*,*) "  Writing coordinates for design number "//trim(text)//        &
+      write(*,*) "  Writing coordinates for design number "//trim(text)//      &
                  " to file "//trim(foilfile)//" ..."
-      open(unit=foilunit, file=foilfile, status='old', position='append',        &
+      open(unit=foilunit, file=foilfile, status='old', position='append',      &
            err=900)
-      write(foilunit,'(A)') 'zone t="Airfoil, maxt='//trim(maxtchar)//&
-                            ', xmaxt='//trim(xmaxtchar)//', maxc='//&
-                            trim(maxcchar)//', xmaxc='//trim(xmaxcchar)//'", '//&
-                            'SOLUTIONTIME='//trim(text)
+      write(foilunit,'(A)')'zone t="Airfoil, maxt='//trim(maxtchar)//          &
+                           ', xmaxt='//trim(xmaxtchar)//', maxc='//            &
+                           trim(maxcchar)//', xmaxc='//trim(xmaxcchar)//'", '//&
+                           'SOLUTIONTIME='//trim(text)
 
       !! Open polar file and write zone header
       !
-      !write(*,*) "  Writing polars for design number "//trim(text)//             &
+      !write(*,*) "  Writing polars for design number "//trim(text)//          &
       !           " to file "//trim(polarfile)//" ..."
-      !open(unit=polarunit, file=polarfile, status='old', position='append',      &
+      !open(unit=polarunit, file=polarfile, status='old', position='append',   &
       !     err=901)
       !write(polarunit,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
 
@@ -1787,8 +1817,8 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
   !! Write polars to file
   !
   !  do i = 1, noppoint
-  !    write(polarunit,'(8ES14.6)') alpha(i), lift(i), drag(i), moment(i),        &
-  !                                 xtrt(i), xtrb(i), actual_flap_degrees(i),     &
+  !    write(polarunit,'(8ES14.6)') alpha(i), lift(i), drag(i), moment(i),     &
+  !                                 xtrt(i), xtrb(i), actual_flap_degrees(i),  &
   !                                 actual_x_flap
   !  end do
 
@@ -1810,7 +1840,8 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
         textdv=adjustl(textdv)
         write(variablesunit,'(A12)', advance='no') 'bot - '//trim(textdv)
       end do
-      if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no') 'te_thick'
+      if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no')     &
+        'te_thick'
       write(variablesunit,'(A)') ' '
   
       do i = 1, size(designvars(dvtbnd1:dvtbnd2),1)
@@ -1819,7 +1850,8 @@ function write_airfoil_optimization_progress(designvars, designcounter, laststep
       do i = 1, size(designvars(dvbbnd1:dvbbnd2),1)
         write(variablesunit,'(F12.8)', advance='no') designvars(dvbbnd1+i-1)
       end do
-      if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no') actual_tcTE
+      if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no')     &
+        actual_tcTE
       write(variablesunit,'(A)') ' '
     
     close(variablesunit)
@@ -1877,7 +1909,7 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
 
 ! Set modes for top and bottom surfaces
 
-  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top, ndvs_bot)
+  call parametrization_dvs(nmodest, nmodesb, shape_functions, ndvs_top,ndvs_bot)
   
   dvtbnd = ndvs_top
   dvbbnd = ndvs_top + ndvs_bot
@@ -1885,7 +1917,7 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
   ! Get actual trailing edge based on design variable
   if (int_tcTE_spec == 1) then
     tefact = 1.d0/(max_tcTE - min_tcTE)
-    actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+         &
+    actual_tcTE = designvars(dvbbnd+nflap_optimize+int_x_flap_spec+            &
       int_tcTE_spec)/tefact + min_tcTE
   else
     actual_tcTE=tcTE
@@ -1990,7 +2022,8 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
       textdv=adjustl(textdv)
       write(variablesunit,'(A12)', advance='no') 'bot - '//trim(textdv)
     end do
-    if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no') 'te_thick'
+    if (int_tcTE_spec .NE. 0) write(variablesunit,'(A12)', advance='no')       &
+      'te_thick'
     write(variablesunit,'(A)') ' '
 
     do i = 1, size(designvars(1:dvtbnd),1)
@@ -1999,7 +2032,8 @@ function write_matchfoil_optimization_progress(designvars, designcounter)
     do i = 1, size(designvars(dvtbnd+1:dvbbnd),1)
       write(variablesunit,'(F12.8)', advance='no') designvars(dvtbnd+i)
     end do
-    if (int_tcTE_spec .NE. 0) write(variablesunit,'(F12.8)', advance='no') actual_tcTE
+    if (int_tcTE_spec .NE. 0) write(variablesunit,'(F12.8)', advance='no')     &
+      actual_tcTE
     write(variablesunit,'(A)') ' '
     
   close(variablesunit)
@@ -2205,9 +2239,9 @@ function write_function_restart_cleanup(restart_status, global_search,         &
     write(relfminchar,'(F14.10)') relfmin(i)
     write(radchar,'(ES14.6)') rad(i)
     write(timechar,'(I14)') time(i)
-    write(histunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
-                                         adjustl(relfminchar), adjustl(radchar), &
-                                         adjustl(timechar)
+    write(histunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar),                 &
+      adjustl(fminchar), adjustl(relfminchar), adjustl(radchar),               &
+      adjustl(timechar)
   end do
 
 ! Close history file
@@ -2471,7 +2505,7 @@ end subroutine get_last_design_parameters
 ! get_last_airfoil
 !
 !=============================================================================80
-subroutine get_last_airfoil(restart_status, global_search,           &
+subroutine get_last_airfoil(restart_status, global_search,                     &
   local_search, last_airfoil)
 
   use vardef,             only : airfoil_type, output_prefix, xseedt, xseedb
