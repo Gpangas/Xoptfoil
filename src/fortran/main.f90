@@ -76,8 +76,10 @@ program main
                    pso_options, ga_options, ds_options, matchfoil_file)
   
   ! Set thread number
+  iMaxThreads = 1
+  !$ iMaxThreads = OMP_GET_MAX_THREADS()
   
-  iMaxThreads = OMP_GET_MAX_THREADS()
+  ! Write thread number
   if ((abs(number_threads).eq.0).or.(abs(number_threads).gt.iMaxThreads)) then
     NumThreads = iMaxThreads
   else
@@ -89,7 +91,7 @@ program main
   write(*,*) 'Number of threads used is :    ', NumThreads 
   write(*,*)
   
-  call OMP_SET_NUM_THREADS(NumThreads)
+  !$ call OMP_SET_NUM_THREADS(NumThreads)
   
   ! Load seed airfoil into memory, including transformations and smoothing
 
