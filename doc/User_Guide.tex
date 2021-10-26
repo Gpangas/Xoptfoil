@@ -969,6 +969,14 @@ optimization.  Only written if the option write\_designs is set to .true.  Each 
 is identified under one of the ``zone t=...'' labels.  You can plot these using 
 xoptfoil\_visualizer\_V2. See Section \ref{sec:xoptfoil_visualizer_V2} for more information.}
 
+\item{\textbf{\{prefix\}\_design\_cp.dat}: Airfoil polars with pressure distribution
+data at the requested operating points for each progressively better design found during the 
+optimization.  Only written if the option write\_cp\_file is set to .true.}
+
+\item{\textbf{\{prefix\}\_design\_bl.dat}: Airfoil polars with boundary layer
+data at the requested operating points for each progressively better design found during the 
+optimization.  Only written if the option write\_bl\_file  is set to .true.}
+
 \item{\textbf{\{prefix\}\_design\_aifoil\_variables.dat}: Airfoil design variables file for the
 	last design.}
 
@@ -1115,8 +1123,6 @@ To quit the design visualizer tool, enter 0 at the main menu.
 \end{figure}
 
 \section{Using xfoil\_only}
-
-Not available in this version.
 
 Xoptfoil comes with a tool called xfoil\_only, which does exactly what it sounds like it
 does: it runs Xfoil alone without optimizing. This can be useful for getting an idea of
