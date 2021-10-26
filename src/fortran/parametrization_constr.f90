@@ -176,8 +176,6 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
   double precision, dimension(n+1+int_LEM,n+1+int_LEM) :: A
   double precision, dimension(n+1+int_LEM) ::             B
   
-  real, dimension(n+1+int_LEM) ::                         W_send
-  
   double precision, dimension(n+1+int_LEM,1) ::           B_send
   double precision, dimension(n+1+int_LEM) ::             S
   double precision ::                                     RCOND
@@ -185,7 +183,6 @@ subroutine KBParameterization_fitting(ndata,X,Z,n,zcTE,int_LEM,W)
   double precision, dimension(5*(n+1+int_LEM)) ::         WORK
   
   integer ::                                              i,j
-  double precision ::                                     rmse
     
   F  = 0.0d0
   G  = 0.0d0  
@@ -735,7 +732,6 @@ subroutine GET_Z_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   real*8:: B_DUMMY(n+1)
   real*8:: p(nspline-2)
   real*8:: A(n_cp-2,n_cp-2), B(n_cp-2)
-  real:: X(n_cp-2)
   real*8, dimension(n_cp+n+1):: t 
   
   double precision, dimension(n_cp-2,1) ::           B_send
@@ -743,9 +739,6 @@ subroutine GET_Z_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   double precision ::                                RCOND
   integer ::                                         RANK, LWORK, INFO
   double precision, dimension(5*(n_cp-2)) ::         WORK
-  
-  double precision, dimension(n_cp) ::               pcontrol2
-  double precision ::                                rmse
   
   !Knot vector
   do i =1,n_cp+n+1
@@ -819,7 +812,6 @@ subroutine GET_X_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   real*8:: B_DUMMY(n+1)
   real*8:: p(nspline-3)
   real*8:: A(n_cp-3,n_cp-3), B(n_cp-3)
-  real:: X(n_cp-3)
   real*8, dimension(n_cp+n+1):: t 
   
   double precision, dimension(n_cp-3,1) ::           B_send
@@ -827,9 +819,6 @@ subroutine GET_X_MINSQUARES(nspline,uspline,pspline,n,n_cp,pcontrol,BSPLINE_FULL
   double precision ::                                RCOND
   integer ::                                         RANK, LWORK, INFO
   double precision, dimension(5*(n_cp-3)) ::         WORK
-  
-  double precision, dimension(n_cp) ::               pcontrol2
-  double precision ::                                rmse
   
   !Knot vector
   do i =1,n_cp+n+1

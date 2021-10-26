@@ -1236,7 +1236,7 @@ subroutine ga_write_dvs(step, dv, objval, message_codes, messages,             &
 
       !   Open dvs file and write zone header
 
-      open(unit=iunit, file=constfile, status='old', position='append', err=900)
+      open(unit=iunit, file=constfile, status='old', position='append', err=901)
 
     end if
 
