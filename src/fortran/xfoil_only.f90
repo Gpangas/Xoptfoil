@@ -86,9 +86,11 @@ program xfoil_only
 
 ! Run xfoil
 
+  file_options%design_number = 0
   file_options%polar = .true.
   file_options%cp = write_cp_file
   file_options%bl = write_bl_file
+  file_options%write_all_airfoils = .true.
   
   call run_xfoil(foil, xfoil_geom_options, op_point(1:noppoint),               &
                  op_mode(1:noppoint), op_search, use_previous_op(1:noppoint),  &
