@@ -575,6 +575,8 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
   double precision, dimension(size(operating_points,1)), intent(out),          &
                                                    optional :: alpha, xtrt, xtrb
   double precision, dimension(:), intent(in), optional :: ncrit_per_point
+  
+  integer :: start_cp_bl = 1        !Replace file if point number is this
 
   integer :: i, j, noppoint
   integer :: current_search_point
@@ -793,12 +795,15 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
       if (file_options%polar) call write_polar(i, file_options%design_number,    &
         x_flap, flap_degrees(i))
       if (file_options%cp) call write_polar_cp(i, file_options%design_number,    &
-        x_flap, flap_degrees(i))
+        x_flap, flap_degrees(i), start_cp_bl)
       if (file_options%bl) call write_polar_bl(i, file_options%design_number,    &
-        x_flap, flap_degrees(i))
+        x_flap, flap_degrees(i), start_cp_bl)
     else
       if (file_options%polar) call write_polar_search(i, file_options%design_number,    &
         x_flap, flap_degrees(i), alpha(i), lift(i), moment(i),drag(i), drag(i), xtrt(i), xtrb(i))
+      if (i .EQ. 1) then
+        start_cp_bl = 2 ! start op for cp and bl can not be search type
+      end if
     end if
   end do run_oppoints
     
@@ -1094,7 +1099,8 @@ end subroutine write_polar_search
 ! Based on CPDUMP subroutine from XFOIL V6.99
 !
 !=============================================================================80
-subroutine write_polar_cp(point_number, design_number, x_flap, flap_degrees)
+subroutine write_polar_cp(point_number, design_number, x_flap, flap_degrees,   &
+  start_number)
 
   use xfoil_inc
   use vardef, only : output_prefix
@@ -1102,6 +1108,7 @@ subroutine write_polar_cp(point_number, design_number, x_flap, flap_degrees)
   integer, intent(in) :: point_number
   integer, intent(in) :: design_number
   double precision, intent(in) :: x_flap, flap_degrees
+  integer, intent(in) :: start_number
   
   double precision :: alpha, lift, moment,drag, drag_pressure, xtrt, xtrb
   !double precision :: BETA, BFAC, CPINC, DEN, CPCOM
@@ -1117,16 +1124,16 @@ subroutine write_polar_cp(point_number, design_number, x_flap, flap_degrees)
   xtrt = XOCTR(1)
   xtrb = XOCTR(2)
   
-! Replace file if point_number is 1
+! Replace file if point_number is start_number
 
-if (design_number .EQ. 0 .AND. point_number .EQ. 1) then
+if (design_number .EQ. 0 .AND. point_number .EQ. start_number) then
     open(unit=321, file=trim(output_prefix)//'_design_cp.dat',                 &
       status='replace')
     write(321,'(A)') ' Polar file and Cp distributions'
     write(321,'(A)') 'zone t="Seed airfoil polar"'
 
     close(321)
-  elseif (point_number .EQ. 1) then
+  elseif (point_number .EQ. start_number) then
     open(unit=310, file=trim(output_prefix)//'_design_cp.dat', status='old',   &
       position='append')
     write(text,*) design_number
@@ -1180,7 +1187,8 @@ end subroutine write_polar_cp
 ! Based on BLDUMP subroutine from XFOIL V6.99
 !
 !=============================================================================80
-subroutine write_polar_bl(point_number, design_number, x_flap, flap_degrees)
+subroutine write_polar_bl(point_number, design_number, x_flap, flap_degrees,   &
+  start_number)
 
   use xfoil_inc
   use xbl_inc
@@ -1190,6 +1198,7 @@ subroutine write_polar_bl(point_number, design_number, x_flap, flap_degrees)
   integer, intent(in) :: point_number
   integer, intent(in) :: design_number
   double precision, intent(in) :: x_flap, flap_degrees
+  integer, intent(in) :: start_number
   
   double precision :: alpha, lift, moment,drag, drag_pressure, xtrt, xtrb
   double precision :: AMSQ, CDIS, CF, CT, DS, dummy, H, HK, TH, UE, UI
@@ -1207,14 +1216,14 @@ subroutine write_polar_bl(point_number, design_number, x_flap, flap_degrees)
   
 ! Replace file if point_number is 1
 
-if (design_number .EQ. 0 .AND. point_number .EQ. 1) then
+if (design_number .EQ. 0 .AND. point_number .EQ. start_number) then
     open(unit=321, file=trim(output_prefix)//'_design_bl.dat',                 &
       status='replace')
     write(321,'(A)') ' Polar file and BL distributions'
     write(321,'(A)') 'zone t="Seed airfoil polar"'
 
     close(321)
-  elseif (point_number .EQ. 1) then
+  elseif (point_number .EQ. start_number) then
     open(unit=310, file=trim(output_prefix)//'_design_bl.dat', status='old',   &
       position='append')
     write(text,*) design_number
