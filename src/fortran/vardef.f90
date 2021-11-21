@@ -35,7 +35,7 @@ module vardef
 
   type op_search_type
 
-    integer :: noppoint
+    integer :: noppoint = 0
     integer, dimension(:), allocatable :: oppoints
     double precision, dimension(:), allocatable :: op_start
     double precision, dimension(:), allocatable :: op_end

@@ -579,7 +579,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
   integer :: start_cp_bl = 1        !Replace file if point number is this
 
   integer :: i, j, noppoint
-  integer :: current_search_point
+  integer :: current_search_point = 0
   logical :: use_search
   logical, dimension(size(operating_points,1)) :: point_converged, point_fixed 
   character(30) :: text
@@ -768,7 +768,7 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
       end if
     
     else
-      
+
       call operating_point_analysis_sequence(op_modes(i), &
         op_search%op_start(current_search_point),                              &
         op_search%op_end(current_search_point),                                &
