@@ -1001,8 +1001,8 @@ function aerodynamic_penalty_function(moment, drag, lift, viscrms, &
   if ( (penaltyval > epsexit) .and. penalize ) then
     write(text,'(1000I4)') (op_list(i),i=1,n_op)
     aerodynamic_penalty_function%value = penaltyval*1.0D+06
-    if (aerodynamic_penalty_function%value .GT. 10**18)                        &
-      aerodynamic_penalty_function%value = 10**18
+    if (aerodynamic_penalty_function%value .GT. 10.0**18)                        &
+      aerodynamic_penalty_function%value = 10.0**18
     aerodynamic_penalty_function%message_code = 16
     aerodynamic_penalty_function%message = ' failed, unconverged points at '// &
       & trim(text)
@@ -1332,7 +1332,7 @@ subroutine run_consistency_check(actual_flap_degrees, actual_x_flap, lift,     &
 
   use vardef, only: noppoint, optimization_type, drag_check_tol, lift_check_tol, &
     op_mode, use_previous_op, op_point, ncrit_pt, mach, reynolds, curr_foil, &
-    op_search, use_flap, y_flap, y_flap_spec
+    op_search, op_search_type, use_flap, y_flap, y_flap_spec
   use xfoil_driver, only: run_xfoil
 
   double precision, intent(in) :: actual_x_flap
@@ -1344,18 +1344,27 @@ subroutine run_consistency_check(actual_flap_degrees, actual_x_flap, lift,     &
   
   double precision, dimension(noppoint) :: clcheck, cdcheck, cmcheck, rmscheck,&
     alcheck, xtrtcheck, xtrbcheck
-  integer :: i, check_idx
+  integer :: i, j, check_idx
   integer, dimension(noppoint) :: checkpt_list
   logical, dimension(noppoint) :: checkpt, opm_previous_op
   logical :: check
   character(7), dimension(noppoint) :: opm_check
   double precision, dimension(noppoint) :: opp_check, re_check, ma_check,      &
     fd_check, ncrit_check
+  type(op_search_type) :: opm_search
   !maxlift - module
   !mindrag - module
   !xfoil_geom_options - module
   !xfoil_options - module
   !file_options - module
+  
+    !type op_search_type
+    !
+    !integer :: noppoint
+    !integer, dimension(:), allocatable :: oppoints
+    !double precision, dimension(:), allocatable :: op_start
+    !double precision, dimension(:), allocatable :: op_end
+    !double precision, dimension(:), allocatable :: op_step
   
   ! Determine if points need to be checked for xfoil consistency
 
@@ -1401,12 +1410,55 @@ subroutine run_consistency_check(actual_flap_degrees, actual_x_flap, lift,     &
 
   end do
 
+  opm_search%noppoint = 0
+  do i=1, ncheckpt
+    if (optimization_type(checkop(i)) .eq. 'max-lift-search') then
+      opm_search%noppoint = opm_search%noppoint + 1
+    end if
+  end do
+  
+  if (opm_search%noppoint .ne. 0) then
+    
+    allocate(opm_search%oppoints(opm_search%noppoint))
+    allocate(opm_search%op_start(opm_search%noppoint))
+    allocate(opm_search%op_end(opm_search%noppoint))
+    allocate(opm_search%op_step(opm_search%noppoint))
+
+    j=1
+    do i=1, op_search%noppoint
+      if (checkpt(op_search%oppoints(i))) then
+        opm_search%oppoints(j) = checkpt_list(op_search%oppoints(i))
+        opm_search%op_start(j) = op_search%op_start(i)
+        opm_search%op_end(j) = op_search%op_end(i)
+        opm_search%op_step(j) = op_search%op_step(i)
+        j=j+1
+      end if
+    end do
+    
+  end if
+
 ! Analyze airfoil at perturbed operating points to check for repeatability
 
   anychecked: if (ncheckpt > 0) then
 
+      !if (opm_search%noppoint .NE. 0) then
+      !  ! Wait for user to check information
+      !  !write(*,*) opm_search%noppoint
+      !  !write(*,*) opm_search%oppoints
+      !  !write(*,*) opm_search%op_start
+      !  !write(*,*) opm_search%op_end
+      !  !write(*,*) opm_search%op_step
+      !  do i=1, op_search%noppoint
+      !    write(*,*) checkop(opm_search%oppoints(i))
+      !    if (checkop(opm_search%oppoints(i)) .NE. 1) then
+      !      write(*,*) 'Press Enter to continue'
+      !      read(*,*) 
+      !    end if
+      !  end do
+      !end if
+    
     call run_xfoil(curr_foil, xfoil_geom_options, opp_check(1:ncheckpt),       & 
-                   opm_check(1:ncheckpt), op_search,                           &
+                   opm_check(1:ncheckpt), opm_search,                          &
                    opm_previous_op(1:noppoint), re_check(1:ncheckpt),          &
                    ma_check(1:ncheckpt), use_flap, actual_x_flap, y_flap,      &
                    y_flap_spec, fd_check(1:ncheckpt), xfoil_options,           &
