@@ -1291,5 +1291,485 @@ subroutine read_run_control(commands, ncommands)
 502 write(*,*) "Warning: error encountered while reading run_control. Skipping."
 
 end subroutine read_run_control
+  
+subroutine write_progress_cmd(step, f0, fmin, radius, relative_fmin_report)
+  
+  integer, intent(in) :: step
+  double precision, intent(in) :: f0, fmin, radius
+  logical, intent(in) :: relative_fmin_report
+  
+  write(*,*)
+  write(*,'(A12,I5)')   ' Iteration: ', step
+  write(*,'(A27,F12.6)') '   Objective function:    ', fmin
+  if (relative_fmin_report) write(*,'(A27,F12.6,A1)')             &
+                      '   Improvement over seed: ', (f0 - fmin)/f0*100.d0, '%'
+  write(*,'(A27,ES13.3)') '   Design radius:         ', radius
 
+end subroutine write_progress_cmd
+  
+subroutine write_progress_per_eval(i, control)
+
+  use vardef, only : progress_per_eval
+  use, intrinsic :: iso_fortran_env, only: OUTPUT_UNIT
+  
+  integer, intent(in) :: i, control 
+    
+  if (progress_per_eval .NE. 'none') then
+    if (progress_per_eval .EQ. 'full' .AND. control .EQ. 1) then
+      write(*,'(I5)', advance='no') i
+      write(*,'(A22)', advance='no') 'Start function, '
+    end if
+    if (progress_per_eval .EQ. 'full' .AND. control .EQ. 2) then
+      write(*,'(I5)', advance='no') i
+      write(*,'(A22)', advance='no') 'end the function, '
+    end if
+    if (progress_per_eval .EQ. 'full' .AND. control .EQ. 3) then
+      write(*,'(I5)', advance='no') i
+      write(*,'(A22)') 'assign values.'
+    end if
+  end if
+
+end subroutine write_progress_per_eval
+  
+subroutine write_history(step, f0, fmin, radius, relative_fmin_report,         &
+  stepstart, steptime, restarttime, control)
+  
+  use vardef, only : output_prefix
+
+  integer, intent(in) :: step
+  double precision, intent(in) :: f0, fmin, radius
+  logical, intent(in) :: relative_fmin_report
+  integer, intent(in) :: stepstart, steptime, restarttime
+  integer, intent(in) :: control
+  
+  integer :: iunit, ioerr
+  logical :: new_history_file
+  character(100) :: histfile
+  character(14) :: timechar
+  character(11) :: stepchar
+  character(20) :: fminchar
+  character(15) :: radchar
+  character(25) :: relfminchar
+  
+  histfile = trim(output_prefix)//'_optimization_history.dat'
+  iunit = 17
+  
+  ! Only header
+  if (control .EQ. 1) then
+  ! Open file for writing iteration history
+    new_history_file = .false.
+    if (step == 1) then
+      new_history_file = .true.
+    else
+      open(unit=iunit, file=histfile, status='old',            &
+           position='append', iostat=ioerr)
+      if (ioerr /= 0) then
+        write(*,*) 
+        write(*,*) "Warning: did not find existing optimization_history.dat file."
+        write(*,*) "A new one will be written, but old data will be lost."
+        write(*,*)
+        new_history_file = .true.
+      end if
+    end if
+    if (new_history_file) then
+      open(unit=iunit, file=histfile, status='replace')
+      if (relative_fmin_report) then
+        write(iunit,'(A)') "Iteration  Objective function  "//&
+                           "% Improvement over seed  Design radius"//&
+                           "  Time (seconds)"
+      else
+        write(iunit,'(A)') "Iteration  Objective function  Design radius"//&
+                           "  Time (seconds)"
+      end if
+      flush(iunit)
+    end if
+    close(iunit)
+  end if
+  
+  !Only values
+  if (control .EQ. 2) then
+    open(unit=iunit, file=histfile, status='old', position='append',           &
+      iostat=ioerr)
+    if (ioerr /= 0) then
+      write(*,*) 
+      write(*,*) "Warning: did not find existing optimization_history.dat file."
+      write(*,*) "A new one will be written, but old data will be lost."
+      write(*,*)
+      new_history_file = .true.
+    end if
+    
+    write(stepchar,'(I11)') step
+    write(fminchar,'(F14.10)') fmin
+    write(radchar,'(ES14.6)') radius
+    write(timechar,'(I14)') (steptime-stepstart)+restarttime
+    if (relative_fmin_report) then
+      write(relfminchar,'(F14.10)') (f0 - fmin)/f0*100.d0
+      write(iunit,'(A11,A20,A25,A15,A14)') adjustl(stepchar),                  &
+        adjustl(fminchar), adjustl(relfminchar), adjustl(radchar),             &
+        adjustl(timechar)
+    else
+      write(iunit,'(A11,A20,A15,A14)') adjustl(stepchar), adjustl(fminchar),   &
+        adjustl(radchar), adjustl(timechar)
+    end if
+    flush(iunit)
+    
+    close(iunit)
+  end if
+  
+end subroutine write_history
+
+
+!=============================================================================80
+!
+! Dvs write routine
+!
+!=============================================================================80
+subroutine write_dvs(name_len, name, step, dv, objval, message_codes, messages,&
+                         constrain_matrix, aero_matrix, x0, f0, xopt, fmin)
+
+  use vardef, only : output_prefix, dvs_for_type, naddthickconst, noppoint,    &
+                     ndrag_constrain, nmoment_constrain, nlift_constrain
+
+  integer, intent(in) :: name_len
+  character(name_len), intent(in)  :: name
+  integer, intent(in) :: step
+  double precision, intent(in) :: fmin, f0
+  double precision, dimension(:), intent(in) ::  x0, xopt, objval
+  double precision, dimension(:,:), intent(in) :: dv
+  integer, dimension(:), intent(in) :: message_codes
+  character(200), dimension(:), intent(in) :: messages
+  double precision, dimension(:,:), intent(in) :: constrain_matrix
+  double precision, dimension(:,:), intent(in) :: aero_matrix
+
+  integer :: i,j
+  
+  character(100) :: dvsfile, constfile, aerofile, text, textdv
+  integer :: iunit
+  
+  ! Status notification
+
+  dvsfile = 'dvs_'//trim(name)//'_'//trim(output_prefix)//'.dat'
+  constfile = 'constrain_'//trim(name)//'_'//trim(output_prefix)//'.dat'
+  aerofile = 'aero_'//trim(name)//'_'//trim(output_prefix)//'.dat'
+  
+  write(*,'(A)',advance='no') '  Writing '//trim(name)//' log data to files '//trim(dvsfile)
+  if (size(constrain_matrix,2) .NE. 1) then
+    write(*,'(A)', advance='no')' and '//trim(constfile)
+    write(*,'(A)', advance='no')' and '//trim(aerofile)//' ...'
+  end if
+  write(*,*)
+  
+  ! Log file
+  ! Open files and write headers, if necessary
+  iunit = 13
+  write(text,*) step
+  text = adjustl(text)
+  
+  if (step == 1) then
+
+    !   Header for dvs file
+
+    open(unit=iunit, file=dvsfile, status='replace')
+    write(iunit,'(A)') 'title="Design variables file"'
+    write(iunit,'(A)') 'variables="dvs vector", "objval", "message_code", "message"'
+    write(iunit,'(A)') 'step = 0: x0'
+    if (dvs_for_type(2) .NE. 0) then
+      do i=1, dvs_for_type(2)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(3) .NE. 0) then
+      do i=1, dvs_for_type(3)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(4) .NE. 0) then
+      do i=1, dvs_for_type(4)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+      end do
+    end if
+    if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+    if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+    write(iunit,'(A30)', advance='no') 'f0'
+    write(iunit,'(A)') ' '
+  
+    do i = 1, size(dv,1)
+      write(iunit,'(F12.8)', advance='no') x0(i)
+    end do
+    write(iunit,'(F30.8)', advance='no') f0
+    write(iunit,'(A)') ' '
+    
+  else
+
+    !   Open dvs file and write zone header
+
+    open(unit=iunit, file=dvsfile, status='old', position='append', err=900)
+
+  end if
+
+  ! Write coordinates to file
+  write(iunit,'(A)') 'step = '//trim(text)//': xopt '
+  if (dvs_for_type(2) .NE. 0) then
+    do i=1, dvs_for_type(2)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(3) .NE. 0) then
+    do i=1, dvs_for_type(3)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(4) .NE. 0) then
+    do i=1, dvs_for_type(4)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+  if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+  write(iunit,'(A30)', advance='no') 'fmin'
+  write(iunit,'(A)') ' '
+
+  do i =1, size(dv,1)
+    write(iunit,'(F12.8)', advance='no') xopt(i)
+  end do
+  write(iunit,'(F30.8)', advance='no') fmin
+  write(iunit,'(A)') ' '
+  
+  write(iunit,'(A)') 'step = '//trim(text)//': dv '
+  if (dvs_for_type(2) .NE. 0) then
+    do i=1, dvs_for_type(2)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'top - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(3) .NE. 0) then
+    do i=1, dvs_for_type(3)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'bot - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(4) .NE. 0) then
+    do i=1, dvs_for_type(4)
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A12)', advance='no') 'fdef - '//trim(textdv)
+    end do
+  end if
+  if (dvs_for_type(5) .NE. 0) write(iunit,'(A12)', advance='no') 'fhinge'
+  if (dvs_for_type(6) .NE. 0) write(iunit,'(A12)', advance='no') 'te_thick'
+  write(iunit,'(A30)', advance='no') 'objval'
+  write(iunit,'(A14)', advance='no') 'message_code'
+  write(iunit,'(A)', advance='no') ' message'
+  write(iunit,'(A)') ' '
+  
+  do i = 1, size(dv,2)
+    do j =1, size(dv,1)
+      write(iunit,'(F12.8)', advance='no') dv(j,i)
+    end do
+    write(iunit,'(F30.8)', advance='no') objval(i)
+    write(iunit,'(I14)', advance='no') message_codes(i)
+    write(iunit,'(A)', advance='no') messages(i)
+    write(iunit,'(A)') ' '
+  end do
+
+  ! Close output files
+
+  close(iunit)
+
+  ! Status notification
+  
+  if (size(constrain_matrix,2) .NE. 1) then
+    ! Constrains file
+    ! Open files and write headers, if necessary
+    iunit = 14
+    write(text,*) step
+    text = adjustl(text)
+  
+    if (step == 1) then
+
+      !   Header for Constrains file
+
+      open(unit=iunit, file=constfile, status='replace')
+      write(iunit,'(A)') 'title="Constrains file"'
+      write(iunit,'(A)') 'variables="constrains", "objval", "message_code", "message"'
+    
+    else
+
+      !   Open dvs file and write zone header
+
+      open(unit=iunit, file=constfile, status='old', position='append', err=901)
+
+    end if
+
+    ! Write coordinates to file
+    write(iunit,'(A)') 'step = '//trim(text)//': constrains vector '
+    write(iunit,'(A14)', advance='no') 'tcTE'
+    if (dvs_for_type(4) .NE. 0) then
+      do i=1, dvs_for_type(4)
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A14)', advance='no') 'flap_deg - '//trim(textdv)
+      end do
+    end if
+    write(iunit,'(A14)', advance='no') 'flap_hinge'
+    write(iunit,'(A14)', advance='no') 'minthick'
+    write(iunit,'(A14)', advance='no') 'maxthick'
+    
+    if (naddthickconst .NE. 0) then
+      do i=1, naddthickconst
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A14)', advance='no') 'addthickconst - '//trim(textdv)
+      end do
+    end if
+    
+    write(iunit,'(A14)', advance='no') 'TE_angle'
+    write(iunit,'(A14)', advance='no') 'maxcamb'
+    write(iunit,'(A14)', advance='no') 'maxpang'
+    write(iunit,'(A14)', advance='no') 'minang'
+    write(iunit,'(A14)', advance='no') 'difang'
+    write(iunit,'(A14)', advance='no') 'rev_t'
+    write(iunit,'(A14)', advance='no') 'rev_b'
+    write(iunit,'(A14)', advance='no') 'pan_ang'
+    write(iunit,'(A14)', advance='no') 'maxgrowth'
+    write(iunit,'(A14)', advance='no') 'n_unconv'
+    
+    if (nmoment_constrain .NE. 0) then
+      do i=1, nmoment_constrain
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A14)', advance='no') 'moment - '//trim(textdv)
+      end do
+    end if
+    if (nlift_constrain .NE. 0) then
+      do i=1, nlift_constrain
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A14)', advance='no') 'lift - '//trim(textdv)
+      end do
+    end if
+        if (ndrag_constrain .NE. 0) then
+      do i=1, ndrag_constrain
+        write(textdv,*) i 
+        textdv=adjustl(textdv)
+        write(iunit,'(A14)', advance='no') 'drag - '//trim(textdv)
+      end do
+    end if
+    write(iunit,'(A30)', advance='no') 'objval'
+    write(iunit,'(A14)', advance='no') 'message_code'
+    write(iunit,'(A)', advance='no') ' message'
+    write(iunit,'(A)') ' '
+  
+    do i = 1, size(constrain_matrix,1)
+      do j = 1, size(constrain_matrix,2)
+        write(iunit,'(F14.8)', advance='no') constrain_matrix(i,j)
+      end do
+      write(iunit,'(F30.8)', advance='no') objval(i)
+      write(iunit,'(I14)', advance='no') message_codes(i)
+      write(iunit,'(A)', advance='no') messages(i)
+      write(iunit,'(A)') ' '
+    end do
+
+    ! Close output files
+
+    close(iunit)
+  end if
+
+  
+  if (size(constrain_matrix,2) .NE. 1) then
+    ! Aero file
+    ! Open files and write headers, if necessary
+    iunit = 15
+    write(text,*) step
+    text = adjustl(text)
+  
+    if (step == 1) then
+
+      !   Header for aero file
+
+      open(unit=iunit, file=aerofile, status='replace')
+      write(iunit,'(A)') 'title="Aero file"'
+      write(iunit,'(A)') 'variables="Aerodynamic proprerties", '//             &
+        &'"partial objective function", "partial improvement", '//             &
+        &'"objval", "message_code", "message"'
+    
+    else
+
+      !   Open aero file and write zone header
+
+      open(unit=iunit, file=aerofile, status='old', position='append', err=902)
+
+    end if
+
+    ! Write coordinates to file
+    write(iunit,'(A)') 'step = '//trim(text)//': aero vector '
+    do i=1, noppoint
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A14)', advance='no') 'aero prop - '//trim(textdv)
+    end do
+    do i=1, noppoint
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A14)', advance='no') 'part obj - '//trim(textdv)
+    end do
+    do i=1, noppoint
+      write(textdv,*) i 
+      textdv=adjustl(textdv)
+      write(iunit,'(A14)', advance='no') 'part imp - '//trim(textdv)
+    end do
+    write(iunit,'(A14)', advance='no') 'obj no penal'
+
+    write(iunit,'(A30)', advance='no') 'objval'
+    write(iunit,'(A14)', advance='no') 'message_code'
+    write(iunit,'(A)', advance='no') ' message'
+    write(iunit,'(A)') ' '
+  
+    do i = 1, size(aero_matrix,1)
+      do j = 1, size(aero_matrix,2)
+        write(iunit,'(F14.8)', advance='no') aero_matrix(i,j)
+      end do
+      write(iunit,'(F30.8)', advance='no') objval(i)
+      write(iunit,'(I14)', advance='no') message_codes(i)
+      write(iunit,'(A)', advance='no') messages(i)
+      write(iunit,'(A)') ' '
+    end do
+
+    ! Close output files
+
+    close(iunit)
+  end if
+  
+    ! Status notification
+
+    write(*,*) '  Successfully wrote '//trim(name)//' log data.'
+  
+  return
+  
+  ! Warning if there was an error opening dvs file
+
+  900 write(*,*) "Warning: unable to open "//trim(dvsfile)//". Skipping ..."
+  return
+  901 write(*,*) "Warning: unable to open "//trim(constfile)//". Skipping ..."
+  return
+  902 write(*,*) "Warning: unable to open "//trim(aerofile)//". Skipping ..."
+  return
+        
+  
+end subroutine write_dvs
+  
 end module optimization_util

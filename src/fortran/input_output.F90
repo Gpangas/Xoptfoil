@@ -92,7 +92,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
             kulfan_bussoletti_LEM,                                             &
             b_spline_degree, b_spline_xtype, b_spline_distribution, restart,   &
             restart_write_freq, write_designs, write_cp_file, write_bl_file,   &
-            write_dvs_file, number_threads
+            write_dvs_file, progress_per_eval, number_threads
   namelist /operating_conditions/ noppoint, op_mode, op_point, op_point_start, &
             op_point_end, op_point_step, reynolds, mach, use_flap,  x_flap,    &
             flap_connection, connection_apply, connection_radius, x_flap_spec, &
@@ -166,6 +166,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write_cp_file = .false.
   write_bl_file = .false.
   write_dvs_file = .false.
+  progress_per_eval = 'full'
   number_threads = 0
 
 ! Read main namelist options
@@ -724,6 +725,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " write_cp_file = ", write_cp_file
   write(*,*) " write_bl_file = ", write_bl_file
   write(*,*) " write_dvs_file = ", write_dvs_file
+  write(*,*) " progress_per_eval = ", "'"//trim(progress_per_eval)//"'"
   write(*,*) " number_threads = ", number_threads
   write(*,'(A)') " /"
   write(*,*)
@@ -986,6 +988,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(100,*) " write_cp_file = ", write_cp_file
   write(100,*) " write_bl_file = ", write_bl_file
   write(100,*) " write_dvs_file = ", write_dvs_file
+  write(100,*) " progress_per_eval = ", "'"//trim(progress_per_eval)//"'"
   write(100,*) " number_threads = ", number_threads
   write(100,'(A)') "/"
   write(100,*)
@@ -1253,6 +1256,10 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   if ( (flap_optimization_only) .and. (nflap_optimize==0))                     &
     call my_stop("flap_optimization_only can only be used with with a number   &
       &of flaps to optimize diferent from 0")
+  if (trim(progress_per_eval) /= 'full' .and.                                  &
+      trim(progress_per_eval) /= 'none')                                       &
+    call my_stop("progress_per_eval must be 'full' or 'none'.")
+  
 ! Operating points
 
   if (noppoint < 1) call my_stop("noppoint must be > 0.")

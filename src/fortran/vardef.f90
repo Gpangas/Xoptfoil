@@ -108,6 +108,7 @@ module vardef
   character(8), dimension(max_op_points) :: moment_constraint_type,            &
                                           lift_constraint_type,                &
                                           drag_constraint_type
+  character(4) :: progress_per_eval
   character(80) :: airfoil_file
   double precision, dimension(max_op_points) :: min_moment, min_lift, max_drag
 
