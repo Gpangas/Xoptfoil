@@ -349,7 +349,7 @@ subroutine operating_point_analysis_with_init(op_mode, op_point,               &
     elseif (op_mode == 'spec-cl') then
       addpoints(j) = op_point - (1.0d0-addweight(j)) *        &
         abs(op_point-xfoil_options_init_cl0) *                &
-        sign(1.d0, op_point-xfoil_options_init_al0)
+        sign(1.d0, op_point-xfoil_options_init_cl0)
             
       call xfoil_speccl(addpoints(j), xfoil_options_viscous_mode,          &
                   xfoil_options_maxit, addlift(j), adddrag(j), addmoment(j))
@@ -373,6 +373,12 @@ subroutine operating_point_analysis_with_init(op_mode, op_point,               &
     if (present(op_xtrb)) addxtrb(j) = XOCTR(2)
         
     addviscrms(j) = RMSBL
+    
+    if (RMSBL .GT. 1.0E-4) then
+      LIPAN = .false.
+      LBLINI = .false.
+    end if
+  
   end do
       
   ! Get op point values
@@ -481,6 +487,11 @@ subroutine operating_point_analysis_sequence(op_mode,                &
     addxtrb(j) = XOCTR(2)
         
     addviscrms(j) = RMSBL
+    
+    if (RMSBL .GT. 1.0E-4) then
+      LIPAN = .false.
+      LBLINI = .false.
+    end if
   end do
       
   k=0
