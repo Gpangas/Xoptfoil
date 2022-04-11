@@ -1,20 +1,21 @@
-This is Xoptfoil, an airfoil optimization code using the Xfoil aerodynamics
+This is Xoptfoil V2, an airfoil optimization code using the Xfoil aerodynamics
 engine.
-
-Copyright 2017-2019 Daniel Prosser.
+Copyright 2020-2022 Ricardo Palmeira.
+-- based on Xoptfoil V1.11.1, written and maintained by Daniel Prosser (https://github.com/montagdude/Xoptfoil)
 
 Xoptfoil uses the GNU Public License Version 3, a copy of which can be found in the license directory.
 
 Code features:
 -- Supports up to 30 operating points during optimization and multiple user-defined constraints
 -- Each operating point has a specified lift coefficient or angle of attack, Reynolds number, Mach number, and flap deflection
--- Different optimization objectives (minimize drag, maximize glide slope, minimize sink rate, maximize lift, or move the turbulent transition point aft) can be set at each operating point
+-- Different optimization objectives (minimize drag, maximize glide slope, minimize sink rate, maximize lift, or move the turbulent transition point aft, added maximaze maximum lift coefficient and target obejectives) can be set at each operating point
+-- Allows flap optimization (horizontal hinge position and deflection) and trailing edge thickness optimization
 -- Each operating point is assigned a relative weight (importance) by the user
 -- Available constraints include thickness, camber, curvature, pitching moment, flap angles, and trailing edge wedge angle
 -- Currently included optimization algorithms: particle swarm, genetic algorithm, and Nelder-Mead simplex algorithm
 -- The optimizer is robust: many checks for reasonable geometry and Xfoil convergence in place
 -- Particle swarm and genetic algorithm run in parallel (must be compiled manually; pre-compiled binaries are serial)
--- Xfoil engine accurately predicts transition, separation bubbles, and stall at low Reynolds numbers
+-- Xfoil engine accurately predicts transition, separation bubbles, and stall at low Reynolds numbers (XFOIL 6.97)
 -- Includes a graphical tool to monitor the optimization and plot the results
 
 Installing and compiling instructions are included in the User Guide.

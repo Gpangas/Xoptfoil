@@ -1,5 +1,19 @@
 Version notes
 --------------------------------------------------------------------------------
+Version 2.0.0
+-- revert scaling and translation changes from 1.11.1
+-- Add new parametrization formulations: b-spline, class shape functions (KBP) and bezier parsec 3333
+-- Add flap hinge location in x (flap chord) as a possible variable
+-- Add airfoil trailing edge thickness as possible variable
+-- Add XFOIL analysis support for determing maximum lift coefficient
+-- Add XFOIL non convergence features
+-- Add target objective for operating points
+-- Reworked constrains to be relative to limits or initial airfoil
+-- Add log files with information about each generation of the optimization
+-- Code is reorganized
+-- Add multi thread options
+
+--------------------------------------------------------------------------------
 Version 1.11.1
 -- Ensure shape functions go to 0 at leading edge and trailing edge so that trailing edge thickness is preserved
 -- Undo any scaling and translation when passing coordinates to xfoil or writing them to file to ensure moment reference point is consistent with seed airfoil
