@@ -1,0 +1,34 @@
+{
+  "configurations": [
+    {
+      "name": "Debug",
+      "buildType": "Debug",
+      "cacheEntries": [
+        {
+          "name": "ENABLE_OPENMP",
+          "value": "False",
+          "type": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "Release",
+      "buildType": "Release",
+      "cacheEntries": [
+        {
+          "name": "ENABLE_OPENMP",
+          "value": "True",
+          "type": "BOOL"
+        }
+      ]
+    },
+    {
+      "name": "RelWithDebInfo",
+      "buildType": "RelWithDebInfo"
+    },
+    {
+      "name": "MinSizeRel",
+      "buildType": "MinSizeRel"
+    }
+  ]
+}

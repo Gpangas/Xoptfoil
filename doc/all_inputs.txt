@@ -65,6 +65,8 @@
   write_cp_file = .false.  !Whether to write cp file
   write_bl_file = .false.  !Whether to write bl file
   write_dvs_file = .true.  !Whether to write dvs files
+  progress_per_eval = 'part' ! Either 'full', 'part' or 'none'. Controls showing
+                             !  progress per evaluation.
   number_threads = 3       !Number of threads to use
 /
 

@@ -1327,6 +1327,9 @@ subroutine write_progress_per_eval(i, control)
       write(*,'(I5)', advance='no') i
       write(*,'(A22)') 'assign values.'
     end if
+    if (progress_per_eval .EQ. 'part' .AND. control .EQ. 3) then
+      write(*,'(A1)', advance='no') '.'
+    end if
   end if
 
 end subroutine write_progress_per_eval

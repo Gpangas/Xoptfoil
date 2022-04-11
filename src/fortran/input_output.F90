@@ -1257,8 +1257,9 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
     call my_stop("flap_optimization_only can only be used with with a number   &
       &of flaps to optimize diferent from 0")
   if (trim(progress_per_eval) /= 'full' .and.                                  &
-      trim(progress_per_eval) /= 'none')                                       &
-    call my_stop("progress_per_eval must be 'full' or 'none'.")
+      trim(progress_per_eval) /= 'none' .and.                                  &
+      trim(progress_per_eval) /= 'part')                                    &
+    call my_stop("progress_per_eval must be 'full' or 'none' or 'part'.")    
   
 ! Operating points
 
