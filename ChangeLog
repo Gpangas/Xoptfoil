@@ -1,6 +1,6 @@
 Version notes
 --------------------------------------------------------------------------------
-Version 2.0.0
+Version 2.01.1
 -- revert scaling and translation changes from 1.11.1
 -- Add new parametrization formulations: b-spline, class shape functions (KBP) and bezier parsec 3333
 -- Add flap hinge location in x (flap chord) as a possible variable
