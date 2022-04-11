@@ -82,8 +82,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   character(30) :: text
   character(3) :: family
   character(10) :: pso_convergence_profile, parents_selection_method
-  character :: choice = 'n'
-
+  character :: choice
+ 
   namelist /optimization_options/ search_type, global_search, local_search,    &
             seed_airfoil, airfoil_file, shape_functions, nparameters_top,      &
             nparameters_bot, flap_optimization_only, abs_initial_perturb,      &
@@ -131,6 +131,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   namelist /xfoil_paneling_options/ npan, cvpar, cterat, ctrrat, xsref1,       &
             xsref2, xpref1, xpref2
   namelist /matchfoil_options/ match_foils, matchfoil_file
+
+  choice = 'n'
 
 ! Open input file
 

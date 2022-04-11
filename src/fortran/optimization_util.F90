@@ -114,7 +114,7 @@ subroutine initial_designs_mul(dv, objval, fevals, objfunc, xmin, xmax, use_x0,&
   integer, dimension(:), intent(inout) :: message_codes
   character(200), dimension(:), intent(inout) :: messages
   double precision, dimension(:,:), intent(inout) :: constrain_matrix
-  integer :: CHUNK = 1
+  integer, parameter :: CHUNK = 1
 
   interface
     type(objfunction_type) function objfunc(x,step)
@@ -287,7 +287,7 @@ subroutine initial_designs_mul_2(dv, objval, fevals, objfunc, xmin, xmax, use_x0
   character(200), dimension(:), intent(inout) :: messages
   double precision, dimension(:,:), intent(inout) :: constrain_matrix
   double precision, dimension(:,:), intent(inout) :: aero_matrix
-  integer :: CHUNK = 1
+  integer, parameter :: CHUNK = 1
 
   interface
     type(objfunction_type) function objfunc(x,step)
@@ -463,7 +463,7 @@ subroutine initial_designs(dv, objval, fevals, objfunc, xmin, xmax, use_x0,    &
   integer, intent(in) :: attempts
   integer, dimension(:), intent(inout) :: message_codes
   character(200), dimension(:), intent(inout) :: messages
-  integer :: CHUNK = 1
+  integer, parameter :: CHUNK = 1
 
   interface
     type(objfunction_type) function objfunc(x,step)

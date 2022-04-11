@@ -1191,7 +1191,9 @@ subroutine SetThicknessControlPoints(Xt_le, Xt_te, Yt_le, Yt_te,               &
   real*8, dimension(4), intent(inout) :: Xt_le, Xt_te, Yt_le, Yt_te  ! Control 
                                         ! points for the thickness bezier curves
   integer, intent(out) :: error_code
-  integer :: error = 0
+  integer :: error
+  
+  error = 0
   
   ! Computes the Rt auxiliar parameter.
   call Rt_calc(Rt, Kt_max, Xt_max, Yt_max, Rle, error_code)

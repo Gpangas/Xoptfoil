@@ -587,15 +587,19 @@ subroutine run_xfoil(foil, geom_options, operating_points, op_modes, op_search,&
                                                    optional :: alpha, xtrt, xtrb
   double precision, dimension(:), intent(in), optional :: ncrit_per_point
   
-  integer :: start_cp_bl = 1        !Replace file if point number is this
+  integer :: start_cp_bl        !Replace file if point number is this
 
   integer :: i, j, noppoint
-  integer :: current_search_point = 0
+  integer :: current_search_point
+ 
   logical :: use_search
   logical, dimension(size(operating_points,1)) :: point_converged, point_fixed 
   character(30) :: text
   character(150) :: message
 
+  start_cp_bl = 1
+  current_search_point = 0
+  
   if (.not. xfoil_options%silent_mode .or. first_run_xfoil) then
     write(*,*) 
     write(*,*) ' Analyzing aerodynamics using the XFOIL engine ...'

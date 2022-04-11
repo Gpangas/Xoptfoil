@@ -120,7 +120,7 @@ subroutine particleswarm(xopt, fmin, step, fevals, objfunc, x0, xmin, xmax,    &
   logical :: use_x0, converged, signal_progress
   integer :: stepstart, steptime, restarttime
   character(80), dimension(20) :: commands
-  integer :: CHUNK = 1
+  integer, parameter :: CHUNK = 1
 
   nconstrained = size(constrained_dvs,1)
 
