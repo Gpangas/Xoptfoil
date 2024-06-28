@@ -1,4 +1,5 @@
-Xoptfoil V2 is written and maintained by Ricardo Palmeira.
+Xoptfoil V3 is written and maintained by Guilherme Pangas.
+-- based on Xoptfoil V2, written and maintained by Ricardo Palmeira (https://github.com/r-palmeira-pt/Xoptfoil)
 -- based on Xoptfoil V1.11.1, written and maintained by Daniel Prosser (https://github.com/montagdude/Xoptfoil)
 
 Xoptfoil also includes public domain and open source code from additional sources:
@@ -6,4 +7,4 @@ Xoptfoil also includes public domain and open source code from additional source
 -- naca456 airfoil generator, originally written by Ralph Carmichael (https://www.pdas.com/naca456pdas.html)
 -- quartic written by Alfred H. Morris, William L. Davis, Alan Miller and Ralph L. Carmichael (https://www.pdas.com/quartic.html)
 -- DGELSS subroutine from the LAPACK - Linear Algebra PACKage (https://www.netlib.org/lapack/)
--- Xoptfoil_visualizer-JX.py from Xoptfoil-JX by Matthias Boese and Jochen Guenzel (https://github.com/jxjo/Xoptfoil-JX) 
+-- Xoptfoil_visualizer-JX.py from Xoptfoil-JX by Matthias Boese and Jochen Guenzel (https://github.com/jxjo/Xoptfoil-JX)
