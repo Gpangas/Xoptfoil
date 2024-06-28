@@ -1,5 +1,11 @@
 Version notes
 --------------------------------------------------------------------------------
+Version 3.01.1
+-- Add method to transpose the airfoil aerodynamic characteristics to an aircraft aerodynamic performance
+-- Add method to analysis the an aircraft's fligth performance
+-- Add objective based on the Aircargo 2022 Competition score
+
+--------------------------------------------------------------------------------
 Version 2.01.1
 -- revert scaling and translation changes from 1.11.1
 -- Add new parametrization formulations: b-spline, class shape functions (KBP) and bezier parsec 3333
