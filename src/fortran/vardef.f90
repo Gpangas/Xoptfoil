@@ -13,7 +13,8 @@
 !  You should have received a copy of the GNU General Public License
 !  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
 
-!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira,
+!  2023-2024 Guilherme Pangas
 
 module vardef
 
@@ -58,6 +59,53 @@ module vardef
     type(objfunction_type) :: obj
   end type test_type
   
+  type fuselage_type
+
+    double precision :: height, width
+    double precision :: length, skin_roughness
+    double precision :: wetted_area, interference_factor
+    
+  end type fuselage_type
+    
+  type tail_type
+
+    integer :: config
+    double precision, dimension(2) :: chord, t_c_ratio, max_t_x     
+	double precision, dimension(2) :: skin_roughness, surface_area
+  end type tail_type 
+  
+  type take_off_type
+      
+    double precision :: h, A_1, miu, S_g, weight_empty, weight_payload_ref 
+    double precision :: V_to, V_run
+    
+  end type take_off_type
+  
+  type climb_type
+      
+    logical :: accel
+    double precision :: time, h, dh, V_0
+    double precision, dimension(5) :: points_coeff
+    double precision :: RC_max, V, Cl, t_accel
+    
+  end type climb_type
+  
+  type cruise_type
+    
+    logical :: accel, interval
+    double precision :: time, h, dist_ref, V_0, t_ex
+    double precision :: V_max, t_accel, dist_accel, dist
+    
+  end type cruise_type
+  
+  type turn_type
+    
+    logical :: activation, interval
+    double precision :: h, n, field_length
+    double precision :: V, radius
+    
+  end type turn_type
+  
 ! Main return variable for all optimizations
   type(objfunction_type) :: objfunction_return
   !$omp threadprivate(objfunction_return)
@@ -85,7 +133,9 @@ module vardef
   logical, dimension(max_op_points) :: use_previous_op
   integer, dimension(6) :: dvs_for_type
   integer :: nflap_optimize, nflap_identical, nmoment_constrain,               &
-             ndrag_constrain, nlift_constrain, contrain_number
+             ndrag_constrain, nlift_constrain, contrain_number,                &
+             ntake_off_constrain, nclimb_constrain, ncruise_constrain,           &
+             nturn_constrain
                                      ! Number of operating points where flap 
                                      !   setting will be optimized or identical
   integer, dimension(max_op_points) :: flap_optimize_points,                   &
@@ -141,8 +191,35 @@ module vardef
   integer, parameter :: max_addthickconst = 10 ! remove limit?
   double precision, dimension(max_addthickconst) :: addthick_x, addthick_min,  &
                                                     addthick_max
+  double precision :: weight_min, RC_min, cruise_V_min, turn_V_min
   character(19) :: restart_stat
   character(80) :: global_search_stat, local_search_stat
+  !add aircraft data
+  type(fuselage_type) :: fuselage
+  type(tail_type) :: tail
+  type(take_off_type) :: take_off
+  type(climb_type) :: climb
+  type(cruise_type) :: cruise
+  type(turn_type) :: turn
+  
+  double precision :: weight, weight_i
+  double precision :: A_w, e_w, S_w, S_expose
+  double precision, dimension(3) :: thrust_coeff
+  double precision :: height, width
+  double precision :: length, f_skin_roughness
+  double precision :: wetted_area, interference_factor
+  double precision :: tail_config
+  double precision, dimension(2) :: tail_chord, t_c_ratio, max_t_x
+  double precision, dimension(2) :: t_skin_roughness, tail_surface_area
+  double precision :: Cd_ld, add_drag
+  double precision :: h_take_off, A_1, miu, S_g
+  double precision :: weight_empty, weight_payload_ref
+  logical :: accel_to_climb, accel_to_cruise
+  double precision :: time_climb, h_climb, dh, V_0_climb
+  double precision, dimension(5) :: points_coeff
+  double precision :: time_cruise, h_cruise, V_0_cruise, time_extra, dist_ref_cruise
+  logical :: activation_turn
+  double precision :: h_turn, n_turn, field_length
     
 !$omp threadprivate(curr_foil)
 
