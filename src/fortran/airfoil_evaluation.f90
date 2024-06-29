@@ -13,7 +13,8 @@
 !  You should have received a copy of the GNU General Public License
 !  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
 
-!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira,
+!  2023-2024 Guilherme Pangas
 
 module airfoil_evaluation
 
@@ -97,12 +98,13 @@ function aero_objective_function(designvars, step, include_penalty)
     flap_optimization_only, zseedt, zseedb, curr_foil, use_flap,               &
     flap_connection, connection_apply, op_point, op_mode, op_search,           &
     use_previous_op, reynolds, mach, y_flap, y_flap_spec, ncrit_pt,            &
-    penalty_factor
+    penalty_factor, take_off, climb, cruise, turn
   
   use math_deps,       only : interp_vector, nu_curvature, derv1f1, derv1b1,   &
                               spline_interp_z, spline_interp_t
   use parametrization, only : create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil, get_max_panel_angle
+  use aircraft_flight_performance, only : evaluate_flight_performance
 
   double precision, dimension(:), intent(in) :: designvars
   integer, intent(in) :: step
@@ -112,6 +114,7 @@ function aero_objective_function(designvars, step, include_penalty)
   type(objfunction_type) :: variable_penalty_return
   type(objfunction_type) :: geometry_penalty_return
   type(objfunction_type) :: aerodynamic_penalty_return
+  type(objfunction_type) :: performance_penalty_return
 
   double precision, dimension(size(xseedt,1)) :: zt_new
   double precision, dimension(size(xseedb,1)) :: zb_new
@@ -122,6 +125,7 @@ function aero_objective_function(designvars, step, include_penalty)
   double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
                                            xtrt, xtrb
   double precision, dimension(noppoint) :: actual_flap_degrees
+  double precision, dimension(3) :: points
   double precision, dimension(contrain_number) :: constrains_vector
   double precision, dimension(3*noppoint+1) :: aero_vector
   double precision :: actual_x_flap, actual_tcTE
@@ -360,12 +364,42 @@ function aero_objective_function(designvars, step, include_penalty)
   penaltyval = 0.d0
   
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! Check performance constraints in order:
+  ! lift coefficint convergence (20), weigth_convergence (21), low weight(22),
+  ! low rate of climb (23), negative acceleration time to climb speed (24),
+  ! upper cruise lift range (25), below cruise lift range (26), 
+  ! low cruise speed (27), negative acceleration time to cruise speed (28),
+  ! negative acceleration distance to cruise speed (29),
+  ! low distance travelled (30), upper turn lift range (31), 
+  ! below cruise turn range (32), low turn speed (33)
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
+  call evaluate_flight_performance(moment, drag, lift, alpha, viscrms,         &
+         points, epsexit, constrains_vector, penalize, penaltyval,             & 
+         performance_penalty_return)
+  
+  if(performance_penalty_return%message_code .EQ. 0) then
+    penaltyval = performance_penalty_return%value
+  else
+    aero_objective_function%value = performance_penalty_return%value
+    aero_objective_function%message_code =                                     &
+      performance_penalty_return%message_code
+    aero_objective_function%message = performance_penalty_return%message
+    aero_objective_function%constrains_data =                                  &
+      performance_penalty_return%constrains_data
+    return
+  end if
+  
+  penaltyvaltotal = penaltyvaltotal + penaltyval
+  penaltyval = 0.d0
+  
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !! Get objective function contribution from aerodynamics (aero performance
   !! times normalized weight)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
   
   aero_objective_function%value = calculate_objective_function(moment, drag,   &
-    lift, alpha, viscrms, xtrt, xtrb, aero_vector)
+    lift, alpha, viscrms, xtrt, xtrb, points, aero_vector)
   
   aero_objective_function%aero_data = aero_vector
   
@@ -962,7 +996,12 @@ function geometry_penalty_function(zt_new, zb_new, epsexit, penalize,          &
   geometry_penalty_function%constrains_data = constrains_vector
   
 end function geometry_penalty_function
-
+    
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! Check aerodynamic constraints in order:
+! convergence(16), low moment(17), low lift(18), high drag(19)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  
 function aerodynamic_penalty_function(moment, drag, lift, viscrms, &
   constrains_vector, penalize, epsexit)
 
@@ -1111,8 +1150,7 @@ function aerodynamic_penalty_function(moment, drag, lift, viscrms, &
   aerodynamic_penalty_function%message = ' '
   aerodynamic_penalty_function%constrains_data = constrains_vector
 
-end function aerodynamic_penalty_function
-
+  end function aerodynamic_penalty_function
   
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!! Get objective function contribution from aerodynamics (aero performance
@@ -1120,20 +1158,23 @@ end function aerodynamic_penalty_function
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 
 function calculate_objective_function(moment, drag, lift, alpha, viscrms, xtrt,&
-  xtrb, aero_vector)
+  xtrb, points, aero_vector)
 
   use vardef, only: noppoint, optimization_type, scale_factor, weighting,      &
-    target_value
+                    target_value
   use math_deps, only: derv1f1, derv1b1
 
   double precision, dimension(:), intent(inout) :: moment, drag, lift,         &
-    aero_vector
+                                                   aero_vector
+  double precision, dimension(:), intent(in) :: points
   double precision, dimension(:), intent(in) :: alpha, viscrms, xtrt, xtrb
   double precision :: calculate_objective_function
   integer :: i
   double precision :: pi, increment
+  double precision, dimension(3) :: w
   
   pi = acos(-1.d0)
+  w(:) = 0
   
   calculate_objective_function = 0.d0
 
@@ -1304,7 +1345,46 @@ function calculate_objective_function(moment, drag, lift, alpha, viscrms, xtrt,&
       aero_vector(i) = lift(i)
       aero_vector(i+noppoint) = increment
       aero_vector(i+2*noppoint) = (1.d0 - increment)*100.d0
-      
+    elseif (trim(optimization_type(i)) == 'take-off') then
+
+      aero_vector(i) = 0.d0
+      increment = 0.d0
+      if((i == noppoint) .or. (trim(optimization_type(i+1)) /= 'take-off'))then
+        aero_vector(i) = points(1)  
+        increment = scale_factor(i)/points(1)
+        w(1) = weighting(i)    
+      end if
+      aero_vector(i+noppoint) = increment
+      aero_vector(i+2*noppoint) = (1.d0 - increment)*100.d0
+    elseif (trim(optimization_type(i)) == 'climb') then
+
+      aero_vector(i) = 0.d0
+      increment = 0.d0
+      if((i == noppoint) .or. (trim(optimization_type(i+1)) /= 'climb')) then
+        aero_vector(i) = points(2)
+        increment = scale_factor(i)/points(2)   
+        w(2) = weighting(i)
+      end if
+      aero_vector(i+noppoint) = increment
+      aero_vector(i+2*noppoint) = (1.d0 - increment)*100.d0
+    elseif (trim(optimization_type(i)) == 'cruise') then
+
+      aero_vector(i) = 0.d0
+      increment = 0.d0
+      if((i == noppoint) .or. (trim(optimization_type(i+1)) /= 'cruise')) then
+        aero_vector(i) = points(3)
+        increment = scale_factor(i)/points(3)   
+        w(3) = weighting(i)
+      end if
+      aero_vector(i+noppoint) = increment
+      aero_vector(i+2*noppoint) = (1.d0 - increment)*100.d0
+    elseif (trim(optimization_type(i)) == 'turn') then
+
+      aero_vector(i) = 0.d0
+      increment = 0.d0
+      aero_vector(i+noppoint) = increment
+      aero_vector(i+2*noppoint) = (1.d0 - increment)*100.d0
+            
     else
 
       write(*,*)
@@ -1315,9 +1395,17 @@ function calculate_objective_function(moment, drag, lift, alpha, viscrms, xtrt,&
 
     !   Add contribution to the objective function
 
-    calculate_objective_function = calculate_objective_function +              &
-      weighting(i)*increment
-
+    if((trim(optimization_type(i)) == 'take-off') .or. (trim(optimization_type  &
+      (i)) == 'climb') .or. (trim(optimization_type(i)) == 'cruise'))then
+      if(i == noppoint)then
+        calculate_objective_function = calculate_objective_function + 1000/    &
+          ((w(1)*points(1)+w(2)*points(2)+w(3)*points(3))/(w(1)+w(2)+w(3)))
+      end if
+    else
+      calculate_objective_function = calculate_objective_function +            &
+        weighting(i)*increment
+    end if
+    
   end do
 
   aero_vector(1+3*noppoint) = calculate_objective_function
@@ -1465,7 +1553,7 @@ subroutine run_consistency_check(actual_flap_degrees, actual_x_flap, lift,     &
                    file_options, clcheck, cdcheck, cmcheck, rmscheck, alcheck, &
                    xtrtcheck, xtrbcheck, ncrit_check(1:ncheckpt))
 
-!   Keep the more conservative of the two runs
+    !   Keep the more conservative of the two runs
 
     do i = 1, noppoint
 
@@ -1619,12 +1707,14 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
     op_search, use_previous_op, reynolds, mach, use_flap, y_flap, y_flap_spec, &
     ncrit_pt, connection_apply, flap_connection, flap_optimization_only,       &
     output_prefix, symmetrical, tcTE, write_bl_file, write_cp_file, x_flap,    &
-    flap_identical_op
+    flap_identical_op, weight, take_off, climb, cruise, turn,                  &
+    ntake_off_constrain, nclimb_constrain, ncruise_constrain, nturn_constrain
   
   use math_deps,       only : interp_vector 
   use parametrization, only : create_airfoil, parametrization_dvs
   use xfoil_driver,    only : run_xfoil, xfoil_geometry_info
-
+  use aircraft_flight_performance, only : evaluate_flight_performance_progress
+  
   double precision, dimension(:), intent(in) :: designvars
   integer, intent(in) :: designcounter
   logical, intent(in) :: laststep
@@ -1639,11 +1729,16 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
   double precision, dimension(noppoint) :: actual_flap_degrees
   double precision :: ffact, fxfact, tefact, maxt, xmaxt, maxc, xmaxc
   double precision :: actual_x_flap, actual_tcTE
-  integer :: ndvs, flap_idx, flap_idi, dvcounter
+  integer :: ndvs, flap_idx, flap_idi, dvcounter, ntotal_points
+  double precision :: total_points
+  double precision, dimension(3) :: points
  
   character(100) :: foilfile, polarfile, text, variablesfile, textdv
+  character(100) :: performancefile
   character(8) :: maxtchar, xmaxtchar, maxcchar, xmaxcchar
-  integer :: foilunit, polarunit, variablesunit
+  integer :: foilunit, polarunit, variablesunit, performanceunit
+  logical :: write_performance_file
+  
 
   nmodest = nparams_top
   nmodesb = nparams_bot
@@ -1777,11 +1872,22 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
                  file_options, lift, drag, moment, viscrms, alpha, xtrt, xtrb, &
                  ncrit_pt)
   
+  ! Analyze performance at requested operating conditions
+  call evaluate_flight_performance_progress(moment, drag, lift, alpha, viscrms,& 
+                                            points)
+  
   ! Set file saving options to false
   file_options%polar = .false.
   file_options%cp = .false.
   file_options%bl = .false.
   file_options%write_all_airfoils = .false.
+  
+  if((ntake_off_constrain /= 0) .or. (nclimb_constrain /= 0) .or.              &
+    (ncruise_constrain /= 0) .or. (nturn_constrain /= 0))then
+    write_performance_file = .true.
+  else
+    write_performance_file = .false.
+  end if
   
   if (.not. laststep) then
   
@@ -1802,10 +1908,12 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
     foilfile = trim(output_prefix)//'_design_coordinates.dat'
     polarfile = trim(output_prefix)//'_design_polars.dat'
     variablesfile = trim(output_prefix)//'_design_aifoil_variables.dat'
-
+    performancefile = trim(output_prefix)//'_design_performance.dat'
+    
     foilunit = 13
     !polarunit = 14
     variablesunit = 15
+    performanceunit = 16
 
   ! Open files and write headers, if necessary
 
@@ -1831,7 +1939,88 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
   !    write(polarunit,'(A)') 'variables="alpha" "cl" "cd" "cm" "xtrt" "xtrb"  &
   !    "flap deflexion" "flap hinge position"'
   !    write(polarunit,'(A)') 'zone t="Seed airfoil polar"'
-
+    
+  !   Header for flight performance file
+      if(write_performance_file)then  
+        write(*,*) "  Writing performance for seed airfoil to file "//           &
+                  trim(performancefile)//" ..."
+        open(unit=performanceunit, file=performancefile, status='replace')
+        write(performanceunit,'(A)') '"Aircraft Performance"'
+        !Second line
+        if(ntake_off_constrain /= 0) write(performanceunit,'(A)', advance='no') & 
+        '  Take-off                                                            |'
+        if(nclimb_constrain /= 0) write(performanceunit,'(A)', advance='no')    &
+        '  Climb                                                               |'
+        if(nturn_constrain /= 0) write(performanceunit,'(A)', advance='no')     &
+        '  Turn                      |'
+        if(ncruise_constrain /= 0) write(performanceunit,'(A)', advance='no')   &
+        '  Cruise                                                              |'
+        write(performanceunit,'(A)')'  Total'
+        !Third line
+        if(ntake_off_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') 'V_run'
+          write(performanceunit,'(A14)', advance='no') 'V_to'
+          write(performanceunit,'(A14)', advance='no') 'Weight'
+          write(performanceunit,'(A14)', advance='no') 'payload'
+          write(performanceunit,'(A14)', advance='no') 'points'
+          write(performanceunit,'(A)', advance='no') '|'
+        end if
+        if(nclimb_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') 'RC_max'
+          write(performanceunit,'(A14)', advance='no') 'V_climb'
+          write(performanceunit,'(A14)', advance='no') 'Cl_climb'
+          write(performanceunit,'(A14)', advance='no') 't_accel'
+          write(performanceunit,'(A14)', advance='no') 'points'
+          write(performanceunit,'(A)', advance='no') '|'
+        end if
+        if(nturn_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') 'turn_radius'
+          write(performanceunit,'(A14)', advance='no') 'V_turn'
+          write(performanceunit,'(A)', advance='no') '|'
+        end if
+        if(ncruise_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') 'V_max'
+          write(performanceunit,'(A14)', advance='no') 't_accel'
+          write(performanceunit,'(A14)', advance='no') 'dist_accel'
+          write(performanceunit,'(A14)', advance='no') 'dist'
+          write(performanceunit,'(A14)', advance='no') 'points'
+          write(performanceunit,'(A)', advance='no') '|'
+        end if  
+        write(performanceunit,'(A14)') 'points'
+        !Fourth line
+        if(ntake_off_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') '[m/s]'
+          write(performanceunit,'(A14)', advance='no') '[m/s]'
+          write(performanceunit,'(A14)', advance='no') '[N]'
+          write(performanceunit,'(A14)', advance='no') '[N]'
+          write(performanceunit,'(A14)', advance='no') ' '
+          write(performanceunit,'(A)', advance='no') '|'
+        end if
+        if(nclimb_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') '[m/s]'
+          write(performanceunit,'(A14)', advance='no') '[m/s]'
+          write(performanceunit,'(A14)', advance='no') ' '
+          write(performanceunit,'(A14)', advance='no') '[s]'
+          write(performanceunit,'(A14)', advance='no') ' '
+          write(performanceunit,'(A)', advance='no') '|'
+        end if
+        if(nturn_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') '[m]'
+          write(performanceunit,'(A14)', advance='no') '[m/s]'
+          write(performanceunit,'(A)', advance='no') '|'
+        end if
+        if(ncruise_constrain /= 0)then
+          write(performanceunit,'(A14)', advance='no') '[m/s]'
+          write(performanceunit,'(A14)', advance='no') '[s]'
+          write(performanceunit,'(A14)', advance='no') '[m]'
+          write(performanceunit,'(A14)', advance='no') '[m]'
+          write(performanceunit,'(A14)', advance='no') ' '
+          write(performanceunit,'(A)', advance='no') '|'
+        end if  
+        write(performanceunit,'(A)') ' '
+        !Last line
+        write(performanceunit,'(A)') 'zone t="Seed airfoil Performance"'     
+      end if 
     else
 
   !   Format design counter as string
@@ -1857,6 +2046,14 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
       !open(unit=polarunit, file=polarfile, status='old', position='append',   &
       !     err=901)
       !write(polarunit,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)
+      
+      ! Open polar file and write zone header
+  
+       write(*,*) "  Writing performance for design number "//trim(text)//     &
+         " to file "//trim(performancefile)//" ..."
+       open(unit=performanceunit, file=performancefile, status='old',          & 
+         position='append', err=902)
+       write(performanceunit,'(A)') 'zone t="Polars", SOLUTIONTIME='//trim(text)  
 
     end if
 
@@ -1873,12 +2070,52 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
   !                                 xtrt(i), xtrb(i), actual_flap_degrees(i),  &
   !                                 actual_x_flap
   !  end do
-
+    
+  ! Write flight performance to file
+    total_points = 0.d0
+    ntotal_points = 0
+    if(ntake_off_constrain /= 0)then
+      total_points = total_points + points(1)
+      ntotal_points = ntotal_points + 1 
+    end if    
+    if(nclimb_constrain /= 0)then
+      total_points = total_points + points(2)
+      ntotal_points = ntotal_points + 1
+    end if
+    if(ncruise_constrain /= 0)then
+      total_points = total_points + points(3)
+      ntotal_points = ntotal_points + 1
+    end if    
+         
+    if(write_performance_file)then
+      if(ntake_off_constrain /= 0)then
+        write(performanceunit, 1100, advance='no') take_off%V_run,             & 
+        take_off%V_to, weight, (weight - take_off%weight_empty), points(1), '|'
+        1100 format(F14.8,F14.8,F14.8,F14.8,F14.8,A)
+      end if
+      if(nclimb_constrain /= 0)then
+        write(performanceunit, 1200, advance='no') climb%RC_max, climb%V,      &
+          climb%Cl, climb%t_accel, points(2),'|'
+        1200 format(F14.8,F14.8,F14.8,F14.8,F14.8,A)
+      end if
+      if(nturn_constrain /= 0)then
+        write(performanceunit, 1300, advance='no') turn%radius, turn%V, '|'
+        1300 format(F14.8,F14.8,A)
+      end if
+      if(ncruise_constrain /= 0)then
+        write(performanceunit, 1400, advance='no') cruise%V_max,               &
+          cruise%t_accel, cruise%dist_accel, cruise%dist, points(3),'|'
+        1400 format(F14.8,F14.8,F14.8,F14.8,F14.8,A)
+      end if
+      write(performanceunit, '(F14.8)') total_points/ntotal_points  
+    end if   
+        
   ! Close output files
 
     close(foilunit)
     !close(polarunit)
-
+    if(write_performance_file) close(performanceunit)
+    
     open(unit=variablesunit, file=variablesfile, status='replace')
 
       write(variablesunit,'(A)') 'design aifoil variables'
@@ -1923,6 +2160,10 @@ function write_airfoil_optimization_progress(designvars, designcounter,        &
   !901 write(*,*) "Warning: unable to open "//trim(polarfile)//". Skipping ..."
   !  write_airfoil_optimization_progress = 2
   !  return
+    
+  902 write(*,*) "Warning: unable to open "//trim(performancefile)//". Skipping ..."
+    write_airfoil_optimization_progress = 3
+    return
   
   end if
   
@@ -2645,3 +2886,4 @@ subroutine get_last_airfoil(restart_status, global_search,                     &
 end subroutine get_last_airfoil  
   
 end module airfoil_evaluation
+
