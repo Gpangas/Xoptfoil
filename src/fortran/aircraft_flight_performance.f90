@@ -311,7 +311,7 @@ subroutine take_off_evaluation(oppoint_init, oppoint_end, drag, lift, points,  &
   weight_converge = 1
   
   !Iterate the weight to achieve the pre-defined take-off distance
-  weight_loop: do j = 1, 1000
+  weight_loop: do j = 1, take_off%niteration_weight
       
     V_s = sqrt(abs(2*weight/(rho*Cl_max*S_w)))  
     take_off%V_to = take_off%A_1 * V_s
@@ -348,7 +348,7 @@ subroutine take_off_evaluation(oppoint_init, oppoint_end, drag, lift, points,  &
     end do
     
     weight_converge = abs((take_off%S_g-S_g_i) / take_off%S_g)
-    if(weight_converge < 1E-3) exit weight_loop
+    if(weight_converge < take_off%weight_converge_limit) exit weight_loop
     weight = weight*(1 + 0.5*(take_off%S_g-S_g_i) / take_off%S_g)  
   end do weight_loop
   
