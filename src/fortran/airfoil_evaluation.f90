@@ -98,7 +98,7 @@ function aero_objective_function(designvars, step, include_penalty)
     flap_optimization_only, zseedt, zseedb, curr_foil, use_flap,               &
     flap_connection, connection_apply, op_point, op_mode, op_search,           &
     use_previous_op, reynolds, mach, y_flap, y_flap_spec, ncrit_pt,            &
-    penalty_factor, take_off, climb, cruise, turn
+    penalty_factor
   
   use math_deps,       only : interp_vector, nu_curvature, derv1f1, derv1b1,   &
                               spline_interp_z, spline_interp_t
