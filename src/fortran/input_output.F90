@@ -137,9 +137,11 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
                            height, width, length, f_skin_roughness,            &
                            wetted_area, interference_factor, Cd_ld,            &
                            tail_config, tail_chord, t_c_ratio, max_t_x,        &
-                           t_skin_roughness, tail_surface_area, add_drag
+                           t_skin_roughness, tail_surface_area, add_drag,      &
+                           niteration_lift, lift_converge_limit 
   namelist /take_off_data/ h_take_off, A_1, miu, S_g, weight_empty,            &
-                           weight_payload_ref
+                           weight_payload_ref, niteration_weight,              &
+                           weight_converge_limit 
   namelist /climb_data/ accel_to_climb, time_climb, h_climb, dh, V_0_climb,    &
                         points_coeff
   namelist /cruise_data/ accel_to_cruise, time_cruise, h_cruise, V_0_cruise,   &
@@ -286,6 +288,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   thrust_coeff(1) = 1
   thrust_coeff(2) = 1
   thrust_coeff(3) = 1
+  niteration_lift = 1000
+  lift_converge_limit = 1.0E-3
   fuselage%height = 0.2
   fuselage%width = 0.2
   fuselage%length = 0.8
@@ -308,6 +312,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   S_g = 60
   weight_empty = 10
   weight_payload_ref = 50
+  niteration_weight = 1000
+  weight_converge_limit = 1.0E-3
   
 ! Set defaults for climb_data namelist options
   accel_to_climb = .false.
@@ -377,6 +383,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   take_off%S_g = S_g
   take_off%weight_empty = weight_empty
   take_off%weight_payload_ref = weight_payload_ref
+  take_off%niteration_weight = niteration_weight
+  take_off%weight_converge_limit = weight_converge_limit 
     
 !climb_data in derived type
   climb%accel = accel_to_climb
@@ -1003,6 +1011,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " thrust_coeff(1) = ", thrust_coeff(1)
   write(*,*) " thrust_coeff(2) = ", thrust_coeff(2)
   write(*,*) " thrust_coeff(3) = ", thrust_coeff(3)
+  write(*,*) " niteration_lift = ", niteration_lift
+  write(*,*) " lift_converge_limit = ", lift_converge_limit
   write(*,*) " fuselage%height = ", fuselage%height
   write(*,*) " fuselage%width = ", fuselage%width
   write(*,*) " fuselage%length = ", fuselage%length
@@ -1035,6 +1045,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(*,*) " S_g = ", take_off%S_g
   write(*,*) " weight_empty = ", take_off%weight_empty
   write(*,*) " weight_payload_ref = ", take_off%weight_payload_ref
+  write(*,*) " niteration_weight = ", take_off%niteration_weight
+  write(*,*) " weight_converge_limit = ", take_off%weight_converge_limit 
   write(*,'(A)') "/"
   write(*,*)
   
@@ -1354,6 +1366,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(100,*) " thrust_coeff(1) = ", thrust_coeff(1)
   write(100,*) " thrust_coeff(2) = ", thrust_coeff(2)
   write(100,*) " thrust_coeff(3) = ", thrust_coeff(3)
+  write(100,*) " niteration_lift = ", niteration_lift
+  write(100,*) " lift_converge_limit = ", lift_converge_limit
   write(100,*) " fuselage%height = ", fuselage%height
   write(100,*) " fuselage%width = ", fuselage%width
   write(100,*) " fuselage%length = ", fuselage%length
@@ -1386,6 +1400,8 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
   write(100,*) " S_g = ", take_off%S_g
   write(100,*) " weight_empty = ", take_off%weight_empty
   write(100,*) " weight_payload_ref = ", take_off%weight_payload_ref
+  write(100,*) " niteration_weight = ", take_off%niteration_weight
+  write(100,*) " weight_converge_limit = ", take_off%weight_converge_limit
   write(100,'(A)') "/"
   write(100,*)
   
@@ -1834,7 +1850,7 @@ subroutine read_inputs(input_file, search_type, global_search, local_search,   &
            (trim(pso_convergence_profile) /= 'standard') .and.                 &
            (trim(pso_convergence_profile) /= 'mid') )                  &
         call my_stop("pso_convergence_profile must be 'exhaustive' or "//      &
-                     "'quick' or 'standard'.")
+                     "'quick' or 'standard' or 'linear' or 'mid'.")
 
     else if (trim(global_search) == 'genetic_algorithm') then
 
@@ -2137,3 +2153,5 @@ function ask_forced_transition()
 end function ask_forced_transition
 
 end module input_output
+
+
