@@ -32,7 +32,8 @@ module aircraft_aerodynamics
 subroutine aircraft_aerodynamics_level(Cl, Cd, n, h, V, drag, thurst, converge)
     
   use vardef, only : weight, A_w, e_w, S_w, S_expose,fuselage, Cd_ld,          &
-                       add_drag, thrust_coeff
+                       add_drag, thrust_coeff, niteration_lift,                & 
+                       lift_converge_limit
   
   double precision, intent(in) :: Cl, Cd, n, h
   double precision, intent(out) :: V, drag, thurst, converge
@@ -46,12 +47,12 @@ subroutine aircraft_aerodynamics_level(Cl, Cd, n, h, V, drag, thurst, converge)
   Cl_a = Cl
   converge = 1 
   
-  C_L_loop: do i = 1, 1000
+  C_L_loop: do i = 1, niteration_lift
     alpha_i =  Cl_a/(pi*A_w*e_w)
     CL_i = Cl * cos(alpha_i)*(S_expose/S_w)
     converge = abs(Cl_a - Cl_i)
     Cl_a = Cl_a - 0.5*(Cl_a - Cl_i)  
-    if(converge < 1E-5) exit C_L_loop
+    if(converge < lift_converge_limit) exit C_L_loop
   end do C_L_loop
 
   if(converge > 1E-5) return
@@ -82,7 +83,7 @@ subroutine aircraft_aerodynamics_take_off(Cl, Cd, n, h, V, Cl_a, Cd_t, thurst, &
              converge)
     
   use vardef, only : A_w, e_w, S_w, S_expose,fuselage, Cd_ld, add_drag,        &
-                        thrust_coeff
+                       thrust_coeff, niteration_lift, lift_converge_limit
   
   double precision, intent(in) :: Cl, Cd, n, h, V
   double precision, intent(out) :: Cl_a, Cd_t, thurst, converge
@@ -96,12 +97,12 @@ subroutine aircraft_aerodynamics_take_off(Cl, Cd, n, h, V, Cl_a, Cd_t, thurst, &
   Cl_a = Cl
   converge = 1 
   
-  C_L_loop: do i = 1, 1000
+  C_L_loop: do i = 1, niteration_lift
     alpha_i =  Cl_a/(pi*A_w*e_w)
     CL_i = Cl * cos(alpha_i)*(S_expose/S_w)
     converge = abs(Cl_a - Cl_i)
     Cl_a = Cl_a - 0.5*(Cl_a - Cl_i)  
-    if(converge < 1E-5) exit C_L_loop
+    if(converge < lift_converge_limit) exit C_L_loop
   end do C_L_loop
 
   if(converge > 1E-5) return
