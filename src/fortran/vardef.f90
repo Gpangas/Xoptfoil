@@ -75,9 +75,10 @@ module vardef
   end type tail_type 
   
   type take_off_type
-      
+    
+    integer :: niteration_weight  
     double precision :: h, A_1, miu, S_g, weight_empty, weight_payload_ref 
-    double precision :: V_to, V_run
+    double precision :: V_to, V_run, weight_converge_limit
     
   end type take_off_type
   
@@ -134,7 +135,7 @@ module vardef
   integer, dimension(6) :: dvs_for_type
   integer :: nflap_optimize, nflap_identical, nmoment_constrain,               &
              ndrag_constrain, nlift_constrain, contrain_number,                &
-             ntake_off_constrain, nclimb_constrain, ncruise_constrain,           &
+             ntake_off_constrain, nclimb_constrain, ncruise_constrain,         &
              nturn_constrain
                                      ! Number of operating points where flap 
                                      !   setting will be optimized or identical
@@ -202,7 +203,9 @@ module vardef
   type(cruise_type) :: cruise
   type(turn_type) :: turn
   
-  double precision :: weight, weight_i
+  integer :: niteration_weight, niteration_lift
+  double precision :: weight, weight_i, weight_converge_limit,                 & 
+                        lift_converge_limit
   double precision :: A_w, e_w, S_w, S_expose
   double precision, dimension(3) :: thrust_coeff
   double precision :: height, width
@@ -217,10 +220,12 @@ module vardef
   logical :: accel_to_climb, accel_to_cruise
   double precision :: time_climb, h_climb, dh, V_0_climb
   double precision, dimension(5) :: points_coeff
-  double precision :: time_cruise, h_cruise, V_0_cruise, time_extra, dist_ref_cruise
+  double precision :: time_cruise, h_cruise, V_0_cruise, time_extra,           & 
+                        dist_ref_cruise
   logical :: activation_turn
   double precision :: h_turn, n_turn, field_length
     
 !$omp threadprivate(curr_foil)
 
 end module vardef
+
