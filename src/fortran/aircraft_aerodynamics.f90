@@ -55,7 +55,7 @@ subroutine aircraft_aerodynamics_level(Cl, Cd, n, h, V, drag, thurst, converge)
     if(converge < lift_converge_limit) exit C_L_loop
   end do C_L_loop
 
-  if(converge > 1E-5) return
+  if(converge > lift_converge_limit) return
   
   Cd_i = (Cl_a**2)/(pi*A_w*e_w)
   
@@ -105,7 +105,7 @@ subroutine aircraft_aerodynamics_take_off(Cl, Cd, n, h, V, Cl_a, Cd_t, thurst, &
     if(converge < lift_converge_limit) exit C_L_loop
   end do C_L_loop
 
-  if(converge > 1E-5) return
+  if(converge > lift_converge_limit) return
   
   Cd_i = (Cl_a**2)/(pi*A_w*e_w)
   
