@@ -7,9 +7,9 @@
   global_search = 'particle_swarm'
                            !'particle_swarm' or 'genetic_algorithm'
   local_search = 'simplex' !'simplex' is currently the only option
-  seed_airfoil = 'naca'
+  seed_airfoil = 'from_file'
                            !Either 'from_file' or 'naca' or 'from_variables'
-  airfoil_file = 'NACA 6411.dat'
+  airfoil_file = 'S9000.dat'
                            !File name for reading seed airfoil (only if
                            !  seed_airfoil = 'from_file').  Airfoils must be
                            !  in xfoil format: closed loop starting and
@@ -36,8 +36,8 @@
                            !     Rle of thickness curve
                            !     Gamma_le, Alpha_te, Beta_te
                            !     Zte = 0, dZte depends on TE type
-  nparameters_top = 12      !Number of parameters on the top surface
-  nparameters_bot = 12      !Number of parameters on the bot surface
+  nparameters_top = 8      !Number of parameters on the top surface
+  nparameters_bot = 8      !Number of parameters on the bot surface
   flap_optimization_only = .false.
                            ! Whether to opmitize airfoil and flap or flap only
   abs_initial_perturb = 0.001	!Absolute magnitude of initial airfoil perturbation				     
@@ -45,7 +45,7 @@
   penalty_limit_initial = 1.E-1 !Initial penalty limit 
   penalty_limit_end = 1.E-4     !Final penalty limit 
   penalty_factor = 1.0d0        !Penalty multipler on objective function
-  allow_seed_penalties = .true. !Whether the seed airfoil allows for penalties
+  allow_seed_penalties = .false. !Whether the seed airfoil allows for penalties
   min_bump_width = 0.025   !Minimum width of Hicks-Henne bump function
   kulfan_bussoletti_LEM =.false. ! A adicional parameter to improve the leading
                          ! edge accuracy
@@ -58,8 +58,8 @@
                            !    1-cossine
                            !    2-non uniform cossine
                            !    3-linear
-  restart = .false.        !Whether to restart an old optimization
-  restart_write_freq = 20  !Frequency to write restart data
+  restart = .true.        !Whether to restart an old optimization
+  restart_write_freq = 5  !Frequency to write restart data
   write_designs = .true.   !Whether to write airfoil coordinates and polars for
                            !  each improved design for design_visualizer.py
   write_cp_file = .false.  !Whether to write cp file
@@ -76,113 +76,220 @@
 ! attack or Cl, Reynolds number, Mach number, and relative weighting of each
 ! operating point for the objective function.
 
-  noppoint = 4             !Total number of operating points (max of 30 allowed)
-  use_flap = .true.        !Whether to apply flap deflections
+  noppoint = 17             	!Total number of operating points (max of 30 allowed)
+  use_flap = .true.        	!Whether to apply flap deflections
   flap_connection = 'sharp'
-                           !Either 'sharp', 'smooth-top', 'smooth-bot' or 'smooth'
+                           	!Either 'sharp', 'smooth-top', 'smooth-bot' or 'smooth'
   connection_apply = 'none'
-                           ! Either 'none', 'geometric', 'trip_wire' or 'both'
-  connection_radius = 0.02  ! Distance from hinge to apply connection
-  x_flap = 0.83             !Initial flap hinge location in x (0 < x_flap < 1)
-  x_flap_spec ='optimize'  !'specify' or 'optimize'; if the latter, the flap
-                           !  hinge position will be selected by the optimizer
-  y_flap_spec = 'y/t'      !How to specify flap location in y. Either 'y/c' or
-                           !  'y/t'.
-  y_flap = 0.0             !Flap hinge location in y/c or local y/t
-  TE_spec = 'specify'     !'specify', 'use_seed' or 'optimize' type of tcTE
-  tcTE = 1.0E-4            !trailing edge thickness
-  xltTE = 0.0              !begin point of the TE linear transformation
+                           	! Either 'none', 'geometric', 'trip_wire' or 'both'
+  connection_radius = 0.02  	! Distance from hinge to apply connection
+  x_flap = 0.8             	!Initial flap hinge location in x (0 < x_flap < 1)
+  x_flap_spec ='optimize'  	!'specify' or 'optimize'; if the latter, the flap
+                           	!  hinge position will be selected by the optimizer
+  y_flap_spec = 'y/t'      	!How to specify flap location in y. Either 'y/c' or
+                           	!  'y/t'.
+  y_flap = 0.0             	!Flap hinge location in y/c or local y/t
+  TE_spec = 'specify'     	!'specify', 'use_seed' or 'optimize' type of tcTE
+  tcTE = 1.0E-4            	!trailing edge thickness
+  xltTE = 0.0              	!begin point of the TE linear transformation
 
 
-  op_mode(1)='spec-al' !'spec-cl' (constant Cl) or 'spec-al' (constant AoA)
-  optimization_type(1)='max-lift-search'
-						   !'min-drag', 'max-glide', 'min-sink', 'max-lift',
-                           !'max-xtr', 'target-lift', 'target-drag',
-                           ! 'target-moment', 'target-xtrt', 'target-xtrb',
-                           ! 'target-glide', 'target-sink' or 'max-lift-slope'
-						   ! 'max-lift-search'
-  use_previous_op(1) =  .false. 
-                           !Whether to use previous op polar results.
-  op_point(1)=11.5		   !Specified Cl or specified AoA for point 1
-  op_point_start(1)=008.000!Start op point for 'max-lift-search' type 
-  op_point_end(1)=015.000  !End op point for 'max-lift-search' type 
-  op_point_step(1)=001.000 !Step for 'max-lift-search' type 
-  target_value(1) = 0.1    !target value for target type optmization type
-  reynolds(1)=1.600E+05    !Reynolds number for point 1
-  mach(1)=0.02             !Mach number for point 1
-  flap_selection(1)='optimize' !1
-                           !'specify', 'identical' or 'optimize';
-                           ! if 'optimize', the flap
-                           !  deflection will be selected by the optimizer
-                           ! if 'identical', the flap deflection will the same
-                           !  as of the op_point in flap_identical_op
-  flap_identical_op(1)=1   !Op point of identical flap
-  flap_degrees(1)=8.000    !Flap deflection in degrees for point 1 (+ve down)
-  weighting(1)=0.581       !Relative weight for operating point 1. Note:
-                           !  the code automatically normalizes weights.
-  ncrit_pt(1)=9            !ncrit for operating point 1. Defaults to value from
-                           !  xfoil_run_options.
-
+  op_mode(1)='spec-al' 			!'spec-cl' (constant Cl) or 'spec-al' (constant AoA)
+  optimization_type(1)='take-off'	!'min-drag', 'max-glide', 'min-sink', 'max-lift',
+                           		!'max-xtr', 'target-lift', 'target-drag',
+                           		! 'target-moment', 'target-xtrt', 'target-xtrb',
+                           		! 'target-glide', 'target-sink' or 'max-lift-slope'
+					! 'max-lift-search'
+  use_previous_op(1) =  .false. 	!Whether to use previous op polar results.
+  op_point(1)=006.000         		!Specified Cl or specified AoA for point 1
+  op_point_start(1)=005.000             !Start op point for 'max-lift-search' type 
+  op_point_end(1)=09.000  		!End op point for 'max-lift-search' type 
+  op_point_step(1)=001.000 		!Step for 'max-lift-search' type 
+  target_value(1) = 0.1    		!target value for target type optmization type
+  reynolds(1)=1.51E+05    		!Reynolds number for point 1
+  mach(1)=0.02             		!Mach number for point 1
+  flap_selection(1)='optimize' 		!'specify', 'identical' or 'optimize';
+                           		! if 'optimize', the flap
+                           		!  deflection will be selected by the optimizer
+                           		! if 'identical', the flap deflection will the same
+                           		!  as of the op_point in flap_identical_op
+  flap_identical_op(1)=1   		!Op point of identical flap
+  flap_degrees(1)=025.000		!Flap deflection in degrees for point 1 (+ve down)
+  weighting(1)=0.5000       		!Relative weight for operating point 1. Note:
+                           		!  the code automatically normalizes weights.
+  ncrit_pt(1)=9            		!ncrit for operating point 1. Defaults to value from
+                           		!  xfoil_run_options.
 
   op_mode(2)='spec-al'
-  optimization_type(2)='max-lift'
-  op_point(2)=1.5
-  op_point_start(2)=008.000
-  op_point_end(2)=017.000
-  op_point_step(2)=000.500
-  reynolds(2)=1.600E+05
+  optimization_type(2)='take-off'
+  op_point(2)=008.000
+  reynolds(2)=1.07E+05
   mach(2)=0.02
-  flap_selection(2)='identical'
-  flap_identical_op(2)=1
-  flap_degrees(2)=8.000
-  weighting(2)=0.110
+  flap_selection(2)='specify'
+  flap_degrees(2)=0.000
+  weighting(2)=0.1250
   ncrit_pt(2)=9
 
-
   op_mode(3)='spec-al'
-  optimization_type(3)='min-drag'
-  use_previous_op(3) = .true.
-  op_point(3)=1.5
-  op_point_start(3)=008.000
-  op_point_end(3)=017.000
-  op_point_step(3)=000.500
-  reynolds(3)=1.600E+05
+  optimization_type(3)='take-off'
+  op_point(3)=007.000
+  reynolds(3)=1.07E+05
   mach(3)=0.02
-  flap_selection(3)='identical'
-  flap_identical_op(3)=1
-  flap_degrees(3)=8.000
-  weighting(3)=0.065
+  flap_selection(3)='specify'
+  flap_degrees(3)=0.000
+  weighting(3)=0.2500
   ncrit_pt(3)=9
 
-
-  op_mode(4)='spec-cl'
-  optimization_type(4)='min-drag'
-  op_point(4)=0.258
-  op_point_start(4)=008.000
-  op_point_end(4)=017.000
-  op_point_step(4)=000.500
-  reynolds(4)=5.713E+05
-  mach(4)=0.08
-  flap_selection(4)='optimize'
-  flap_identical_op(4)=4
-  flap_degrees(4)=-8.000
-  weighting(4)=0.211
+  op_mode(4)='spec-al'
+  optimization_type(4)='take-off'
+  op_point(4)=006.000
+  reynolds(4)=1.07E+05
+  mach(2)=0.02
+  flap_selection(4)='specify'
+  flap_degrees(4)=0.000
+  weighting(4)=0.1250
   ncrit_pt(4)=9
-  
+
   op_mode(5)='spec-cl'
-  optimization_type(5)='min-drag'
-  op_point(5)=1.443
-  op_point_start(5)=008.000
-  op_point_end(5)=017.000
-  op_point_step(5)=000.500
-  reynolds(5)=3.485E+05
-  mach(5)=0.05
+  optimization_type(5)='climb'
+  op_point(5)=1.05
+  reynolds(5)=1.62E+05
+  mach(5)=0.02
   flap_selection(5)='optimize'
-  flap_identical_op(5)=5
-  flap_degrees(5)=0.000
-  weighting(5)=0.033
+  flap_degrees(5)=4.000
+  weighting(5)=0.0035
   ncrit_pt(5)=9
 
+  op_mode(6)='spec-cl'
+  optimization_type(6)='climb'
+  op_point(6)=0.95
+  reynolds(6)=1.70E+05
+  mach(6)=0.02
+  flap_selection(6)='identical'
+  flap_identical_op(6)=5
+  flap_degrees(6)=4.000
+  weighting(6)=0.0474
+  ncrit_pt(6)=9
+
+  op_mode(7)='spec-cl'
+  optimization_type(7)='climb'
+  op_point(7)=0.85
+  reynolds(7)=1.80E+05
+  mach(7)=0.02
+  flap_selection(7)='identical'
+  flap_identical_op(7)=5
+  flap_degrees(7)=4.000
+  weighting(7)=0.2347
+  ncrit_pt(7)=9
+
+  op_mode(8)='spec-cl'
+  optimization_type(8)='climb'
+  op_point(8)=0.75
+  reynolds(8)=1.91E+05
+  mach(8)=0.02
+  flap_selection(8)='identical'
+  flap_identical_op(8)=5
+  flap_degrees(8)=4.000
+  weighting(8)=0.4277
+  ncrit_pt(8)=9
+
+  op_mode(9)='spec-cl'
+  optimization_type(9)='climb'
+  op_point(9)=0.65
+  reynolds(9)=2.05E+05
+  mach(9)=0.02
+  flap_selection(9)='identical'
+  flap_identical_op(9)=5
+  flap_degrees(9)=4.000
+  weighting(9)=0.2867
+  ncrit_pt(9)=9
+
+  op_mode(10)='spec-cl'
+  optimization_type(10)='turn'
+  op_point(10)=0.60
+  reynolds(10)=3.02E+05
+  mach(10)=0.02
+  flap_selection(10)='optimize'
+  flap_degrees(10)=0.000
+  weighting(10)=0.0290
+  ncrit_pt(10)=9
+
+  op_mode(11)='spec-cl'
+  optimization_type(11)='turn'
+  op_point(11)=0.55
+  reynolds(11)=3.15E+05
+  mach(11)=0.02
+  flap_selection(11)='identical'
+  flap_identical_op(11)=10
+  flap_degrees(11)=0.000
+  weighting(11)=0.1295
+  ncrit_pt(11)=9
+
+  op_mode(12)='spec-cl'
+  optimization_type(12)='turn'
+  op_point(12)=0.50
+  reynolds(12)=3.31E+05
+  mach(12)=0.02
+  flap_selection(12)='identical'
+  flap_identical_op(12)=10
+  flap_degrees(12)=0.000
+  weighting(12)=0.2128
+  ncrit_pt(12)=9
+
+  op_mode(13)='spec-cl'
+  optimization_type(13)='turn'
+  op_point(13)=0.45
+  reynolds(13)=3.48E+05
+  mach(13)=0.02
+  flap_selection(13)='identical'
+  flap_identical_op(13)=10
+  flap_degrees(13)=0.000
+  weighting(13)=0.1287
+  ncrit_pt(13)=9
+
+  op_mode(14)='spec-cl'
+  optimization_type(14)='cruise'
+  op_point(14)=0.35
+  reynolds(14)=2.79E+05
+  mach(14)=0.02
+  flap_selection(14)='identical'
+  flap_identical_op(14)=10
+  flap_degrees(14)=0.000
+  weighting(14)=0.0124
+  ncrit_pt(14)=9
+
+  op_mode(15)='spec-cl'
+  optimization_type(15)='cruise'
+  op_point(15)=0.3
+  reynolds(15)=3.02E+05
+  mach(15)=0.02
+  flap_selection(15)='identical'
+  flap_identical_op(15)=10
+  flap_degrees(15)=0.000
+  weighting(15)=0.0841
+  ncrit_pt(15)=9
+
+  op_mode(16)='spec-cl'
+  optimization_type(16)='cruise'
+  op_point(16)=0.25
+  reynolds(16)=3.31E+05
+  mach(16)=0.02
+  flap_selection(16)='identical'
+  flap_identical_op(16)=10
+  flap_degrees(16)=0.000
+  weighting(16)=0.2102
+  ncrit_pt(16)=9
+
+  op_mode(17)='spec-cl'
+  optimization_type(17)='cruise'
+  op_point(17)=0.20
+  reynolds(17)=3.70E+05
+  mach(17)=0.02
+  flap_selection(17)='identical'
+  flap_identical_op(17)=10
+  flap_degrees(17)=0.00
+  weighting(17)=0.1933
+  ncrit_pt(17)=9
 /
 
 &constraints
@@ -190,40 +297,40 @@
 ! Specification of constraints on the optimization.  These are implemented by
 ! adding penalties to the objective function value when violated.
 
-  min_thickness = 0.1     !Lowest allowable value of airfoil max
-                           !  thickness/chord (usually for structural concerns)
-  max_thickness = 1000.0   !Largest allowable value of airfoil max
-                           !  thickness/chord
-  min_camber = -1000       !Lowest allowable value of airfoil camber/chord
-  max_camber = 1000       !Largest allowable value of airfoil camber/chord
-  max_growth_seed_mult = 2.0 ! Largest allowable growth rate multipler on seed max growth rate
+  min_thickness = 0.09     	 !Lowest allowable value of airfoil max
+                                 !  thickness/chord (usually for structural concerns)
+  max_thickness = 0.25           !Largest allowable value of airfoil max
+                            	 !thickness/chord
+  min_camber = -0.1       	 !Lowest allowable value of airfoil camber/chord
+  max_camber = 0.8       	 !Largest allowable value of airfoil camber/chord
+  max_growth_seed_mult = 2.0 	 !Largest allowable growth rate multipler on seed max growth rate
   min_leading_edge_angle = 60.00 !Lowest allowable value of leading edge angle
   max_leading_edge_angle = 89.99 !Largest allowable value of leading edge angle
   dif_leading_edge_angle = 20.00 !Largest allowable value of leading edge angle 
                                  ! difference between top and botton
-  min_te_angle = 5.00       !Minimum allowable trailing edge wedge angle
-  te_angle_x_apply = 0.5    !X position in witch to apply te_angle condition
-  max_panel_angle = 25.0    !Largest allowable value of panel angle
-  lift_check_tol = 0.2     !Lift tolerance before checking at a perturb point 
-  drag_check_tol = 0.2     !Drag tolerance before checking at a perturb point
+  min_te_angle = 5.00       	 !Minimum allowable trailing edge wedge angle
+  te_angle_x_apply = 0.5    	 !X position in witch to apply te_angle condition
+  max_panel_angle = 25.0    	 !Largest allowable value of panel angle
+  lift_check_tol = 0.2     	 !Lift tolerance before checking at a perturb point 
+  drag_check_tol = 0.2     	 !Drag tolerance before checking at a perturb point
   check_curvature = .true.
-                           !Whether to check for curvature reversals
-  max_curv_reverse_top = 5 !Max number of allowed curv. reversals top surface
-  max_curv_reverse_bot = 5 !Max number of allowed curv. reversals bot surface
-  curv_threshold = 0.10    !Curvature threshhold for detecting reversals
-  symmetrical = .false.    !Whether to only generate symmetrical airfoils
-  max_flap_degrees = 15.0  !Maximum allowed flap angle for 'optimize' flap
-                           !  selection type (+ve down)
-  min_flap_degrees = -10.0 !Minimum allowed flap angle for 'optimize' flap
-                           !  selection type (+ve down)
-  max_flap_x = 0.9         !Maximum allowed flap hinge position for 'optimize'
-                           !  flap selection type
-  min_flap_x = 0.7         !Minimum allowed flap hinge position for 'optimize'
-                           !  flap selection type
-  max_tcTE = 1.0E-3        !Maximum allowed trailing edge thickness for 'optimize'
-                           !  trailing edge type
-  min_tcTE = 1.0E-5        !Minimum allowed trailing edge thickness for 'optimize'
-                           !  trailing edge type
+                           	 !Whether to check for curvature reversals
+  max_curv_reverse_top = 2 	 !Max number of allowed curv. reversals top surface
+  max_curv_reverse_bot = 3 	 !Max number of allowed curv. reversals bot surface
+  curv_threshold = 0.10    	 !Curvature threshhold for detecting reversals
+  symmetrical = .false.    	 !Whether to only generate symmetrical airfoils
+  max_flap_degrees = 25.0  	 !Maximum allowed flap angle for 'optimize' flap
+                           	 !  selection type (+ve down)
+  min_flap_degrees = -15.0 	 !Minimum allowed flap angle for 'optimize' flap
+                           	 !  selection type (+ve down)
+  max_flap_x = 0.9         	 !Maximum allowed flap hinge position for 'optimize'
+                           	 !  flap selection type
+  min_flap_x = 0.7         	 !Minimum allowed flap hinge position for 'optimize'
+                           	 !  flap selection type
+  max_tcTE = 1.0E-3        	 !Maximum allowed trailing edge thickness for 'optimize'
+                           	 !  trailing edge type
+  min_tcTE = 1.0E-5        	 !Minimum allowed trailing edge thickness for 'optimize'
+                           	 !  trailing edge type
 
 ! Moment constraints are specified below for each operating point
 
@@ -233,14 +340,34 @@
   moment_constraint_type(2) = 'none'
   moment_constraint_type(3) = 'none'
   moment_constraint_type(4) = 'none'
-
-
+  moment_constraint_type(5) = 'none'
+  moment_constraint_type(6) = 'none'
+  moment_constraint_type(7) = 'none'
+  moment_constraint_type(8) = 'none'
+  moment_constraint_type(9) = 'none'
+  moment_constraint_type(10) = 'none'
+  moment_constraint_type(11) = 'none'
+  moment_constraint_type(12) = 'none'
+  moment_constraint_type(13) = 'none'
+  moment_constraint_type(14) = 'none'
+  
+  
   lift_constraint_type(1) = 'none'
                            !How to implement lift constraint for operating
                            !  point 1. Either 'none', 'specify', or 'use_seed'.
   lift_constraint_type(2) = 'none'
   lift_constraint_type(3) = 'none'
   lift_constraint_type(4) = 'none'
+  lift_constraint_type(5) = 'none'
+  lift_constraint_type(6) = 'none'
+  lift_constraint_type(7) = 'none'
+  lift_constraint_type(8) = 'none'
+  lift_constraint_type(9) = 'none'
+  lift_constraint_type(10) = 'none'
+  lift_constraint_type(11) = 'none'
+  lift_constraint_type(12) = 'none'
+  lift_constraint_type(13) = 'none'
+  lift_constraint_type(14) = 'none'
 
 
   drag_constraint_type(1) = 'none'
@@ -249,6 +376,16 @@
   drag_constraint_type(2) = 'none'
   drag_constraint_type(3) = 'none'
   drag_constraint_type(4) = 'none'
+  drag_constraint_type(5) = 'none'
+  drag_constraint_type(6) = 'none'
+  drag_constraint_type(7) = 'none'
+  drag_constraint_type(8) = 'none'
+  drag_constraint_type(9) = 'none'
+  drag_constraint_type(10) = 'none'
+  drag_constraint_type(11) = 'none'
+  drag_constraint_type(12) = 'none'
+  drag_constraint_type(13) = 'none'
+  drag_constraint_type(14) = 'none'
 
 
   min_moment(1) = -0.11    !Lowest allowable value of airfoil pitching moment;
@@ -257,6 +394,8 @@
   min_moment(2) = -0.11
   min_moment(3) = -0.11
   min_moment(4) = -0.11
+  min_moment(5) = -0.11
+
 
   min_lift(1) = -0.11      !Lowest allowable value of airfoil pitching moment;
                            !  for point 1; only used if
@@ -264,6 +403,7 @@
   min_lift(2) = -0.11
   min_lift(3) = -0.11
   min_lift(4) = -0.11
+  min_lift(5) = -0.11
 
   max_drag(1) = -0.11      !Lowest allowable value of airfoil pitching moment;
                            !  for point 1; only used if
@@ -271,14 +411,19 @@
   max_drag(2) = -0.11
   max_drag(3) = -0.11
   max_drag(4) = -0.11
+  max_drag(5) = -0.11
 
   ! Additional thickness constraints at specified x/c (max 10)
 
-  naddthickconst = 0       ! Number of additional thickness constraints
+  naddthickconst = 2       	! Number of additional thickness constraints
 
-  addthick_x(1) = 0.9      ! x/c location of constraint 1
-  addthick_min(1) = 0.01   ! Min thickness at x/c 1
-  addthick_max(1) = 1000.0 ! Max thickness at x/c 1
+  addthick_x(1) = 0.9      	! x/c location of constraint 1
+  addthick_min(1) = 0.0152  	! Min thickness at x/c 1
+  addthick_max(1) = 0.5      	! Max thickness at x/c 1
+
+  addthick_x(2) = 0.8       	! x/c location of constraint 2
+  addthick_min(2) = 0.0328  	! Min thickness at x/c 2
+  addthick_max(2) = 0.5     	! Max thickness at x/c 2
 
 /
 
@@ -304,11 +449,11 @@
 ! Initialization options. Applies only to global search.
 
   feasible_init = .false.   !Force initial designs to be in feasible space
-  feasible_limit = 10.0 !Max objective function value below which initial
+  feasible_limit = 10 !Max objective function value below which initial
                            !  designs are considered feasible (assumes
                            !  infeasible designs are penalized by a large
                            !  objective function value)
-  feasible_init_attempts = 1000
+  feasible_init_attempts = 50
                            !Number of attempts to try to get initially feasible
                            !  designs
 /
@@ -318,14 +463,14 @@
 ! Options for particle swarm optimization; only used for global_search =
 ! 'particle_swarm'.  PSO is used to get in the vicinity of the global optimum.
 
-  pso_pop = 40             !Particle swarm population size
+  pso_pop = 50             !Particle swarm population size
   pso_tol = 1.E-04         !Tolerance in max radius of particles before
                            !  triggering a stop condition
   pso_maxit = 1000         !Max iterations before stopping
   pso_convergence_profile = 'exhaustive'
                            !'exhaustive' or 'quick'; 'exhaustive' finds
                            !  better designs, but requires more iterations
-  pso_speed_limit = 0.025  !Speed limit for algorithm
+  pso_speed_limit = 0.05   !Speed limit for algorithm
 /
 
 &genetic_algorithm_options
@@ -423,4 +568,83 @@
   match_foils = .false.
   matchfoil_file = 'NACA 6411.dat'
 
+/
+
+&aircraft_data
+
+  weight_i = 41.59              !Aircraft total weight, [N]
+  S_w = 0.426                   !Wing area [m^2]
+  A_w = 11.3                    !Aspect ratio
+  e_w = 0.98                    !Oswald efficiency
+  S_expose = 0.402              !Expose wing area [m^2]
+
+  thrust_coeff(1) = -0.0045     !Thrust coefficient [T/V^2]
+  thrust_coeff(2) = -0.2554     !Thrust coefficient [T/V]
+  thrust_coeff(3) = 14.964      !Thrust coefficient [T]
+
+  niteration_lift = 1000
+  lift_converge_limit = 1E-5
+  
+  height = 0.175                !Fuselage height [m]
+  width = 0.124                 !Fuselage width [m]
+  length = 0.710                !Fulesage length [m]
+  f_skin_roughness = 6.34E-6    !Fuselage skin roughness [m]
+  wetted_area = 0.274           !Fuselage wetted area [m^2]
+  interference_factor = 1.0     !Fuselage interference factor
+
+  CD_ld = 0.000507              !Landing gear drag coefficient
+
+  tail_config = 1               !1 for V-tail, 2 for Conventional_tail
+  tail_chord(1) = 0.125         !Tail chord [m]
+  tail_surface_area(1) = 0.027  !Tail surface area [m^2]
+  t_c_ratio(1) = 0.09           !Tail thickness chord ratio
+  max_t_x(1) = 0.3              !Tail maximum airfoil thickness relative x position
+  t_skin_roughness(1) = 6.34E-6 !Tail skin roughness [m]
+  
+  CD_add = 0.00845              !Extra drag coefficient
+
+/
+
+&take_off_data
+  
+  h_take_off = 474              !Runway altitude [m]
+  A_1 = 1.1                     !Rotation factor
+  miu = 0.262                   !Friction coefficient
+  S_g = 60                      !Runway length [m]
+  weight_empty = 23.92          !Aircraft empty weigth [N]
+  weight_payload_ref = 31.470   !Reference payload weigth [N]
+  niteration_weight = 1000      !Maximum umber of iterations to compute aircraft weigth
+  weight_converge_limit = 1E-3  !
+  run_oppoint = 2               !The index of the take-off oppoint to compute the take-off run
+				!The index of the first oppoint with optimization_type(i)='take-off' is 0
+
+/
+
+&climb_data
+         
+  time_climb = 60               !Time to climb [s]
+  h_climb = 524                 !Average climb altitude [m]
+  dh_climb = 100                !Altitude to climb [m] 
+  points_coeff(1) = -3.92E-5    !Climb points coefficient [points/V^4]
+  points_coeff(2) = 1.08E-2     !Climb points coefficient [points/V^3]
+  points_coeff(3) = -1.156      !Climb points coefficient [points/V^2]
+  points_coeff(4) = 64.2        !Climb points coefficient [points/V]
+  points_coeff(5) = -537        !Climb points coefficient [points]
+  
+/
+
+&turn_data
+        
+  activation_turn = .true.      !Turn activation
+  h_turn = 574                  !Turn altitude [m] 
+  n_turn = 2                    !Turn load factor
+  field_length = 375            !Maximum leg lenght [m] 
+
+/
+
+&cruise_data
+        
+  time_cruise = 120             !Time to travel [s]
+  h_cruise = 574                !Cruise altitude [m]
+  dist_ref_cruise = 3255        !Reference distance traveled [m]
 /
