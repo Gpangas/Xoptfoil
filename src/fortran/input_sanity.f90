@@ -13,7 +13,8 @@
 !  You should have received a copy of the GNU General Public License
 !  along with XOPTFOIL.  If not, see <http://www.gnu.org/licenses/>.
 
-!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira
+!  Copyright (C) 2017-2019 Daniel Prosser, 2020-2021 Ricardo Palmeira,
+!  2023-2024 Guilherme Pangas
 
 module input_sanity
 
@@ -35,6 +36,7 @@ subroutine check_seed()
                                  spline_interp_z, spline_interp_t
   use xfoil_driver,       only : run_xfoil, get_max_panel_angle
   use airfoil_evaluation, only : xfoil_options, xfoil_geom_options, file_options
+  use aircraft_flight_performance, only : evaluate_flight_performance_sanity
 
   double precision, dimension(noppoint) :: lift, drag, moment, viscrms, alpha, &
                                            xtrt, xtrb
@@ -52,6 +54,7 @@ subroutine check_seed()
   integer :: i, nptt, nptb, nreversalst, nreversalsb, nptint, flap_idi
   character(30) :: text, text2
   character(15) :: opt_type
+  character(200) :: message
   logical :: addthick_violation, side
 
   penaltyval = 0.d0
@@ -509,9 +512,14 @@ subroutine check_seed()
       end if
     end if
   end do
+  
+  ! Analyze aircraft flight performance at requested operating conditions
+  call evaluate_flight_performance_sanity(moment, drag, lift, alpha, viscrms,  &
+                                          message)
+  
+  if(trim(message) .ne. ' ') call ask_stop(message, allow_seed_penalties)
 
-! Evaluate objectives to establish scale factors for each point
-
+  ! Evaluate objectives to establish scale factors for each point
   do i = 1, noppoint
     write(text,*) i
     text = adjustl(text)
@@ -601,6 +609,18 @@ subroutine check_seed()
     elseif (trim(optimization_type(i)) == 'max-lift-search') then
 
       checkval = 1.d0/lift(i)
+    elseif (trim(optimization_type(i)) == 'take-off') then
+
+      checkval = 1.d0/1000
+    elseif (trim(optimization_type(i)) == 'climb') then
+
+      checkval = 1.d0/1000
+    elseif (trim(optimization_type(i)) == 'cruise') then
+
+      checkval = 1.d0/1000
+    elseif (trim(optimization_type(i)) == 'turn') then
+
+      checkval = 1.d0/1000
     else
       write(*,*)
       write(*,*) "Error: requested optimization_type for operating point "//   &
