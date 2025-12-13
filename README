@@ -1,6 +1,6 @@
-This is Xoptfoil V2, an airfoil optimization code using the Xfoil aerodynamics
-engine.
-Copyright 2020-2022 Ricardo Palmeira.
+This is Xoptfoil V3.01.1, an airfoil optimization code using the Xfoil aerodynamics engine.
+Copyright 2022-2024 Guilherme Pangas.
+-- based on Xoptfoil V2.01.0, written and maintained by Ricardo Palmeira (https://github.com/r-palmeira-pt/Xoptfoil)
 -- based on Xoptfoil V1.11.1, written and maintained by Daniel Prosser (https://github.com/montagdude/Xoptfoil)
 
 Xoptfoil uses the GNU Public License Version 3, a copy of which can be found in the license directory.
