@@ -1717,7 +1717,7 @@ def main_menu(initialchoice, seedfoil, designfoils, prefix):
 
     exitchoice = False
     rcParams['toolbar'] = 'None'    # Turn on matplotlib toolbar
-    plt.style.use('seaborn-paper')
+    plt.style.use('seaborn-v0_8-paper')
     rcParams['lines.linewidth'] = 1.5
 
     while (not exitchoice):
